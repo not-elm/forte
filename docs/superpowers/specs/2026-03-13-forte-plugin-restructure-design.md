@@ -12,6 +12,10 @@ Restructure the forte project from an informal skill collection nested under `~/
 
 Forte is notelm's personal collection of Claude Code skills (code-review-board, codex-investigate, codex-review, discussion-board). Currently it lacks the metadata files required for Claude Code plugin registration and uses a non-standard directory layout (`plugins/` instead of `skills/`). The goal is to make it installable via `https://github.com/not-elm/forte.git`.
 
+## Prerequisites
+
+- The GitHub repository `https://github.com/not-elm/forte.git` must exist (create it if it doesn't).
+
 ## Design
 
 ### Target Structure
@@ -35,6 +39,8 @@ Forte is notelm's personal collection of Claude Code skills (code-review-board, 
 └── LICENSE
 ```
 
+Note: The `docs/` directory used during design is not part of the final structure and will be removed after implementation.
+
 ### plugin.json
 
 ```json
@@ -45,32 +51,31 @@ Forte is notelm's personal collection of Claude Code skills (code-review-board, 
   "author": {
     "name": "notelm"
   },
+  "repository": "https://github.com/not-elm/forte.git",
   "license": "MIT"
 }
 ```
 
 ### marketplace.json
 
+Follows the reference format from the superpowers plugin. The `source` is `"./"` because the marketplace.json lives inside the plugin repo itself.
+
 ```json
 {
   "name": "forte",
+  "description": "notelm's personal collection of Claude Code skills",
   "owner": {
     "name": "notelm"
-  },
-  "metadata": {
-    "description": "notelm's personal collection of Claude Code skills",
-    "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "forte",
-      "source": {
-        "source": "url",
-        "url": "https://github.com/not-elm/forte.git"
-      },
       "description": "notelm's personal collection of Claude Code skills",
       "version": "1.0.0",
-      "strict": true
+      "source": "./",
+      "author": {
+        "name": "notelm"
+      }
     }
   ]
 }
@@ -132,20 +137,21 @@ MIT license, copyright 2026 notelm.
 
 ### Git Remote
 
-Update origin to `https://github.com/not-elm/forte.git`.
+Set origin to `https://github.com/not-elm/forte.git`. Forte already has its own `.git` directory (it is an independent repo, not a subdirectory of the Zenn repo), so this is a `git remote set-url` or `git remote add` depending on whether a remote is already configured.
 
 ## Migration Steps
 
-1. Move the repo from `~/workspace/Zenn/forte/` to `~/workspace/forte/`
+1. Move the repo directory from `~/workspace/Zenn/forte/` to `~/workspace/forte/` (preserves `.git/` and all history)
 2. Rename `plugins/` to `skills/`
 3. Create `.claude-plugin/plugin.json`
 4. Create `.claude-plugin/marketplace.json`
 5. Create `LICENSE` (MIT)
 6. Replace `.gitignore`
 7. Update `CLAUDE.md`
-8. Update git remote to `https://github.com/not-elm/forte.git`
+8. Remove `docs/` directory (design-time artifact)
+9. Set git remote origin to `https://github.com/not-elm/forte.git`
 
-No changes to any SKILL.md files.
+No changes to any SKILL.md files — audited and confirmed they contain no references to the `plugins/` directory path.
 
 ## What Is NOT Changing
 
