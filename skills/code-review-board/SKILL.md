@@ -178,13 +178,13 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 | Status | Meaning |
 |--------|---------|
 | `setup` | Initial state. Leader is creating files and spawning reviewers. |
-| `reviewing` | Reviewers are analyzing code. Update with progress: `reviewing (3/8 completed)`. |
+| `reviewing` | Reviewers are analyzing code. Update with progress: `reviewing (3/7 completed)`. |
 | `cross-reviewing` | Leader has broadcast findings summary. Reviewers responding with cross-review input. |
 | `synthesizing` | Leader is reading all findings, deduplicating, and scoring. |
 | `reporting` | Leader is generating the Markdown report and terminal summary. |
 | `completed` | Review finished. Report generated, intermediate files cleaned up. |
 
-Update `Status` and `Phase` at each transition. During `reviewing`, also update with progress: `reviewing (3/8 completed)`.
+Update `Status` and `Phase` at each transition. During `reviewing`, also update with progress: `reviewing (3/7 completed)`.
 
 ---
 
@@ -206,7 +206,7 @@ Format: `[R-{PERSPECTIVE}-{NNN}]`
 
 | Level | Color | Description |
 |-------|-------|------------|
-| **Critical** | Red | Immediate fix required. Security vulnerabilities, data loss risk, panics. |
+| **Critical** | Red | Immediate fix required. Security vulnerabilities, data loss risk, crashes. |
 | **Major** | Yellow | Fix before release. Performance issues, significant design problems. |
 | **Minor** | Blue | Improvement recommended but not urgent. Naming, comments, minor redundancy. |
 | **Info** | Gray | Reference information, praise for good implementation. |
@@ -310,7 +310,7 @@ For **Minor** and **Info** (Evidence optional):
                        Stage 2 — Location overlap: file:line within ±5 lines AND same
                                  issue category → merge, adopt higher severity
                        Stage 3 — Semantic duplicate: different locations but same root
-                                 cause (e.g., repeated unwrap() pattern) → group as
+                                 cause (e.g., repeated missing-null-check pattern) → group as
                                  representative finding + "N similar occurrences" note
                        Apply cross-review duplicate notes from step 6.
 
@@ -415,16 +415,15 @@ For **Minor** and **Info** (Evidence optional):
 
 ### Correctness & Reliability Agent Checklist
 
-- Panic possibilities (`.unwrap()`, `.expect()`, array index access)
+- Crash / abort possibilities (unhandled null, unchecked access, out-of-bounds access)
 - Integer overflow, division by zero
-- Unhandled edge cases (empty collections, None, error paths)
-- Resource leaks (missing Drop impl, unclosed file handles)
+- Unhandled edge cases (empty collections, null/nil/None, error paths)
+- Resource leaks (unclosed handles, missing cleanup/dispose)
 - Logic errors (off-by-one, inverted conditions)
 - Concurrency bugs (deadlocks, race conditions, lock ordering)
-- Async correctness (cancellation, timeout, unawaited futures)
-- `unsafe` block invariants
-- Numeric conversion/precision issues (`as` casts, float edge cases)
-- React hook pitfalls (stale closures, dependency array mistakes) — TS targets only
+- Async correctness (cancellation, timeout, unawaited futures/promises)
+- Unsafe / FFI boundary invariants
+- Numeric conversion/precision issues (implicit casts, float edge cases)
 
 ### Spec Compliance & Testing Agent Checklist
 
@@ -448,7 +447,7 @@ For **Minor** and **Info** (Evidence optional):
 - DRY principle — but tolerate intentional duplication for clarity
 - Testability seams (DI, trait boundaries, mockability)
 - Unnecessary abstraction / premature generalization
-- engine/core/ui/sdk boundary enforcement
+- Module/layer boundary enforcement
 
 ### Security Agent Checklist
 
@@ -463,13 +462,13 @@ For **Minor** and **Info** (Evidence optional):
 
 ### Performance Agent Checklist
 
-- Unnecessary allocations (`.clone()` overuse, String vs &str)
+- Unnecessary allocations (redundant copies, string duplication, boxing)
 - N+1 problems (queries/file I/O in loops)
-- Unnecessary copies (large struct move vs reference)
+- Unnecessary copies (large object copy vs reference/pointer)
 - Inefficient algorithms (O(n^2) that could be O(n log n))
 - Underutilized caching
 - Lock contention and sync bottlenecks
-- React re-render churn and memoization opportunities — TS targets only
+- Unnecessary re-renders / recomputations in UI frameworks
 - Startup/load-time regressions
 
 ### Codex Holistic Review Agent Checklist
@@ -596,23 +595,23 @@ Full report: docs/reviews/{review-id}-review.md
 
 ---
 
-## Example: Reviewing a Speech Module
+## Example: Reviewing an API Module
 
 ```
-Target: crates/homunculus_api/src/speech/
-Spec: docs/plans/2026-03-01-speech-design.md
+Target: src/api/
+Spec: docs/plans/api-design.md
 
 === SETUP PHASE ===
 
 1. Leader parses arguments:
-   - Target files: timeline.rs, mod.rs, types.rs
-   - Spec: docs/plans/2026-03-01-speech-design.md
+   - Target files: routes.ts, middleware.ts, types.ts
+   - Spec: docs/plans/api-design.md
    - --perspectives: not specified (all active)
-   - Review ID: 2026-03-01-speech
+   - Review ID: 2026-03-01-api
 
-2. Leader creates docs/reviews/2026-03-01-speech/ directory:
-   - docs/reviews/2026-03-01-speech/SYNTHESIS.md
-   - docs/reviews/2026-03-01-speech/findings/ (empty directory)
+2. Leader creates docs/reviews/2026-03-01-api/ directory:
+   - docs/reviews/2026-03-01-api/SYNTHESIS.md
+   - docs/reviews/2026-03-01-api/findings/ (empty directory)
 
 3. Leader creates team "code-review", spawns 7 reviewer agents.
    Each reviewer writes to their own findings/{perspective}.md file.
@@ -622,27 +621,27 @@ Spec: docs/plans/2026-03-01-speech-design.md
 
 4. Reviewers work in parallel, each writing to their own file:
 
-   readability completes (1/8):
-   → Leader displays: "1/8 reviewers completed — Readability: 0 Critical, 1 Major, 2 Minor"
+   readability completes (1/7):
+   → Leader displays: "1/7 reviewers completed — Readability: 0 Critical, 1 Major, 2 Minor"
 
-   correctness completes (2/8):
-   → Leader displays: "2/8 reviewers completed — Correctness: 1 Critical, 1 Major"
+   correctness completes (2/7):
+   → Leader displays: "2/7 reviewers completed — Correctness: 1 Critical, 1 Major"
 
    (reviewers continue completing, leader displays progress for each...)
 
    After 4 minutes, leader sends reminder to any unresponsive reviewers.
-   All 8 complete within 5 minutes.
+   All 7 complete within 5 minutes.
 
 === CROSS-REVIEW PHASE ===
 
 5. Leader reads all findings/*.md, composes summary:
-   "timeline.rs: [R-CR-001] Critical, [R-RD-001] Major, [R-PF-001] Major, [R-BV-001] Minor
-    mod.rs: [R-CR-002] Major, [R-SC-001] Minor
-    types.rs: [R-SP-001] Minor, [R-SP-002] Info"
+   "routes.ts: [R-CR-001] Critical, [R-RD-001] Major, [R-PF-001] Major
+    middleware.ts: [R-CR-002] Major, [R-SC-001] Minor
+    types.ts: [R-SP-001] Minor, [R-SP-002] Info"
 
    Broadcasts to all reviewers. Responses within 2 minutes:
    - correctness: "CROSS-REVIEW: duplicates=[R-CR-001=R-SC-001], missed=[]"
-   - performance: "CROSS-REVIEW: duplicates=[], missed=[timeline.rs:45 allocates Vec in loop]"
+   - performance: "CROSS-REVIEW: duplicates=[], missed=[routes.ts:45 allocates new array in loop]"
 
 === SYNTHESIZING PHASE ===
 
@@ -651,7 +650,7 @@ Spec: docs/plans/2026-03-01-speech-design.md
    Severity calibration:
    - [R-RD-002] Major "function length 60 lines" → calibrated: Major→Minor
      (reason: architecture rated 80-line function as Minor; applying consistent threshold)
-   - [R-PF-002] Critical "clone in hot path" → no Evidence provided
+   - [R-PF-002] Critical "redundant copy in hot path" → no Evidence provided
      → calibrated: Critical→Minor (reason: no Evidence)
 
    3-stage deduplication:
@@ -670,20 +669,20 @@ Spec: docs/plans/2026-03-01-speech-design.md
    | Performance | 87 | B+ | 0 | 1 | 1 | 0 |
    | Codex Holistic | 84 | B | 0 | 1 | 2 | 1 |
 
-   Overall: 89 → B+
+   Overall: 87 → B+
 
 === REPORTING PHASE ===
 
-7. Leader generates docs/reviews/2026-03-01-speech-review.md
+7. Leader generates docs/reviews/2026-03-01-api-review.md
    with severity-grouped checklists and file summary.
-   Deletes docs/reviews/2026-03-01-speech/findings/ and SYNTHESIS.md.
-   Removes docs/reviews/2026-03-01-speech/ directory.
+   Deletes docs/reviews/2026-03-01-api/findings/ and SYNTHESIS.md.
+   Removes docs/reviews/2026-03-01-api/ directory.
    Displays terminal summary with Critical/Major findings.
 
 === COMPLETED ===
 
 8. Leader sends shutdown requests, deletes team.
-   Reports to user: "Code review complete. Report: docs/reviews/2026-03-01-speech-review.md"
+   Reports to user: "Code review complete. Report: docs/reviews/2026-03-01-api-review.md"
 ```
 
 ---
