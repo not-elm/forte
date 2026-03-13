@@ -136,32 +136,18 @@ Reviewers append findings using the Finding Format (see Entry ID System). No oth
 
 ### WHITEBOARD.md Template
 
-WHITEBOARD.md uses per-member write zones. Each reviewer writes only within their own `### {perspective}` subsection under each `## Debate Round N` and `## Solutions` section. The leader creates this file during setup with sections for all active perspectives (after `--perspectives` filtering).
+WHITEBOARD.md uses per-member write zones. Each reviewer writes only within their own `### {perspective}` subsection under `## Debate` and `## Solutions` sections. Reviewers add `#### Round 1`, `#### Round 2` headers within their own `### {perspective}` subsection. The leader creates this file during setup with sections for all active perspectives (after `--perspectives` filtering).
 
 ```markdown
-# WHITEBOARD
+# WHITEBOARD — {review-id}
+> Target: {target paths}
+> Rounds: {N}
 
 ## Findings Summary
 
 > Leader populates this section with a summary of all findings after the reviewing phase.
 
-## Debate Round 1
-
-### readability
-
-### correctness
-
-### spec-compliance
-
-### architecture
-
-### security
-
-### performance
-
-### codex-reviewer
-
-## Debate Round 2
+## Debate
 
 ### readability
 
@@ -310,9 +296,9 @@ Format: `[D-{XX}-R{round}-{NNN}]`
 Each debate entry must include a label: **agree**, **disagree**, or **revise**, followed by a reference to the finding being discussed.
 
 ```markdown
-- [D-CR-R1-001] **agree** [R-SC-001] | The null dereference is a genuine crash risk. Our correctness analysis confirms this path is reachable.
-- [D-PF-R1-001] **disagree** [R-CR-002] | The allocation is on a cold path called once at startup. Not a real performance concern.
-- [D-AR-R1-001] **revise** [R-RD-003] | Agree the function is too long, but the root cause is mixing validation and transformation — should be split by responsibility, not just length.
+- [D-CR-R1-001] **agree** refs=[R-SC-001] | The null dereference is a genuine crash risk. Our correctness analysis confirms this path is reachable.
+- [D-PF-R1-001] **disagree** refs=[R-CR-002] | The allocation is on a cold path called once at startup. Not a real performance concern.
+- [D-AR-R1-001] **revise** refs=[R-RD-003] | Agree the function is too long, but the root cause is mixing validation and transformation — should be split by responsibility, not just length.
 ```
 
 **Debate entry rules:**
@@ -328,21 +314,21 @@ The leader tallies debate entries during synthesis to determine finding outcomes
 - **Tally scope:** Count agree, disagree, and revise entries across all rounds for each finding.
 - **Minimum threshold:** A finding needs reactions from at least 2 different reviewers (not counting the author) for the tally to apply. Findings below threshold keep their original severity.
 - **Finding author rule:** The finding author's perspective is excluded from the tally (they cannot vote on their own finding).
+- **Revise handling:** `revise` counts as `disagree` for majority calculation (but the proposed revision is recorded separately for severity calibration).
 - **Tally interpretation:**
-  - **Agree majority** (agree > disagree): Finding is confirmed. Severity unchanged or upgraded if multiple reviewers emphasize urgency.
-  - **Disagree majority** (disagree > agree): Finding is disputed. Downgrade one severity level (Critical→Major, Major→Minor, Minor→Info).
-  - **Tie** (agree = disagree): Finding keeps original severity; note as "contested" in report.
-  - **Revise entries** count as partial agree — they confirm the issue exists but suggest reframing. Count as 0.5 agree for tally purposes.
-- **No consensus:** Findings with no debate entries (no one reacted) keep their original severity unchanged.
+  - **Agree majority** = agree count > (disagree + revise) count among responding reviewers → severity maintained
+  - **Disagree majority** = (disagree + revise) count > agree count among responding reviewers → severity adjustment or exclusion considered during synthesizing
+  - **Tie** = treated as "no consensus" → finding passes through unchanged
+- **No consensus** (tie or fewer than 2 reactions): Finding passes through at original severity. No debate-based calibration applied.
 
 ### Debate Result Integration
 
 After tallying, the leader applies results during synthesis:
 
-- **Consensus (confirmed):** Finding keeps or gains severity. Note "confirmed by debate" in report.
-- **Dispute (downgraded):** Finding severity reduced one level. Note "disputed in debate" in Severity Calibration Log.
-- **Revision:** Finding description updated to incorporate revise suggestions. Note "revised per debate" in report.
-- **No consensus:** Finding unchanged. No annotation needed.
+- **Consensus (agree majority)** → Severity maintained
+- **Dispute (disagree majority)** → Severity adjustment or finding exclusion considered during synthesizing
+- **Revision proposed (revise entries)** → Severity change recorded in calibration log with the proposed revision as rationale
+- **No consensus** → Finding passes through unchanged
 
 ### Early Termination
 
@@ -358,8 +344,9 @@ Format: `[S-{XX}-{NNN}]`
 Each solution entry must reference one or more finding IDs it addresses.
 
 ```markdown
-- [S-CR-001] refs [R-SC-001], [R-CR-002] | Add null check at `api.ts:45` before accessing `user.role`. Wrap in try-catch for the downstream call at `api.ts:52`.
-- [S-AR-001] refs [R-RD-003] | Extract validation logic into `validateRequest()` and transformation into `transformPayload()`. Reduces function from 80 lines to ~30 each.
+- [S-CR-001] refs=[R-SC-001], [R-CR-002] | Add null check at `api.ts:45` before accessing `user.role`. Wrap in try-catch for the downstream call at `api.ts:52`.
+  > Example: `if (!user?.role) throw new AuthError('missing role');`
+- [S-AR-001] refs=[R-RD-003] | Extract validation logic into `validateRequest()` and transformation into `transformPayload()`. Reduces function from 80 lines to ~30 each.
 ```
 
 **Solution entry rules:**
@@ -370,11 +357,11 @@ Each solution entry must reference one or more finding IDs it addresses.
 
 ### Entry ID Summary
 
-| Type | Format | Written By | Written Where |
-|------|--------|-----------|---------------|
-| Finding | `[R-{XX}-{NNN}]` | Reviewer (own perspective) | `findings/{perspective}.md` |
-| Debate | `[D-{XX}-R{round}-{NNN}]` | Reviewer (reacting to others) | WHITEBOARD.md per-member zone |
-| Solution | `[S-{XX}-{NNN}]` | Reviewer (proposing fix) | WHITEBOARD.md per-member zone |
+| Type | Format | File | Phase |
+|------|--------|------|-------|
+| Finding | `[R-{XX}-{NNN}]` | `findings/{perspective}.md` | reviewing |
+| Debate | `[D-{XX}-R{round}-{NNN}]` | WHITEBOARD.md | debating |
+| Solution | `[S-{XX}-{NNN}]` | WHITEBOARD.md | resolving |
 
 ---
 
