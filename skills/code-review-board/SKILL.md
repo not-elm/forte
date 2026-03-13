@@ -8,7 +8,7 @@ description: >-
 
 # Code Review Board — Multi-Perspective Team Code Review
 
-Perform comprehensive code review from 8 perspectives using parallel reviewer agents. Each agent writes findings to their own `findings/{perspective}.md` file, and the leader synthesizes results into an interactive HTML dashboard report.
+Perform comprehensive code review from 8 perspectives using parallel reviewer agents. Each agent writes findings to their own `findings/{perspective}.md` file, and the leader synthesizes results into a Markdown report with checklists for tracking fixes.
 
 ## When to Use
 
@@ -59,7 +59,7 @@ setup → reviewing → cross-reviewing → synthesizing → reporting → compl
 | `reviewing` | All reviewers | Each reviewer analyzes code from their perspective, writes findings to `findings/{perspective}.md`, sends structured completion report to leader. Leader displays progress to user after each report. |
 | `cross-reviewing` | Leader + reviewers | Leader broadcasts findings summary. Each reviewer responds with duplicates found and missed issues from their perspective. |
 | `synthesizing` | Leader only | Leader reads all `findings/*.md`, applies 3-stage deduplication, calibrates severity, computes scores, writes to SYNTHESIS.md |
-| `reporting` | Leader only | Leader generates HTML dashboard report to `docs/reviews/YYYY-MM-DD-{target}-review.html`, opens in browser, deletes `findings/` and SYNTHESIS.md |
+| `reporting` | Leader only | Leader generates Markdown report to `docs/reviews/YYYY-MM-DD-{target}-review.md`, displays terminal summary, deletes `findings/` and SYNTHESIS.md |
 | `completed` | Leader only | Sends shutdown requests to all reviewers, cleans up team |
 
 ### Transition Triggers
@@ -68,7 +68,7 @@ setup → reviewing → cross-reviewing → synthesizing → reporting → compl
 - `reviewing` → `cross-reviewing`: All reviewers have reported completion (or timed out after 5 minutes). Leader sends reminder after 4 minutes to unresponsive reviewers.
 - `cross-reviewing` → `synthesizing`: All reviewers have responded to cross-review summary (or 2 minutes elapsed).
 - `synthesizing` → `reporting`: SYNTHESIS.md is complete with scores and deduplicated findings.
-- `reporting` → `completed`: HTML report generated, intermediate files cleaned up.
+- `reporting` → `completed`: Markdown report generated, intermediate files cleaned up.
 
 ---
 
@@ -104,7 +104,7 @@ docs/reviews/{review-id}/
 │   ├── security.md
 │   ├── performance.md
 │   └── codex-reviewer.md
-└── (HTML report generated here at end)
+└── (intermediate files, cleaned up after report generation)
 ```
 
 Ensure `docs/reviews/` is in `.gitignore`. Add if missing:
@@ -186,7 +186,7 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 | `reviewing` | Reviewers are analyzing code. Update with progress: `reviewing (3/8 completed)`. |
 | `cross-reviewing` | Leader has broadcast findings summary. Reviewers responding with cross-review input. |
 | `synthesizing` | Leader is reading all findings, deduplicating, and scoring. |
-| `reporting` | Leader is generating the HTML dashboard report. |
+| `reporting` | Leader is generating the Markdown report and terminal summary. |
 | `completed` | Review finished. Report generated, intermediate files cleaned up. |
 
 Update `Status` and `Phase` at each transition. During `reviewing`, also update with progress: `reviewing (3/8 completed)`.
@@ -343,13 +343,13 @@ For **Minor** and **Info** (Evidence optional):
                     e. Populate SYNTHESIS.md tables.
 
  8. REPORT        → Update SYNTHESIS.md: Phase → "reporting"
-                    Generate HTML dashboard report (see HTML Report Template).
-                    Save to docs/reviews/{review-id}/{review-id}-review.html
+                    Generate Markdown report using Markdown Report Template.
+                    Save directly to docs/reviews/{review-id}-review.md (not inside the subdirectory).
                     Delete docs/reviews/{review-id}/findings/ directory.
                     Delete docs/reviews/{review-id}/SYNTHESIS.md.
-                    Move HTML report to docs/reviews/{review-id}-review.html.
                     Delete docs/reviews/{review-id}/ directory.
-                    Open in browser with: open docs/reviews/{review-id}-review.html
+                    Display terminal summary to user (see Terminal Output Format).
+                    Report file path to user.
 
  9. SHUTDOWN      → Send shutdown_request to all reviewers.
                     Delete team with TeamDelete.
@@ -503,193 +503,118 @@ For **Minor** and **Info** (Evidence optional):
 
 ---
 
-## HTML Report Template
+## Markdown Report Template
 
-The leader generates a single-file HTML report with all CSS and JS inline. The report structure:
+The leader generates a Markdown report file. The report structure:
 
-### Document Structure
+```markdown
+# Code Review Report
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Code Review Report — {target}</title>
-  <style>
-    /* All CSS inline — see CSS section below */
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Code Review Report</h1>
-    <p class="meta">{YYYY-MM-DD} | Target: <code>{target paths}</code></p>
-    <p class="meta">Spec: <code>{spec path or "none"}</code></p>
-  </header>
+> Date: {YYYY-MM-DD}
+> Target: `{target paths}`
+> Spec: `{spec path or "none"}`
 
-  <section id="filters">
-    <h3>Filters</h3>
-    <div class="filter-group">
-      <label>Severity:</label>
-      <button class="filter-btn active" data-filter="severity" data-value="critical">Critical</button>
-      <button class="filter-btn active" data-filter="severity" data-value="major">Major</button>
-      <button class="filter-btn active" data-filter="severity" data-value="minor">Minor</button>
-      <button class="filter-btn active" data-filter="severity" data-value="info">Info</button>
-    </div>
-    <div class="filter-group">
-      <label>Perspective:</label>
-      <!-- One button per active perspective -->
-      <button class="filter-btn active" data-filter="perspective" data-value="{perspective}">{Perspective Name}</button>
-    </div>
-    <div class="filter-group">
-      <label>File:</label>
-      <input type="text" id="file-filter" placeholder="Filter by file path..." />
-    </div>
-    <div class="filter-group">
-      <label>Sort:</label>
-      <select id="sort-select">
-        <option value="severity">By Severity</option>
-        <option value="file">By File</option>
-        <option value="perspective">By Perspective</option>
-      </select>
-    </div>
-  </section>
+## Overall Score
 
-  <section id="overall">
-    <div class="score-card overall">
-      <div class="grade">{letter grade}</div>
-      <div class="score">{score}/100</div>
-    </div>
-    <div class="severity-cards">
-      <div class="card critical">{N} Critical</div>
-      <div class="card major">{N} Major</div>
-      <div class="card minor">{N} Minor</div>
-      <div class="card info">{N} Info</div>
-    </div>
-  </section>
+**{letter grade}** ({score}/100)
 
-  <section id="perspectives">
-    <h2>Perspective Scores</h2>
-    <table>
-      <tr><th>Perspective</th><th>Grade</th><th>Score</th><th>Bar</th></tr>
-      <tr>
-        <td>{perspective name}</td>
-        <td>{grade}</td>
-        <td>{score}/100</td>
-        <td><div class="bar" style="width:{score}%"></div></td>
-      </tr>
-    </table>
-  </section>
+| Metric | Count |
+|--------|-------|
+| Critical | {N} |
+| Major | {N} |
+| Minor | {N} |
+| Info | {N} |
 
-  <section id="findings">
-    <h2>Findings</h2>
-    <!-- All findings in a flat list with data attributes for filtering -->
-    <div class="finding {severity}" data-severity="{severity}" data-perspective="{perspective}" data-file="{file-path}">
-      <span class="id">[R-XX-001]</span>
-      <span class="severity-badge {severity}">{Severity}</span>
-      <span class="perspective-badge">{Perspective}</span>
-      <code class="location">{file}:{line}</code>
-      <p>{Description}</p>
-      <!-- Evidence block (if present) -->
-      <pre class="evidence">{code snippet}</pre>
-      <!-- Calibration note (if severity was adjusted) -->
-      <p class="calibration-note">Calibrated: {Original}→{New} — {reason}</p>
-    </div>
-  </section>
+## Perspective Scores
 
-  <section id="file-summary">
-    <h2>File-Level Summary</h2>
-    <table>
-      <tr><th>File</th><th>Critical</th><th>Major</th><th>Minor</th><th>Info</th></tr>
-    </table>
-  </section>
+| Perspective | Grade | Score | Critical | Major | Minor | Info |
+|-------------|-------|-------|----------|-------|-------|------|
+| {name} | {grade} | {score}/100 | {n} | {n} | {n} | {n} |
 
-  <section id="recommendations">
-    <h2>Top Recommendations</h2>
-    <ol>
-      <li><strong>[R-XX-NNN]</strong> — {action description}</li>
-    </ol>
-  </section>
+## File Summary
 
-  <footer>
-    <p>Generated by Code Review Board | {YYYY-MM-DD}</p>
-  </footer>
+| File | Critical | Major | Minor | Info |
+|------|----------|-------|-------|------|
+| `{file path}` | {n} | {n} | {n} | {n} |
 
-  <script>
-    // Filter toggle buttons
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        btn.classList.toggle('active');
-        applyFilters();
-      });
-    });
+## Findings
 
-    // File path filter
-    document.getElementById('file-filter').addEventListener('input', applyFilters);
+### Critical
 
-    // Sort select
-    document.getElementById('sort-select').addEventListener('change', applySort);
+- [ ] [R-XX-NNN] **Critical** | `{perspective}` | `{file}:{line}` | {Description}
+  > Evidence: `{code snippet}`
 
-    function applyFilters() {
-      const activeSeverities = new Set(
-        [...document.querySelectorAll('[data-filter="severity"].active')].map(b => b.dataset.value)
-      );
-      const activePerspectives = new Set(
-        [...document.querySelectorAll('[data-filter="perspective"].active')].map(b => b.dataset.value)
-      );
-      const fileQuery = document.getElementById('file-filter').value.toLowerCase();
+### Major
 
-      document.querySelectorAll('.finding').forEach(f => {
-        const matchSev = activeSeverities.has(f.dataset.severity);
-        const matchPersp = activePerspectives.has(f.dataset.perspective);
-        const matchFile = !fileQuery || f.dataset.file.toLowerCase().includes(fileQuery);
-        f.style.display = (matchSev && matchPersp && matchFile) ? '' : 'none';
-      });
-    }
+- [ ] [R-XX-NNN] **Major** | `{perspective}` | `{file}:{line}` | {Description}
+  > Evidence: `{code snippet}`
 
-    function applySort() {
-      const container = document.getElementById('findings');
-      const findings = [...container.querySelectorAll('.finding')];
-      const sortBy = document.getElementById('sort-select').value;
-      const severityOrder = {critical: 0, major: 1, minor: 2, info: 3};
+### Minor
 
-      findings.sort((a, b) => {
-        if (sortBy === 'severity') return severityOrder[a.dataset.severity] - severityOrder[b.dataset.severity];
-        if (sortBy === 'file') return a.dataset.file.localeCompare(b.dataset.file);
-        if (sortBy === 'perspective') return a.dataset.perspective.localeCompare(b.dataset.perspective);
-        return 0;
-      });
+- [ ] [R-XX-NNN] **Minor** | `{perspective}` | `{file}:{line}` | {Description}
 
-      const h2 = container.querySelector('h2');
-      findings.forEach(f => container.appendChild(f));
-    }
-  </script>
-</body>
-</html>
+### Info
+
+- [R-XX-NNN] **Info** | `{perspective}` | `{file}:{line}` | {Description}
+
+## Top Recommendations
+
+1. **[R-XX-NNN]** — {action description}
+2. ...
+
+## Calibration Log
+
+- [R-XX-NNN] calibrated: {Original}→{New} — {reason}
+
+---
+*Generated by Code Review Board | {YYYY-MM-DD}*
 ```
 
-### CSS Design Guidelines
+### Report Format Notes
 
-- **Color palette:** Clean, professional dashboard
-  - Background: `#f8f9fa`
-  - Cards: `#ffffff` with subtle shadow
-  - Critical: `#dc3545` (red)
-  - Major: `#ffc107` (amber)
-  - Minor: `#0d6efd` (blue)
-  - Info: `#6c757d` (gray)
-- **Typography:** System font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`)
-- **Layout:** Max-width `1200px`, centered
-- **Score card:** Large centered grade letter with score underneath
-- **Severity cards:** Horizontal flex row of 4 colored cards with counts
-- **Perspective table:** Full-width with progress bar in last column
-- **Responsive:** Single-column layout below `768px`
-- **Filter bar:** Sticky top bar with button toggles, search input, sort select
-  - Active filter buttons: filled color. Inactive: outline only.
-  - `.filter-btn.active` with perspective/severity color fill
-- **Evidence blocks:** `<pre class="evidence">` with `background: #f1f3f5`, `border-left: 3px solid #6c757d`, `font-size: 0.85em`, monospace
-- **Calibration notes:** `<p class="calibration-note">` with `color: #6c757d`, `font-style: italic`, `font-size: 0.85em`
-- **Findings:** Flat list (not grouped by `<details>`) with `data-*` attributes for filtering. Each finding card has severity color left border, perspective badge, and file location.
-- **Perspective badges:** Small colored pills showing which perspective found the issue
+- Critical/Major/Minor findings use `- [ ]` checkboxes for fix tracking. Users mark fixes as complete by editing: `- [x] [R-CR-001] ...`
+- Info findings use `- ` without checkbox (reference only, no fix needed)
+- Findings grouped by severity (Critical first), within each group sorted by perspective
+- Evidence shown as blockquote (`>`)
+- Calibrated findings show their **final** (post-calibration) severity in the findings section; calibration details appear only in the Calibration Log
+- File Summary table provides per-file severity counts
+
+### Perspective Enrichment
+
+Reviewer findings use the format `[R-XX-NNN] **Severity** | \`file:line\` | Description` (no perspective field). When generating the Markdown report, the leader adds the perspective name based on the entry ID prefix:
+
+| Prefix | Perspective (full name) |
+|--------|------------|
+| RD | Readability |
+| CR | Correctness & Reliability |
+| SP | Spec Compliance & Testing |
+| AR | Architecture |
+| BV | Bevy Architecture |
+| SC | Security |
+| PF | Performance |
+| CX | Codex Holistic Review |
+
+The leader maps the prefix to add `` `{perspective}` `` to each finding line in the report.
+
+---
+
+## Terminal Output Format
+
+After generating the Markdown report, the leader displays a summary to the terminal. Only Critical and Major findings are shown — Minor/Info are in the file.
+
+```
+## Code Review Complete — {grade} ({score}/100)
+
+Critical: {N} | Major: {N} | Minor: {N} | Info: {N}
+
+### Critical
+- [R-XX-NNN] `{file}:{line}` — {Description}
+
+### Major
+- [R-XX-NNN] `{file}:{line}` — {Description}
+
+Full report: docs/reviews/{review-id}-review.md
+```
 
 ---
 
@@ -772,16 +697,16 @@ Spec: docs/plans/2026-03-01-speech-design.md
 
 === REPORTING PHASE ===
 
-7. Leader generates docs/reviews/2026-03-01-speech-review.html
-   with interactive filters (severity, perspective, file) and Evidence blocks.
+7. Leader generates docs/reviews/2026-03-01-speech-review.md
+   with severity-grouped checklists and file summary.
    Deletes docs/reviews/2026-03-01-speech/findings/ and SYNTHESIS.md.
    Removes docs/reviews/2026-03-01-speech/ directory.
-   Opens: open docs/reviews/2026-03-01-speech-review.html
+   Displays terminal summary with Critical/Major findings.
 
 === COMPLETED ===
 
 8. Leader sends shutdown requests, deletes team.
-   Reports to user: "Code review complete. Report: docs/reviews/2026-03-01-speech-review.html"
+   Reports to user: "Code review complete. Report: docs/reviews/2026-03-01-speech-review.md"
 ```
 
 ---
