@@ -25,6 +25,7 @@ Perform comprehensive code review from 7 perspectives using parallel reviewer ag
 - `target` (required): File paths or directory paths to review (space-separated)
 - `--spec <path>` (optional): Specification document file path for spec compliance checks
 - `--perspectives <list>` (optional): Comma-separated list of perspectives to include or exclude. Prefix with `-` to exclude. Default: all applicable perspectives.
+- `--rounds <N>` (optional): Number of debate rounds. Default: 2. Set to 0 to skip debate phase entirely.
 
 **Examples:**
 ```
@@ -32,15 +33,17 @@ Perform comprehensive code review from 7 perspectives using parallel reviewer ag
 /code-review src/api/ --spec docs/plans/api-design.md
 /code-review src/api/ --perspectives security,correctness,performance
 /code-review src/api/ --perspectives -codex-reviewer
+/code-review src/api/ --rounds 3
+/code-review src/api/ --rounds 0
 ```
 
 ## Core Principles
 
 1. **Review-centric** — The board revolves around a set of target files/directories. All findings reference specific file locations.
-2. **Individual file model** — Each reviewer writes to their own `findings/{perspective}.md`. Leader reads all files during synthesize and generates a unified view. No shared WHITEBOARD.md.
+2. **Individual file model + WHITEBOARD.md** — Each reviewer writes findings to their own `findings/{perspective}.md`. For debate and solutions, reviewers write to per-member `### {perspective}` subsections in a shared WHITEBOARD.md. Leader reads all files during synthesize and generates a unified view.
 3. **Leader-only SYNTHESIS.md** — Reviewers can read SYNTHESIS.md but never write to it.
 4. **Append-only** — Reviewers add findings, never delete or modify existing entries.
-5. **Two-pass workflow** — Reviewers analyze independently in parallel (pass 1), then respond to leader's cross-review summary (pass 2). Leader synthesizes all input.
+5. **Multi-pass workflow** — Reviewers analyze independently in parallel (pass 1), debate findings validity across N rounds (pass 2), then propose solutions (pass 3). Leader synthesizes all input.
 6. **Evidence-backed findings** — Critical and Major findings require concrete code evidence. Findings without evidence are downgraded.
 7. **Explicit state management** — SYNTHESIS.md tracks `Status` and `Phase` for progress visibility, matching discussion-board patterns.
 
@@ -49,23 +52,25 @@ Perform comprehensive code review from 7 perspectives using parallel reviewer ag
 ## Phase Model
 
 ```
-setup → reviewing → cross-reviewing → synthesizing → reporting → completed
+setup → reviewing → debating (N rounds) → resolving → synthesizing → reporting → completed
 ```
 
 | Phase | Who Acts | What Happens |
 |-------|----------|--------------|
-| `setup` | Leader | Parse arguments, identify target files, create `docs/reviews/{review-id}/` directory with SYNTHESIS.md and `findings/` subdirectory, create team, spawn reviewers |
+| `setup` | Leader | Parse arguments (including `--rounds`), identify target files, create `docs/reviews/{review-id}/` directory with SYNTHESIS.md, WHITEBOARD.md, and `findings/` subdirectory, create team, spawn reviewers |
 | `reviewing` | All reviewers | Each reviewer analyzes code from their perspective, writes findings to `findings/{perspective}.md`, sends structured completion report to leader. Leader displays progress to user after each report. |
-| `cross-reviewing` | Leader + reviewers | Leader broadcasts findings summary. Each reviewer responds with duplicates found and missed issues from their perspective. |
-| `synthesizing` | Leader only | Leader reads all `findings/*.md`, applies 3-stage deduplication, calibrates severity, computes scores, writes to SYNTHESIS.md |
-| `reporting` | Leader only | Leader generates Markdown report to `docs/reviews/YYYY-MM-DD-{target}-review.md`, displays terminal summary, deletes `findings/` and SYNTHESIS.md |
+| `debating` | All reviewers | Reviewers write reactions to other perspectives' findings in WHITEBOARD.md per-member write zones. Multiple rounds (default 2, configurable via `--rounds`). Leader manages round transitions. |
+| `resolving` | All reviewers | Each reviewer proposes solutions for confirmed findings in WHITEBOARD.md `## Solutions` section. Single pass. |
+| `synthesizing` | Leader only | Leader reads all `findings/*.md` and WHITEBOARD.md, applies debate tally, calibrates severity, deduplicates, consolidates solutions, computes scores, writes to SYNTHESIS.md |
+| `reporting` | Leader only | Leader generates Markdown report to `docs/reviews/YYYY-MM-DD-{target}-review.md` (with Solution lines and Debate Summary), displays terminal summary, deletes intermediate files |
 | `completed` | Leader only | Sends shutdown requests to all reviewers, cleans up team |
 
 ### Transition Triggers
 
 - `setup` → `reviewing`: All reviewers spawned and tasks assigned.
-- `reviewing` → `cross-reviewing`: All reviewers have reported completion (or timed out after 5 minutes). Leader sends reminder after 4 minutes to unresponsive reviewers.
-- `cross-reviewing` → `synthesizing`: All reviewers have responded to cross-review summary (or 2 minutes elapsed).
+- `reviewing` → `debating`: All reviewers have reported completion (or timed out after 5 minutes). Leader sends reminder after 4 minutes to unresponsive reviewers.
+- `debating` → next round or `resolving`: Each round completes when all reviewers report (or timeout at 3 min, reminder at 2 min). After final round (or early termination), proceed to `resolving`.
+- `resolving` → `synthesizing`: All reviewers have reported solution proposals (or timeout at 3 min, reminder at 2 min).
 - `synthesizing` → `reporting`: SYNTHESIS.md is complete with scores and deduplicated findings.
 - `reporting` → `completed`: Markdown report generated, intermediate files cleaned up.
 
@@ -93,6 +98,7 @@ Create at `docs/reviews/{review-id}/` where `{review-id}` is `YYYY-MM-DD-{target
 ```
 docs/reviews/{review-id}/
 ├── SYNTHESIS.md          (leader-only)
+├── WHITEBOARD.md         (per-member write zones)
 ├── findings/
 │   ├── readability.md
 │   ├── correctness.md
@@ -108,6 +114,7 @@ Ensure `docs/reviews/` is in `.gitignore`. Add if missing:
 ```
 docs/reviews/*/findings/
 docs/reviews/*/SYNTHESIS.md
+docs/reviews/*/WHITEBOARD.md
 ```
 
 ### Individual Finding File Template
@@ -126,6 +133,68 @@ Each reviewer's `findings/{perspective}.md`:
 ```
 
 Reviewers append findings using the Finding Format (see Entry ID System). No other structure needed — each reviewer owns their entire file.
+
+### WHITEBOARD.md Template
+
+WHITEBOARD.md uses per-member write zones. Each reviewer writes only within their own `### {perspective}` subsection under each `## Debate Round N` and `## Solutions` section. The leader creates this file during setup with sections for all active perspectives (after `--perspectives` filtering).
+
+```markdown
+# WHITEBOARD
+
+## Findings Summary
+
+> Leader populates this section with a summary of all findings after the reviewing phase.
+
+## Debate Round 1
+
+### readability
+
+### correctness
+
+### spec-compliance
+
+### architecture
+
+### security
+
+### performance
+
+### codex-reviewer
+
+## Debate Round 2
+
+### readability
+
+### correctness
+
+### spec-compliance
+
+### architecture
+
+### security
+
+### performance
+
+### codex-reviewer
+
+## Solutions
+
+### readability
+
+### correctness
+
+### spec-compliance
+
+### architecture
+
+### security
+
+### performance
+
+### codex-reviewer
+```
+
+**Timeout differences:** Reviewing phase uses 5-minute timeout with 4-minute reminder. Debating and resolving phases use 3-minute timeout with 2-minute reminder (shorter because reviewers are reacting to known findings, not performing fresh analysis).
 
 ---
 
@@ -166,7 +235,10 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 
 ## Severity Calibration Log
 
-## Cross-Review Notes
+## Debate Tally
+
+| Finding | Agree | Disagree | Revise | Result |
+|---------|-------|----------|--------|--------|
 
 ## Top Recommendations
 
@@ -179,12 +251,13 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 |--------|---------|
 | `setup` | Initial state. Leader is creating files and spawning reviewers. |
 | `reviewing` | Reviewers are analyzing code. Update with progress: `reviewing (3/7 completed)`. |
-| `cross-reviewing` | Leader has broadcast findings summary. Reviewers responding with cross-review input. |
-| `synthesizing` | Leader is reading all findings, deduplicating, and scoring. |
+| `debating` | Reviewers are debating findings validity. Update with round: `debating (round 1/2, 4/7 completed)`. |
+| `resolving` | Reviewers are proposing solutions for confirmed findings. |
+| `synthesizing` | Leader is reading all findings, applying debate tally, deduplicating, and scoring. |
 | `reporting` | Leader is generating the Markdown report and terminal summary. |
 | `completed` | Review finished. Report generated, intermediate files cleaned up. |
 
-Update `Status` and `Phase` at each transition. During `reviewing`, also update with progress: `reviewing (3/7 completed)`.
+Update `Status` and `Phase` at each transition. During `reviewing`, update with progress: `reviewing (3/7 completed)`. During `debating`, update with round and progress: `debating (round 1/2, 4/7 completed)`.
 
 ---
 
@@ -225,6 +298,83 @@ For **Minor** and **Info** (Evidence optional):
 ```
 
 **Evidence rule:** Critical/Major findings without an Evidence line are downgraded to Minor by the leader during severity calibration.
+
+### Debate Entry Format
+
+Format: `[D-{XX}-R{round}-{NNN}]`
+
+- `{XX}` — Perspective code of the reviewer writing the debate entry (not the finding author)
+- `R{round}` — Debate round number (R1, R2, etc.)
+- `{NNN}` — Sequential number within the reviewer's debate entries for that round
+
+Each debate entry must include a label: **agree**, **disagree**, or **revise**, followed by a reference to the finding being discussed.
+
+```markdown
+- [D-CR-R1-001] **agree** [R-SC-001] | The null dereference is a genuine crash risk. Our correctness analysis confirms this path is reachable.
+- [D-PF-R1-001] **disagree** [R-CR-002] | The allocation is on a cold path called once at startup. Not a real performance concern.
+- [D-AR-R1-001] **revise** [R-RD-003] | Agree the function is too long, but the root cause is mixing validation and transformation — should be split by responsibility, not just length.
+```
+
+**Debate entry rules:**
+- Reviewers may only react to findings from **other** perspectives (not their own).
+- Each debate entry must reference exactly one finding ID.
+- Debate entries are append-only within the reviewer's write zone.
+- Reviewers should prioritize reacting to Critical and Major findings first.
+
+### Debate Tally Rules
+
+The leader tallies debate entries during synthesis to determine finding outcomes.
+
+- **Tally scope:** Count agree, disagree, and revise entries across all rounds for each finding.
+- **Minimum threshold:** A finding needs reactions from at least 2 different reviewers (not counting the author) for the tally to apply. Findings below threshold keep their original severity.
+- **Finding author rule:** The finding author's perspective is excluded from the tally (they cannot vote on their own finding).
+- **Tally interpretation:**
+  - **Agree majority** (agree > disagree): Finding is confirmed. Severity unchanged or upgraded if multiple reviewers emphasize urgency.
+  - **Disagree majority** (disagree > agree): Finding is disputed. Downgrade one severity level (Critical→Major, Major→Minor, Minor→Info).
+  - **Tie** (agree = disagree): Finding keeps original severity; note as "contested" in report.
+  - **Revise entries** count as partial agree — they confirm the issue exists but suggest reframing. Count as 0.5 agree for tally purposes.
+- **No consensus:** Findings with no debate entries (no one reacted) keep their original severity unchanged.
+
+### Debate Result Integration
+
+After tallying, the leader applies results during synthesis:
+
+- **Consensus (confirmed):** Finding keeps or gains severity. Note "confirmed by debate" in report.
+- **Dispute (downgraded):** Finding severity reduced one level. Note "disputed in debate" in Severity Calibration Log.
+- **Revision:** Finding description updated to incorporate revise suggestions. Note "revised per debate" in report.
+- **No consensus:** Finding unchanged. No annotation needed.
+
+### Early Termination
+
+If all debate entries in a round are **agree** (no disagree or revise entries from any reviewer), the leader may skip remaining rounds and proceed directly to `resolving`. This avoids redundant rounds when reviewers are in full agreement.
+
+### Solution Entry Format
+
+Format: `[S-{XX}-{NNN}]`
+
+- `{XX}` — Perspective code of the reviewer proposing the solution
+- `{NNN}` — Sequential number within the reviewer's solution entries
+
+Each solution entry must reference one or more finding IDs it addresses.
+
+```markdown
+- [S-CR-001] refs [R-SC-001], [R-CR-002] | Add null check at `api.ts:45` before accessing `user.role`. Wrap in try-catch for the downstream call at `api.ts:52`.
+- [S-AR-001] refs [R-RD-003] | Extract validation logic into `validateRequest()` and transformation into `transformPayload()`. Reduces function from 80 lines to ~30 each.
+```
+
+**Solution entry rules:**
+- Each solution must reference at least one finding ID.
+- Solutions may reference findings from any perspective (including the reviewer's own).
+- Multiple reviewers may propose different solutions for the same finding — the leader consolidates during synthesis.
+- Solutions are append-only within the reviewer's write zone.
+
+### Entry ID Summary
+
+| Type | Format | Written By | Written Where |
+|------|--------|-----------|---------------|
+| Finding | `[R-{XX}-{NNN}]` | Reviewer (own perspective) | `findings/{perspective}.md` |
+| Debate | `[D-{XX}-R{round}-{NNN}]` | Reviewer (reacting to others) | WHITEBOARD.md per-member zone |
+| Solution | `[S-{XX}-{NNN}]` | Reviewer (proposing fix) | WHITEBOARD.md per-member zone |
 
 ---
 
