@@ -200,22 +200,6 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 
 ---
 
-## Perspective Scores
-
-| Perspective | Score | Grade | Critical | Major | Minor |
-|-------------|-------|-------|----------|-------|-------|
-
-## Overall Score
-
-| Field | Value |
-|-------|-------|
-| Score | — |
-| Grade | — |
-| Total Findings | — |
-| Critical | — |
-| Major | — |
-| Minor | — |
-
 ## Deduplicated Findings
 
 ## Severity Calibration Log
@@ -238,7 +222,7 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 | `reviewing` | Reviewers are analyzing code. Update with progress: `reviewing (3/7 completed)`. |
 | `debating` | Reviewers are debating findings validity. Update with round: `debating (round 1/2, 4/7 completed)`. |
 | `resolving` | Reviewers are proposing solutions for confirmed findings. |
-| `synthesizing` | Leader is reading all findings, applying debate tally, deduplicating, and scoring. |
+| `synthesizing` | Leader is reading all findings, applying debate tally, and deduplicating. |
 | `reporting` | Leader is generating the Markdown report and terminal summary. |
 | `completed` | Review finished. Report generated, intermediate files cleaned up. |
 
@@ -486,24 +470,7 @@ Each solution entry must reference one or more finding IDs it addresses.
                                  representative finding + "N similar occurrences" note
                        Apply debate tally duplicate notes from step 6.
 
-                    c. SCORING: For each perspective:
-                       - Count deduplicated findings by severity
-                       - Score 0-100: Start at 100
-                         Critical: -20 per finding
-                         Major: -10 per finding
-                         Minor: -3 per finding
-                         Minimum score: 0
-                       - Convert to letter grade:
-                         97-100=A+, 93-96=A, 90-92=A-,
-                         87-89=B+, 83-86=B, 80-82=B-,
-                         77-79=C+, 73-76=C, 70-72=C-,
-                         67-69=D+, 63-66=D, 60-62=D-,
-                         0-59=F
-                       Overall = simple average of active perspective scores
-                       (exclude timed-out perspectives without fallback).
-
-                    d. Write top 5 recommendations (highest severity first).
-                    e. Populate SYNTHESIS.md tables.
+                    c. Write top 5 recommendations (highest severity first).
 
                     Additional inputs: WHITEBOARD.md ## Debate and ## Solutions.
                     a. Severity calibration now includes debate evidence:
@@ -684,22 +651,6 @@ The leader generates a Markdown report file. The report structure:
 > Target: `{target paths}`
 > Spec: `{spec path or "none"}`
 
-## Overall Score
-
-**{letter grade}** ({score}/100)
-
-| Metric | Count |
-|--------|-------|
-| Critical | {N} |
-| Major | {N} |
-| Minor | {N} |
-
-## Perspective Scores
-
-| Perspective | Grade | Score | Critical | Major | Minor |
-|-------------|-------|-------|----------|-------|-------|
-| {name} | {grade} | {score}/100 | {n} | {n} | {n} |
-
 ## File Summary
 
 | File | Critical | Major | Minor |
@@ -777,7 +728,7 @@ The leader maps the prefix to add `` `{perspective}` `` to each finding line in 
 After generating the Markdown report, the leader displays a summary to the terminal. Only Critical and Major findings are shown — Minor are in the file.
 
 ```
-## Code Review Complete — {grade} ({score}/100)
+## Code Review Complete
 
 Critical: {N} | Major: {N} | Minor: {N}
 
@@ -892,19 +843,6 @@ Rounds: 2 (default)
    3-stage deduplication:
    - Stage 1: [R-CR-001] and [R-SC-001] same file:line → merged (keep R-CR-001, Critical)
 
-   Scoring:
-
-   | Perspective | Score | Grade | Critical | Major | Minor |
-   |-------------|-------|-------|----------|-------|-------|
-   | Readability | 90 | A- | 0 | 1 | 0 |
-   | Correctness | 70 | C- | 1 | 1 | 0 |
-   | Spec Compliance | 94 | A | 0 | 0 | 2 |
-   | Architecture | 90 | A- | 0 | 1 | 0 |
-   | Security | 100 | A+ | 0 | 0 | 0 |
-   | Performance | 94 | A | 0 | 0 | 2 |
-   | Codex Holistic | 84 | B | 0 | 1 | 2 |
-
-   Overall: 89 → B+
 
 === REPORTING PHASE ===
 
@@ -974,4 +912,4 @@ Files reviewed: {N}
 Processing time: {approximate duration}
 ```
 
-**Note:** Severity counts in completion reports are self-reported and used for progress display only. Official scoring uses the leader's calibrated severity during synthesize.
+**Note:** Severity counts in completion reports are self-reported and used for progress display only.
