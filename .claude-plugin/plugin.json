@@ -1,0 +1,10 @@
+{
+  "name": "forte",
+  "description": "notelm's personal collection of Claude Code skills",
+  "version": "1.0.0",
+  "author": {
+    "name": "notelm"
+  },
+  "repository": "https://github.com/not-elm/forte.git",
+  "license": "MIT"
+}
