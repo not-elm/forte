@@ -252,19 +252,34 @@ Format: `[R-{PERSPECTIVE}-{NNN}]`
 | **Major** | Yellow | Fix before release. Performance issues, significant design problems. |
 | **Minor** | Blue | Improvement recommended but not urgent. Naming, comments, minor redundancy. |
 
+### Impact Scope Tags
+
+Every `> Impact:` line MUST begin with a scope tag:
+
+| Tag | Meaning |
+|-----|---------|
+| `[single-site]` | Fix is contained to the target line/function, no ripple effects |
+| `[multi-site]` | Multiple locations within the same module need changes |
+| `[cross-module]` | Changes span modules or affect external interfaces |
+
+**Tag assignment rules:**
+- `[single-site]`: The fix modifies only the reported location. No callers, exports, or shared state are affected.
+- `[multi-site]`: The fix requires changes in multiple places within the same file or module (e.g., rename used in 3 functions in the same file).
+- `[cross-module]`: The fix changes a public interface, shared type, or behavior depended on by other modules.
+
 ### Finding Format
 
 For **Critical** and **Major** (Evidence required):
 ```markdown
 - [R-XX-NNN] **Severity** | `file:line` | Description of the issue.
-  > Impact: {affected scope}
+  > Impact: [scope-tag] {affected scope}
   > Evidence: `relevant code snippet (max 3 lines)`
 ```
 
 For **Minor** (Evidence optional):
 ```markdown
 - [R-XX-NNN] **Minor** | `file:line` | Description of the issue.
-  > Impact: {affected scope}
+  > Impact: [scope-tag] {affected scope}
 ```
 
 **Evidence rule:** Critical/Major findings without an Evidence line are downgraded to Minor by the leader during severity calibration.
@@ -469,6 +484,8 @@ Each solution entry must reference one or more finding IDs it addresses.
                                  cause (e.g., repeated missing-null-check pattern) → group as
                                  representative finding + "N similar occurrences" note
                        Apply debate tally duplicate notes from step 6.
+                       When merging findings, adopt the wider scope tag
+                       (single-site < multi-site < cross-module).
 
                     c. Write top 5 recommendations (highest severity first).
 
@@ -515,7 +532,7 @@ Each solution entry must reference one or more finding IDs it addresses.
 3. **Write** findings to your individual file at `findings/{perspective}.md`:
    - Use `[R-XX-NNN]` format with severity label.
    - Each finding must reference a specific `file:line` location.
-   - Every finding MUST include an `> Impact:` line describing the affected scope.
+   - Every finding MUST include an `> Impact:` line beginning with a scope tag (`[single-site]`, `[multi-site]`, or `[cross-module]`) followed by a description of the affected scope.
    - Critical/Major findings MUST include an Evidence line with a code snippet (max 3 lines).
    - Focus on your perspective's checklist items — do not duplicate other perspectives' work.
 4. **Report** completion to the leader via SendMessage using the structured completion report format.
@@ -662,21 +679,21 @@ The leader generates a Markdown report file. The report structure:
 ### Critical
 
 - [ ] [R-XX-NNN] **Critical** | `{perspective}` | `{file}:{line}` | {Description}
-  > Impact: {affected scope}
+  > Impact: [scope-tag] {affected scope}
   > Evidence: `{code snippet}`
   > Solution: {solution description — only if proposed}
 
 ### Major
 
 - [ ] [R-XX-NNN] **Major** | `{perspective}` | `{file}:{line}` | {Description}
-  > Impact: {affected scope}
+  > Impact: [scope-tag] {affected scope}
   > Evidence: `{code snippet}`
   > Solution: {solution description — only if proposed}
 
 ### Minor
 
 - [ ] [R-XX-NNN] **Minor** | `{perspective}` | `{file}:{line}` | {Description}
-  > Impact: {affected scope}
+  > Impact: [scope-tag] {affected scope}
 
 ## Top Recommendations
 
@@ -850,7 +867,7 @@ Rounds: 2 (default)
    with severity-grouped checklists, Solution lines, Debate Summary, and file summary.
    Sample finding in report:
    - [ ] [R-CR-001] **Critical** | `Correctness` | `routes.ts:45` | Null check missing
-     > Impact: All API routes using user.name — runtime crash on anonymous requests
+     > Impact: [multi-site] All API routes using user.name — runtime crash on anonymous requests
      > Evidence: `const name = user.name.toLowerCase()`
      > Solution: Add null guard with early return. `if (!user?.name) return defaultResponse;`
 
