@@ -376,11 +376,13 @@ Each solution entry must reference one or more finding IDs it addresses.
                     - Validate that target paths exist
                     - List all files in target directories (recursively)
                     - Apply --perspectives filter to Team Composition table
+                    - Extract --rounds N (default: 2)
                     - Generate review-id: YYYY-MM-DD-{target-name}
 
  2. CREATE FILES  → Create docs/reviews/{review-id}/ directory.
                     Create docs/reviews/{review-id}/findings/ subdirectory.
                     Write SYNTHESIS.md using template above.
+                    Create docs/reviews/{review-id}/WHITEBOARD.md using WHITEBOARD.md template.
                     Ensure docs/reviews/ entries are in .gitignore.
 
  3. CREATE TEAM   → TeamCreate with team_name "code-review".
@@ -419,19 +421,52 @@ Each solution entry must reference one or more finding IDs it addresses.
                     (2-3 key concerns from the perspective's checklist) to the
                     timed-out perspective's finding file.
 
- 6. CROSS-REVIEW  → Update SYNTHESIS.md: Phase → "cross-reviewing"
-                    Read all findings/*.md files.
-                    Compose a concise summary of all findings (grouped by file,
-                    listing entry IDs and severity — no full descriptions).
-                    Broadcast summary to all active reviewers with instruction:
-                    "Review this summary. Reply with:
-                     1. Duplicate findings you notice (cite both IDs)
-                     2. Important issues from your perspective that were missed
-                     Format: CROSS-REVIEW: duplicates=[ID1=ID2, ...], missed=[description, ...]"
-                    Wait up to 2 minutes for responses.
-                    Record cross-review notes in SYNTHESIS.md ## Cross-Review Notes.
+ 6. DEBATE        → Update SYNTHESIS.md: Phase → "debating"
+                    a. Read all findings/*.md files.
+                    b. Compose findings summary (finding ID, severity, file:line,
+                       brief description — grouped by file).
+                    c. Write findings summary to WHITEBOARD.md ## Findings Summary.
+                    d. Broadcast to all reviewers:
+                       "DEBATE ROUND 1/{max_rounds}: Review the Findings Summary in
+                        WHITEBOARD.md. For each finding from other perspectives,
+                        write your reaction in your ### {perspective} section under
+                        ## Debate. Use format: [D-{XX}-R1-{NNN}] **agree|disagree|revise**
+                        refs=[R-XX-NNN] | reason. Send completion report when done."
+                    e. Wait for completion reports (reminder at 2 min, timeout at 3 min).
+                    f. Update SYNTHESIS.md Status: "debating (round 1/{max_rounds})"
 
- 7. SYNTHESIZE    → Update SYNTHESIS.md: Phase → "synthesizing"
+                    For round 2+:
+                    g. Read all ## Debate sections from WHITEBOARD.md.
+                    h. Compose debate summary for the previous round (per-finding
+                       tally of agree/disagree/revise with key arguments).
+                    i. Broadcast to all reviewers:
+                       "DEBATE ROUND {N}/{max_rounds}: Previous round summary:
+                        {debate_summary}. Continue debating in your ### {perspective}
+                        section. Add #### Round {N} header, then your entries.
+                        Send completion report when done."
+                    j. Wait for completion reports (reminder at 2 min, timeout at 3 min).
+                    k. Update SYNTHESIS.md Status: "debating (round {N}/{max_rounds})"
+
+                    After all rounds (or early termination):
+                    l. Tally debate results per finding using Debate Tally Rules.
+                    m. Record tally results in SYNTHESIS.md ## Debate Tally.
+
+ 7. RESOLVE       → Update SYNTHESIS.md: Phase → "resolving"
+                    a. Apply debate tally to findings: exclude findings with
+                       disagree majority (record in calibration log), note severity
+                       revision proposals.
+                    b. Compose confirmed findings list (finding ID, adjusted severity,
+                       file:line, brief description).
+                    c. Broadcast to all reviewers:
+                       "RESOLVE: Confirmed findings list below. Propose solutions
+                        for findings relevant to your expertise. Write to your
+                        ### {perspective} section under ## Solutions in WHITEBOARD.md.
+                        Format: [S-{XX}-{NNN}] refs=[R-XX-NNN] | solution description.
+                        Send completion report when done.
+                        Confirmed findings: {confirmed_findings_list}"
+                    d. Wait for completion reports (reminder at 2 min, timeout at 3 min).
+
+ 8. SYNTHESIZE    → Update SYNTHESIS.md: Phase → "synthesizing"
                     Read all findings/*.md files.
 
                     a. SEVERITY CALIBRATION:
@@ -449,7 +484,7 @@ Each solution entry must reference one or more finding IDs it addresses.
                        Stage 3 — Semantic duplicate: different locations but same root
                                  cause (e.g., repeated missing-null-check pattern) → group as
                                  representative finding + "N similar occurrences" note
-                       Apply cross-review duplicate notes from step 6.
+                       Apply debate tally duplicate notes from step 6.
 
                     c. SCORING: For each perspective:
                        - Count deduplicated findings by severity
@@ -471,7 +506,18 @@ Each solution entry must reference one or more finding IDs it addresses.
                     d. Write top 5 recommendations (highest severity first).
                     e. Populate SYNTHESIS.md tables.
 
- 8. REPORT        → Update SYNTHESIS.md: Phase → "reporting"
+                    Additional inputs: WHITEBOARD.md ## Debate and ## Solutions.
+                    a. Severity calibration now includes debate evidence:
+                       - Debate disagree majority → downgrade or exclude
+                       - Debate revise proposals → severity change with rationale
+                       - Existing Evidence-based downgrading still applies
+                    b. Solution consolidation:
+                       - For each finding, collect all [S-XX-NNN] entries that
+                         reference it via refs=[]
+                       - If multiple solutions exist, select the most actionable one
+                       - Store selected solution text per finding for report generation
+
+ 9. REPORT        → Update SYNTHESIS.md: Phase → "reporting"
                     Generate Markdown report using Markdown Report Template.
                     Save directly to docs/reviews/{review-id}-review.md (not inside the subdirectory).
                     Delete docs/reviews/{review-id}/findings/ directory.
@@ -480,7 +526,14 @@ Each solution entry must reference one or more finding IDs it addresses.
                     Display terminal summary to user (see Terminal Output Format).
                     Report file path to user.
 
- 9. SHUTDOWN      → Send shutdown_request to all reviewers.
+                    Additional content:
+                    a. Add > Solution: line to findings that have a selected solution
+                       (after Evidence line, or after description if no Evidence)
+                    b. Add ## Debate Summary section before ## Calibration Log
+                       with per-finding tally and outcome
+                    c. Delete WHITEBOARD.md along with findings/ and SYNTHESIS.md
+
+10. SHUTDOWN      → Send shutdown_request to all reviewers.
                     Delete team with TeamDelete.
                     Report completion to user with report file path.
 ```
@@ -499,7 +552,8 @@ Each solution entry must reference one or more finding IDs it addresses.
    - Critical/Major findings MUST include an Evidence line with a code snippet (max 3 lines).
    - Focus on your perspective's checklist items — do not duplicate other perspectives' work.
 4. **Report** completion to the leader via SendMessage using the structured completion report format.
-5. **Cross-review** (when prompted): Read the leader's findings summary broadcast. Reply with duplicate findings and missed issues from your perspective.
+5. **Debate** (when prompted): Read the Findings Summary in WHITEBOARD.md. For each finding from other perspectives, write reactions in own `### {perspective}` section under `## Debate`. Use `[D-{XX}-R{round}-{NNN}]` format with `agree`/`disagree`/`revise` labels. Send completion report when done. Repeat for each debate round.
+6. **Resolve** (when prompted): Read the confirmed findings list from leader's broadcast. Propose solutions for findings relevant to own expertise. Write to own `### {perspective}` section under `## Solutions`. Use `[S-{XX}-{NNN}]` format. Send completion report when done.
 
 ### Codex Reviewer
 
@@ -526,7 +580,8 @@ Each solution entry must reference one or more finding IDs it addresses.
 5. **Write** converted findings to `findings/codex-reviewer.md`.
 6. **Handle errors**: If `codex` CLI is not installed or fails, retry once. On second failure, write: `- [R-CX-001] **Info** | N/A | Codex review unavailable — codex CLI execution failed.`
 6. **Report** completion to the leader via SendMessage using the structured completion report format.
-7. **Cross-review** (when prompted): Same as other reviewers.
+7. **Debate** (when prompted): Same as other reviewers.
+8. **Resolve** (when prompted): Same as other reviewers.
 
 ---
 
