@@ -202,8 +202,8 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 
 ## Perspective Scores
 
-| Perspective | Score | Grade | Critical | Major | Minor | Info |
-|-------------|-------|-------|----------|-------|-------|------|
+| Perspective | Score | Grade | Critical | Major | Minor |
+|-------------|-------|-------|----------|-------|-------|
 
 ## Overall Score
 
@@ -215,7 +215,6 @@ Create at `docs/reviews/{review-id}/SYNTHESIS.md`. This file is **leader-only**.
 | Critical | — |
 | Major | — |
 | Minor | — |
-| Info | — |
 
 ## Deduplicated Findings
 
@@ -268,19 +267,20 @@ Format: `[R-{PERSPECTIVE}-{NNN}]`
 | **Critical** | Red | Immediate fix required. Security vulnerabilities, data loss risk, crashes. |
 | **Major** | Yellow | Fix before release. Performance issues, significant design problems. |
 | **Minor** | Blue | Improvement recommended but not urgent. Naming, comments, minor redundancy. |
-| **Info** | Gray | Reference information, praise for good implementation. |
 
 ### Finding Format
 
 For **Critical** and **Major** (Evidence required):
 ```markdown
-- [R-XX-NNN] **Severity** | `file:line` | Description of the issue and its impact.
+- [R-XX-NNN] **Severity** | `file:line` | Description of the issue.
+  > Impact: {affected scope}
   > Evidence: `relevant code snippet (max 3 lines)`
 ```
 
-For **Minor** and **Info** (Evidence optional):
+For **Minor** (Evidence optional):
 ```markdown
-- [R-XX-NNN] **Severity** | `file:line` | Description of the issue and its impact.
+- [R-XX-NNN] **Minor** | `file:line` | Description of the issue.
+  > Impact: {affected scope}
 ```
 
 **Evidence rule:** Critical/Major findings without an Evidence line are downgraded to Minor by the leader during severity calibration.
@@ -492,7 +492,6 @@ Each solution entry must reference one or more finding IDs it addresses.
                          Critical: -20 per finding
                          Major: -10 per finding
                          Minor: -3 per finding
-                         Info: 0 (no deduction)
                          Minimum score: 0
                        - Convert to letter grade:
                          97-100=A+, 93-96=A, 90-92=A-,
@@ -549,6 +548,7 @@ Each solution entry must reference one or more finding IDs it addresses.
 3. **Write** findings to your individual file at `findings/{perspective}.md`:
    - Use `[R-XX-NNN]` format with severity label.
    - Each finding must reference a specific `file:line` location.
+   - Every finding MUST include an `> Impact:` line describing the affected scope.
    - Critical/Major findings MUST include an Evidence line with a code snippet (max 3 lines).
    - Focus on your perspective's checklist items — do not duplicate other perspectives' work.
 4. **Report** completion to the leader via SendMessage using the structured completion report format.
@@ -565,7 +565,7 @@ Each solution entry must reference one or more finding IDs it addresses.
    - Unhandled edge cases
    - Security issues
    - Performance concerns
-   Report each finding with: severity (Critical/Major/Minor/Info), file:line, and description.
+   Report each finding with: severity (Critical/Major/Minor), file:line, and description.
    Files: {target file contents inlined}
    ```
 3. **Run** Codex CLI via temp file + stdin (not as CLI argument — avoids shell length limits):
@@ -578,7 +578,7 @@ Each solution entry must reference one or more finding IDs it addresses.
    ```
 4. **Convert** Codex response into `[R-CX-NNN]` finding format with Evidence where applicable.
 5. **Write** converted findings to `findings/codex-reviewer.md`.
-6. **Handle errors**: If `codex` CLI is not installed or fails, retry once. On second failure, write: `- [R-CX-001] **Info** | N/A | Codex review unavailable — codex CLI execution failed.`
+6. **Handle errors**: If `codex` CLI is not installed or fails, retry once. On second failure, write: `- [R-CX-001] **Minor** | N/A | Codex review unavailable — codex CLI execution failed.`
 6. **Report** completion to the leader via SendMessage using the structured completion report format.
 7. **Debate** (when prompted): Same as other reviewers.
 8. **Resolve** (when prompted): Same as other reviewers.
@@ -667,9 +667,9 @@ Each solution entry must reference one or more finding IDs it addresses.
 
 - Build a Code Review prompt with all target file contents following the `codex-review` skill pattern
 - Run via temp file + stdin: write prompt to `/tmp/codex-review-prompt.txt`, pipe to `codex exec`, clean up temp file
-- Prompt Codex: "Analyze the following code. Identify issues: bugs, logic errors, unhandled edge cases, security issues, performance concerns. Report each finding with: severity (Critical/Major/Minor/Info), file:line, and description."
+- Prompt Codex: "Analyze the following code. Identify issues: bugs, logic errors, unhandled edge cases, security issues, performance concerns. Report each finding with: severity (Critical/Major/Minor), file:line, and description."
 - Convert Codex response into `[R-CX-NNN]` finding format
-- If `codex` CLI is not installed or fails, retry once. On second failure, write a single Info finding: "Codex review unavailable — codex CLI execution failed."
+- If `codex` CLI is not installed or fails, retry once. On second failure, write a single Minor finding: "Codex review unavailable — codex CLI execution failed."
 
 ---
 
@@ -693,41 +693,39 @@ The leader generates a Markdown report file. The report structure:
 | Critical | {N} |
 | Major | {N} |
 | Minor | {N} |
-| Info | {N} |
 
 ## Perspective Scores
 
-| Perspective | Grade | Score | Critical | Major | Minor | Info |
-|-------------|-------|-------|----------|-------|-------|------|
-| {name} | {grade} | {score}/100 | {n} | {n} | {n} | {n} |
+| Perspective | Grade | Score | Critical | Major | Minor |
+|-------------|-------|-------|----------|-------|-------|
+| {name} | {grade} | {score}/100 | {n} | {n} | {n} |
 
 ## File Summary
 
-| File | Critical | Major | Minor | Info |
-|------|----------|-------|-------|------|
-| `{file path}` | {n} | {n} | {n} | {n} |
+| File | Critical | Major | Minor |
+|------|----------|-------|-------|
+| `{file path}` | {n} | {n} | {n} |
 
 ## Findings
 
 ### Critical
 
 - [ ] [R-XX-NNN] **Critical** | `{perspective}` | `{file}:{line}` | {Description}
+  > Impact: {affected scope}
   > Evidence: `{code snippet}`
   > Solution: {solution description — only if proposed}
 
 ### Major
 
 - [ ] [R-XX-NNN] **Major** | `{perspective}` | `{file}:{line}` | {Description}
+  > Impact: {affected scope}
   > Evidence: `{code snippet}`
   > Solution: {solution description — only if proposed}
 
 ### Minor
 
 - [ ] [R-XX-NNN] **Minor** | `{perspective}` | `{file}:{line}` | {Description}
-
-### Info
-
-- [R-XX-NNN] **Info** | `{perspective}` | `{file}:{line}` | {Description}
+  > Impact: {affected scope}
 
 ## Top Recommendations
 
@@ -748,8 +746,7 @@ The leader generates a Markdown report file. The report structure:
 
 ### Report Format Notes
 
-- Critical/Major/Minor findings use `- [ ]` checkboxes for fix tracking. Users mark fixes as complete by editing: `- [x] [R-CR-001] ...`
-- Info findings use `- ` without checkbox (reference only, no fix needed)
+- All findings use `- [ ]` checkboxes for fix tracking. Users mark fixes as complete by editing: `- [x] [R-CR-001] ...`
 - Findings grouped by severity (Critical first), within each group sorted by perspective
 - Evidence shown as blockquote (`>`)
 - Calibrated findings show their **final** (post-calibration) severity in the findings section; calibration details appear only in the Calibration Log
@@ -777,12 +774,12 @@ The leader maps the prefix to add `` `{perspective}` `` to each finding line in 
 
 ## Terminal Output Format
 
-After generating the Markdown report, the leader displays a summary to the terminal. Only Critical and Major findings are shown — Minor/Info are in the file.
+After generating the Markdown report, the leader displays a summary to the terminal. Only Critical and Major findings are shown — Minor are in the file.
 
 ```
 ## Code Review Complete — {grade} ({score}/100)
 
-Critical: {N} | Major: {N} | Minor: {N} | Info: {N}
+Critical: {N} | Major: {N} | Minor: {N}
 
 ### Critical
 - [R-XX-NNN] `{file}:{line}` — {Description}
@@ -840,7 +837,7 @@ Rounds: 2 (default)
 5. Leader reads all findings/*.md, composes findings summary:
    "routes.ts: [R-CR-001] Critical, [R-RD-001] Major, [R-PF-001] Major
     middleware.ts: [R-CR-002] Major, [R-SC-001] Minor
-    types.ts: [R-SP-001] Minor, [R-SP-002] Info"
+    types.ts: [R-SP-001] Minor"
 
    Writes summary to WHITEBOARD.md ## Findings Summary.
    Broadcasts debate round 1 instructions to all reviewers.
@@ -897,15 +894,15 @@ Rounds: 2 (default)
 
    Scoring:
 
-   | Perspective | Score | Grade | Critical | Major | Minor | Info |
-   |-------------|-------|-------|----------|-------|-------|------|
-   | Readability | 90 | A- | 0 | 1 | 0 | 0 |
-   | Correctness | 70 | C- | 1 | 1 | 0 | 0 |
-   | Spec Compliance | 94 | A | 0 | 0 | 2 | 1 |
-   | Architecture | 90 | A- | 0 | 1 | 0 | 0 |
-   | Security | 100 | A+ | 0 | 0 | 0 | 0 |
-   | Performance | 94 | A | 0 | 0 | 2 | 0 |
-   | Codex Holistic | 84 | B | 0 | 1 | 2 | 1 |
+   | Perspective | Score | Grade | Critical | Major | Minor |
+   |-------------|-------|-------|----------|-------|-------|
+   | Readability | 90 | A- | 0 | 1 | 0 |
+   | Correctness | 70 | C- | 1 | 1 | 0 |
+   | Spec Compliance | 94 | A | 0 | 0 | 2 |
+   | Architecture | 90 | A- | 0 | 1 | 0 |
+   | Security | 100 | A+ | 0 | 0 | 0 |
+   | Performance | 94 | A | 0 | 0 | 2 |
+   | Codex Holistic | 84 | B | 0 | 1 | 2 |
 
    Overall: 89 → B+
 
@@ -915,6 +912,7 @@ Rounds: 2 (default)
    with severity-grouped checklists, Solution lines, Debate Summary, and file summary.
    Sample finding in report:
    - [ ] [R-CR-001] **Critical** | `Correctness` | `routes.ts:45` | Null check missing
+     > Impact: All API routes using user.name — runtime crash on anonymous requests
      > Evidence: `const name = user.name.toLowerCase()`
      > Solution: Add null guard with early return. `if (!user?.name) return defaultResponse;`
 
@@ -951,7 +949,7 @@ The old rule #5 ('Cross-review responses via SendMessage, not file writes') is r
 |-----------|--------|
 | Reviewer has not reported completion after 4 minutes | Leader sends one reminder via SendMessage |
 | Reviewer has not reported completion after 5 minutes | Leader writes brief fallback review (2-3 key concerns from checklist) to the perspective's finding file, marks as "Leader fallback" in report |
-| Codex CLI not installed or execution failure | Codex agent retries once. On second failure, writes Info finding "Codex unavailable" |
+| Codex CLI not installed or execution failure | Codex agent retries once. On second failure, writes Minor finding "Codex unavailable" |
 | Target file/directory does not exist | Validated during setup. Non-existent paths skipped with warning message to user |
 | No spec file provided | Spec cross-reference portion skipped; test quality checks still run |
 | docs/reviews/ directory does not exist | Created automatically during setup phase |
