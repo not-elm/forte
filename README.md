@@ -4,8 +4,9 @@ notelm's personal collection of Claude Code skills, packaged as a plugin.
 
 ## Installation
 
-```
-claude plugin add https://github.com/not-elm/forte.git
+```sh
+claude plugin marketplace add https://github.com/not-elm/forte.git
+claude plugin install forte
 ```
 
 ## Skills
