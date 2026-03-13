@@ -8,7 +8,7 @@ description: >-
 
 # Code Review Board — Multi-Perspective Team Code Review
 
-Perform comprehensive code review from 8 perspectives using parallel reviewer agents. Each agent writes findings to their own `findings/{perspective}.md` file, and the leader synthesizes results into a Markdown report with checklists for tracking fixes.
+Perform comprehensive code review from 7 perspectives using parallel reviewer agents. Each agent writes findings to their own `findings/{perspective}.md` file, and the leader synthesizes results into a Markdown report with checklists for tracking fixes.
 
 ## When to Use
 
@@ -31,7 +31,7 @@ Perform comprehensive code review from 8 perspectives using parallel reviewer ag
 /code-review src/api/
 /code-review src/api/ --spec docs/plans/api-design.md
 /code-review src/api/ --perspectives security,correctness,performance
-/code-review src/api/ --perspectives -bevy-architect,-codex-reviewer
+/code-review src/api/ --perspectives -codex-reviewer
 ```
 
 ## Core Principles
@@ -41,9 +41,8 @@ Perform comprehensive code review from 8 perspectives using parallel reviewer ag
 3. **Leader-only SYNTHESIS.md** — Reviewers can read SYNTHESIS.md but never write to it.
 4. **Append-only** — Reviewers add findings, never delete or modify existing entries.
 5. **Two-pass workflow** — Reviewers analyze independently in parallel (pass 1), then respond to leader's cross-review summary (pass 2). Leader synthesizes all input.
-6. **Conditional agents** — Bevy Architect agent is only spawned when `.rs` files are in the review target.
-7. **Evidence-backed findings** — Critical and Major findings require concrete code evidence. Findings without evidence are downgraded.
-8. **Explicit state management** — SYNTHESIS.md tracks `Status` and `Phase` for progress visibility, matching discussion-board patterns.
+6. **Evidence-backed findings** — Critical and Major findings require concrete code evidence. Findings without evidence are downgraded.
+7. **Explicit state management** — SYNTHESIS.md tracks `Status` and `Phase` for progress visibility, matching discussion-board patterns.
 
 ---
 
@@ -81,10 +80,9 @@ setup → reviewing → cross-reviewing → synthesizing → reporting → compl
 | Reviewer 2 | `correctness` | general-purpose | Always |
 | Reviewer 3 | `spec-compliance` | general-purpose | Always |
 | Reviewer 4 | `architecture` | general-purpose | Always |
-| Reviewer 5 | `bevy-architect` | general-purpose | Only when `.rs` files in target |
-| Reviewer 6 | `security` | general-purpose | Always |
-| Reviewer 7 | `performance` | general-purpose | Always |
-| Reviewer 8 | `codex-reviewer` | general-purpose | Always |
+| Reviewer 5 | `security` | general-purpose | Always |
+| Reviewer 6 | `performance` | general-purpose | Always |
+| Reviewer 7 | `codex-reviewer` | general-purpose | Always |
 
 ---
 
@@ -100,7 +98,6 @@ docs/reviews/{review-id}/
 │   ├── correctness.md
 │   ├── spec-compliance.md
 │   ├── architecture.md
-│   ├── bevy-architect.md  (only if .rs files)
 │   ├── security.md
 │   ├── performance.md
 │   └── codex-reviewer.md
@@ -129,8 +126,6 @@ Each reviewer's `findings/{perspective}.md`:
 ```
 
 Reviewers append findings using the Finding Format (see Entry ID System). No other structure needed — each reviewer owns their entire file.
-
-**Note:** If Bevy Architect agent is not spawned (no `.rs` files), omit the `bevy-architect.md` file.
 
 ---
 
@@ -203,7 +198,6 @@ Format: `[R-{PERSPECTIVE}-{NNN}]`
 | CR | Correctness & Reliability |
 | SP | Spec Compliance & Testing |
 | AR | Architecture |
-| BV | Bevy Architecture |
 | SC | Security |
 | PF | Performance |
 | CX | Codex Holistic Review |
@@ -244,7 +238,6 @@ For **Minor** and **Info** (Evidence optional):
                     - Resolve all paths to absolute paths
                     - Validate that target paths exist
                     - List all files in target directories (recursively)
-                    - Determine if .rs files are present (for Bevy agent)
                     - Apply --perspectives filter to Team Composition table
                     - Generate review-id: YYYY-MM-DD-{target-name}
 
@@ -268,7 +261,6 @@ For **Minor** and **Info** (Evidence optional):
                       using [R-XX-NNN] format. When done, send a structured completion
                       report to review-lead."
 
-                    Skip bevy-architect if no .rs files in target.
                     Skip any perspectives excluded by --perspectives.
 
                     For codex-reviewer, additionally instruct:
@@ -458,18 +450,6 @@ For **Minor** and **Info** (Evidence optional):
 - Unnecessary abstraction / premature generalization
 - engine/core/ui/sdk boundary enforcement
 
-### Bevy Architect Agent Checklist (only when .rs files in target)
-
-- Bevy 0.18 API compliance
-- Project's bevy-patterns.md rules compliance
-- `try_insert` vs `insert` usage
-- ApiReactor pattern correct usage
-- SystemParam utilization
-- System ordering / run conditions correctness
-- Event lifecycle correctness (reader/writer usage)
-- Query filter correctness (`Changed`, `Added`, etc.)
-- Archetype churn risks from add/remove patterns
-
 ### Security Agent Checklist
 
 - Injection vulnerabilities (SQL, command, path traversal)
@@ -489,7 +469,6 @@ For **Minor** and **Info** (Evidence optional):
 - Inefficient algorithms (O(n^2) that could be O(n log n))
 - Underutilized caching
 - Lock contention and sync bottlenecks
-- Bevy system frame-budget regression risks
 - React re-render churn and memoization opportunities — TS targets only
 - Startup/load-time regressions
 
@@ -589,7 +568,6 @@ Reviewer findings use the format `[R-XX-NNN] **Severity** | \`file:line\` | Desc
 | CR | Correctness & Reliability |
 | SP | Spec Compliance & Testing |
 | AR | Architecture |
-| BV | Bevy Architecture |
 | SC | Security |
 | PF | Performance |
 | CX | Codex Holistic Review |
@@ -627,7 +605,7 @@ Spec: docs/plans/2026-03-01-speech-design.md
 === SETUP PHASE ===
 
 1. Leader parses arguments:
-   - Target files: timeline.rs, mod.rs, types.rs (3 .rs files → spawn Bevy agent)
+   - Target files: timeline.rs, mod.rs, types.rs
    - Spec: docs/plans/2026-03-01-speech-design.md
    - --perspectives: not specified (all active)
    - Review ID: 2026-03-01-speech
@@ -636,7 +614,7 @@ Spec: docs/plans/2026-03-01-speech-design.md
    - docs/reviews/2026-03-01-speech/SYNTHESIS.md
    - docs/reviews/2026-03-01-speech/findings/ (empty directory)
 
-3. Leader creates team "code-review", spawns 8 reviewer agents.
+3. Leader creates team "code-review", spawns 7 reviewer agents.
    Each reviewer writes to their own findings/{perspective}.md file.
    SYNTHESIS.md updated: Status → "reviewing", Phase → "reviewing"
 
@@ -688,7 +666,6 @@ Spec: docs/plans/2026-03-01-speech-design.md
    | Correctness | 70 | C- | 1 | 1 | 0 | 0 |
    | Spec Compliance | 94 | A | 0 | 0 | 2 | 1 |
    | Architecture | 90 | A- | 0 | 1 | 0 | 0 |
-   | Bevy Architecture | 97 | A+ | 0 | 0 | 1 | 0 |
    | Security | 100 | A+ | 0 | 0 | 0 | 0 |
    | Performance | 87 | B+ | 0 | 1 | 1 | 0 |
    | Codex Holistic | 84 | B | 0 | 1 | 2 | 1 |
