@@ -713,11 +713,13 @@ The leader generates a Markdown report file. The report structure:
 
 - [ ] [R-XX-NNN] **Critical** | `{perspective}` | `{file}:{line}` | {Description}
   > Evidence: `{code snippet}`
+  > Solution: {solution description — only if proposed}
 
 ### Major
 
 - [ ] [R-XX-NNN] **Major** | `{perspective}` | `{file}:{line}` | {Description}
   > Evidence: `{code snippet}`
+  > Solution: {solution description — only if proposed}
 
 ### Minor
 
@@ -731,6 +733,10 @@ The leader generates a Markdown report file. The report structure:
 
 1. **[R-XX-NNN]** — {action description}
 2. ...
+
+## Debate Summary
+
+- [R-XX-NNN] **{Severity}** — {Consensus/Dispute/Excluded} ({N} agree, {N} disagree). {Outcome description}.
 
 ## Calibration Log
 
@@ -748,6 +754,8 @@ The leader generates a Markdown report file. The report structure:
 - Evidence shown as blockquote (`>`)
 - Calibrated findings show their **final** (post-calibration) severity in the findings section; calibration details appear only in the Calibration Log
 - File Summary table provides per-file severity counts
+- `> Solution:` line appears after Evidence (or after description if no Evidence). Only present when a solution was proposed — no forced fill. Code examples within Solution are optional.
+- Debate Summary section shows per-finding tally and outcome, providing transparency on severity changes and finding exclusions
 
 ### Perspective Enrichment
 
@@ -792,6 +800,7 @@ Full report: docs/reviews/{review-id}-review.md
 ```
 Target: src/api/
 Spec: docs/plans/api-design.md
+Rounds: 2 (default)
 
 === SETUP PHASE ===
 
@@ -799,10 +808,12 @@ Spec: docs/plans/api-design.md
    - Target files: routes.ts, middleware.ts, types.ts
    - Spec: docs/plans/api-design.md
    - --perspectives: not specified (all active)
+   - --rounds: 2 (default)
    - Review ID: 2026-03-01-api
 
 2. Leader creates docs/reviews/2026-03-01-api/ directory:
    - docs/reviews/2026-03-01-api/SYNTHESIS.md
+   - docs/reviews/2026-03-01-api/WHITEBOARD.md
    - docs/reviews/2026-03-01-api/findings/ (empty directory)
 
 3. Leader creates team "code-review", spawns 7 reviewer agents.
@@ -824,70 +835,113 @@ Spec: docs/plans/api-design.md
    After 4 minutes, leader sends reminder to any unresponsive reviewers.
    All 7 complete within 5 minutes.
 
-=== CROSS-REVIEW PHASE ===
+=== DEBATING PHASE (Round 1/2) ===
 
-5. Leader reads all findings/*.md, composes summary:
+5. Leader reads all findings/*.md, composes findings summary:
    "routes.ts: [R-CR-001] Critical, [R-RD-001] Major, [R-PF-001] Major
     middleware.ts: [R-CR-002] Major, [R-SC-001] Minor
     types.ts: [R-SP-001] Minor, [R-SP-002] Info"
 
-   Broadcasts to all reviewers. Responses within 2 minutes:
-   - correctness: "CROSS-REVIEW: duplicates=[R-CR-001=R-SC-001], missed=[]"
-   - performance: "CROSS-REVIEW: duplicates=[], missed=[routes.ts:45 allocates new array in loop]"
+   Writes summary to WHITEBOARD.md ## Findings Summary.
+   Broadcasts debate round 1 instructions to all reviewers.
+
+   Reviewers write reactions in WHITEBOARD.md ## Debate > ### {perspective}:
+   - performance: [D-PF-R1-001] **disagree** refs=[R-CR-001] | Not Critical — input is already validated upstream.
+   - security: [D-SC-R1-001] **agree** refs=[R-CR-001] | Confirmed — validation gap exists.
+   - architecture: [D-AR-R1-001] **revise** refs=[R-PF-001] | Should be Minor — not a hot path.
+   - readability: [D-RD-R1-001] **agree** refs=[R-CR-002] | Confirmed — error handling is unclear.
+
+=== DEBATING PHASE (Round 2/2) ===
+
+6. Leader broadcasts round 1 summary:
+   "[R-CR-001] 4 agree, 1 disagree, 0 revise — key argument: validation gap confirmed by security
+    [R-PF-001] 1 agree, 0 disagree, 3 revise — key argument: not a hot path"
+
+   Reviewers continue debate in round 2:
+   - performance: [D-PF-R2-001] **agree** refs=[R-CR-001] | Reconsidered — security's point is valid.
+   - correctness: [D-CR-R2-001] **revise** refs=[R-PF-001] | Agree with Minor.
+
+   Leader tallies final results:
+   - [R-CR-001] 6 agree, 0 disagree → maintained as Critical
+   - [R-PF-001] 1 agree, 0 disagree, 4 revise → severity revision to Minor
+   - [R-RD-003] 1 agree, 4 disagree → excluded (style preference)
+
+   Records tally in SYNTHESIS.md ## Debate Tally.
+
+=== RESOLVING PHASE ===
+
+7. Leader broadcasts confirmed findings list (excluded findings removed, severity adjusted).
+   Reviewers propose solutions in WHITEBOARD.md ## Solutions > ### {perspective}:
+
+   - correctness: [S-CR-001] refs=[R-CR-001] | Add null guard with early return.
+     > Example: `if (!user?.name) return defaultResponse;`
+   - security: [S-SC-001] refs=[R-CR-001] | Validate input schema at API boundary.
+   - performance: [S-PF-001] refs=[R-PF-001] | Cache the computed value outside the loop.
 
 === SYNTHESIZING PHASE ===
 
-6. Leader reads all findings/*.md files.
+8. Leader reads all findings/*.md and WHITEBOARD.md.
 
-   Severity calibration:
-   - [R-RD-002] Major "function length 60 lines" → calibrated: Major→Minor
-     (reason: architecture rated 80-line function as Minor; applying consistent threshold)
+   Severity calibration (with debate evidence):
+   - [R-PF-001] Major → Minor (debate: 4 revise, not a hot path)
    - [R-PF-002] Critical "redundant copy in hot path" → no Evidence provided
      → calibrated: Critical→Minor (reason: no Evidence)
+   - [R-RD-003] excluded (debate: 4 disagree, style preference)
+
+   Solution consolidation:
+   - [R-CR-001] has 2 solution proposals → selected: [S-CR-001] (most actionable)
+   - [R-PF-001] has 1 solution proposal → selected: [S-PF-001]
 
    3-stage deduplication:
    - Stage 1: [R-CR-001] and [R-SC-001] same file:line → merged (keep R-CR-001, Critical)
-   - Stage 3: [R-CR-002] and cross-review missed finding → grouped as pattern
 
    Scoring:
 
    | Perspective | Score | Grade | Critical | Major | Minor | Info |
    |-------------|-------|-------|----------|-------|-------|------|
-   | Readability | 87 | B+ | 0 | 1 | 1 | 0 |
+   | Readability | 90 | A- | 0 | 1 | 0 | 0 |
    | Correctness | 70 | C- | 1 | 1 | 0 | 0 |
    | Spec Compliance | 94 | A | 0 | 0 | 2 | 1 |
    | Architecture | 90 | A- | 0 | 1 | 0 | 0 |
    | Security | 100 | A+ | 0 | 0 | 0 | 0 |
-   | Performance | 87 | B+ | 0 | 1 | 1 | 0 |
+   | Performance | 94 | A | 0 | 0 | 2 | 0 |
    | Codex Holistic | 84 | B | 0 | 1 | 2 | 1 |
 
-   Overall: 87 → B+
+   Overall: 89 → B+
 
 === REPORTING PHASE ===
 
-7. Leader generates docs/reviews/2026-03-01-api-review.md
-   with severity-grouped checklists and file summary.
-   Deletes docs/reviews/2026-03-01-api/findings/ and SYNTHESIS.md.
+9. Leader generates docs/reviews/2026-03-01-api-review.md
+   with severity-grouped checklists, Solution lines, Debate Summary, and file summary.
+   Sample finding in report:
+   - [ ] [R-CR-001] **Critical** | `Correctness` | `routes.ts:45` | Null check missing
+     > Evidence: `const name = user.name.toLowerCase()`
+     > Solution: Add null guard with early return. `if (!user?.name) return defaultResponse;`
+
+   Deletes docs/reviews/2026-03-01-api/findings/, WHITEBOARD.md, and SYNTHESIS.md.
    Removes docs/reviews/2026-03-01-api/ directory.
    Displays terminal summary with Critical/Major findings.
 
 === COMPLETED ===
 
-8. Leader sends shutdown requests, deletes team.
-   Reports to user: "Code review complete. Report: docs/reviews/2026-03-01-api-review.md"
+10. Leader sends shutdown requests, deletes team.
+    Reports to user: "Code review complete. Report: docs/reviews/2026-03-01-api-review.md"
 ```
 
 ---
 
 ## Conflict Prevention Rules
 
+The old rule #5 ('Cross-review responses via SendMessage, not file writes') is removed — debate reactions are now file writes to WHITEBOARD.md per-member write zones.
+
 | # | Rule | Rationale |
 |---|------|-----------|
-| 1 | Each reviewer writes only to their own `findings/{perspective}.md` file | Individual files eliminate all concurrent write conflicts — no shared file contention |
-| 2 | SYNTHESIS.md is leader-only (reviewers read, never write) | Single writer eliminates shared-section conflicts |
-| 3 | Append-only writes (no deletion/modification of existing entries) | Prevents overwrites when another agent has read stale content |
-| 4 | Phase transitions are leader-controlled via broadcast/SendMessage | Clear phase boundaries prevent out-of-order writes |
-| 5 | Cross-review responses via SendMessage, not file writes | Eliminates race conditions on cross-review notes |
+| 1 | Each reviewer writes only to their own `findings/{perspective}.md` file | Individual files eliminate concurrent write conflicts during reviewing |
+| 2 | Each reviewer writes only to their own `### {perspective}` subsection in WHITEBOARD.md | Per-member write zones prevent conflicts during debating/resolving |
+| 3 | SYNTHESIS.md is leader-only (reviewers read, never write) | Single writer eliminates conflicts |
+| 4 | Append-only writes (no deletion/modification of existing entries) | Prevents overwrites from stale reads |
+| 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
+| 6 | `## Findings Summary` in WHITEBOARD.md is leader-only | Single writer for summary section |
 
 ---
 
@@ -901,7 +955,11 @@ Spec: docs/plans/api-design.md
 | Target file/directory does not exist | Validated during setup. Non-existent paths skipped with warning message to user |
 | No spec file provided | Spec cross-reference portion skipped; test quality checks still run |
 | docs/reviews/ directory does not exist | Created automatically during setup phase |
-| Cross-review responses not received after 2 minutes | Leader proceeds with available responses |
+| Debate reviewer not responding after 2 min | Leader sends reminder |
+| Debate reviewer not responding after 3 min | Leader proceeds with available responses |
+| Resolving reviewer not responding after 3 min | Leader proceeds — solutions are optional |
+| `--rounds 0` specified | Skip debating phase entirely. All findings pass through at original severity (no debate-based calibration). In the resolving phase (step 7), skip step 7a (no tally to apply) and use the original findings list as the confirmed findings list for step 7b-c. |
+| All reviewers agree on all findings in round 1 | Leader ends debate early (skip remaining rounds) |
 | --perspectives specifies non-existent perspective | Warning to user, ignored. Valid perspectives proceed. |
 
 ---
