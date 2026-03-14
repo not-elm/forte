@@ -114,7 +114,8 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                      c. If all items deselected, display message and exit:
                         "No findings selected. Exiting."
 
- 4. DISPATCH      → a. Group selected findings by file path.
+ 4. PHASE 1       → [single-site] findings — parallel dispatch.
+                     a. Group Phase 1 findings by file path.
                      b. For each file group, launch an Agent tool call with:
 
                         Prompt template:
@@ -123,11 +124,11 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
 
                         INSTRUCTIONS:
                         1. Read the file first.
-                        2. For each finding, check if the Evidence snippet matches the
-                           current code at or near the specified line. If the code has
-                           changed (Evidence does not match), SKIP that finding.
-                        3. If a Solution is provided, follow it. Otherwise, make the
-                           minimal fix implied by the description.
+                        2. For each finding, if Evidence is provided, check if it
+                           matches the current code at or near the specified line.
+                           If the code has changed (Evidence does not match), SKIP
+                           that finding. If Evidence is "none", skip this check.
+                        3. Follow the Solution to apply the fix.
                         4. Do NOT make changes beyond what each finding describes.
 
                         FINDINGS:
@@ -135,7 +136,7 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                         - {finding_id} | Line {line} | {severity} | {description}
                           Impact: {impact_text}
                           Evidence: {evidence_snippet or "none"}
-                          Solution: {solution_text or "none"}
+                          Solution: {solution_text}
                         {end for}
 
                         RESPONSE FORMAT (one line per finding, no other output):
@@ -145,6 +146,41 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
 
                      c. Launch ALL file-group Agents in parallel (concurrent
                         Agent tool calls in a single message).
+                     d. If no Phase 1 findings, skip this step entirely.
+
+ 5. PHASE 2       → [multi-site] / [cross-module] findings — sequential dispatch.
+                     a. For each Phase 2 finding, launch a single Agent with:
+
+                        Prompt template:
+                        """
+                        Fix the following code review finding.
+
+                        INSTRUCTIONS:
+                        1. Read all files mentioned in the finding and Solution.
+                        2. If Evidence is provided, check if it matches the current
+                           code at or near the specified line. If the code has
+                           changed (Evidence does not match), SKIP.
+                           If Evidence is "none", skip this check and proceed to
+                           step 3.
+                        3. Follow the Solution description to apply the fix across
+                           all affected files.
+                        4. Do NOT make changes beyond what the finding and Solution
+                           describe.
+
+                        FINDING:
+                        - {finding_id} | {file}:{line} | {severity} | {description}
+                          Impact: {impact_text}
+                          Evidence: {evidence_snippet or "none"}
+                          Solution: {solution_text}
+
+                        RESPONSE FORMAT (one line, no other output):
+                        {finding_id}: {description of changes made, including all files modified}
+                        {finding_id}: SKIPPED — {reason}
+                        """
+
+                     b. Dispatch Agents one at a time, sequentially (wait for
+                        each Agent to complete before launching the next).
+                     c. If no Phase 2 findings, skip this step entirely.
 
  5. COLLECT       → a. Gather responses from all Agents.
                      b. Parse each response line:
