@@ -168,8 +168,19 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        Invoke the discussion-board skill with the context block
                        as the proposition. The discussion-board produces a
                        Design Doc via structured team debate. After the
-                       discussion concludes, use the Design Doc as context
-                       to implement the fix.
+                       discussion concludes, ask the user:
+
+                       ```
+                       Design Doc created. How would you like to proceed?
+                         1) writing-plans — Create a detailed implementation plan from the Design Doc
+                         2) Implement directly — Use the Design Doc as context and start coding
+                       ```
+
+                       - If 1: Invoke `superpowers:writing-plans` with the
+                         Design Doc path as input. Then execute the resulting
+                         implementation plan to apply the fix.
+                       - If 2: Use the Design Doc as context to implement
+                         the fix directly.
 
                     e. Implementation is complete when the user confirms the
                        fix is done, or the delegated workflow completes.
