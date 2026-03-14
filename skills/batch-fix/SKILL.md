@@ -34,21 +34,25 @@ Parse a code-review-board report, extract unchecked findings that have a `> Solu
 
 ## Architecture Note
 
-batch-fix is a **coordinator skill** — it uses parallel Agent tool calls for dispatch but does not use the full Agent Team model (TeamCreate/SendMessage/WHITEBOARD.md). This is a lighter pattern appropriate for tasks where Agents work on independent files with no need for inter-Agent communication.
+batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch but does not use the full Agent Team model (TeamCreate/SendMessage/WHITEBOARD.md). Phase 1 (single-site) uses parallel dispatch with one Agent per file group. Phase 2 (multi-site/cross-module) uses sequential dispatch with one Agent per finding, allowing multi-file edits.
 
 ---
 
 ## Flow
 
 ```
-1. PARSE    — Read review Markdown, extract unchecked [single-site] findings
-2. PRESENT  — Display finding list with selection UI (default: all selected)
-3. CONFIRM  — User selects/deselects findings, confirms
-4. DISPATCH — Group findings by file path, spawn 1 Agent per file in parallel
-5. COLLECT  — Gather results from Agents (success + fix memo, or skip reason)
-6. UPDATE   — Update review Markdown: [x] checkbox + <!-- fixed: memo --> comment
-7. COMMIT   — Stage modified code files + updated review Markdown, auto-commit (skip if 0 fixes)
-8. REPORT   — Display summary: N fixed, N skipped
+1. PARSE    — Read review Markdown, extract unchecked findings with > Solution: line
+             → Classify by scope tag:
+               - Phase 1: [single-site]
+               - Phase 2: [multi-site], [cross-module], or missing/malformed scope tag
+2. PRESENT  — Display finding list with checkbox UI (default: all selected)
+3. CONFIRM  — User toggles selection, confirms with "ok"
+4. PHASE 1  — [single-site] grouped by file → parallel Agent dispatch
+5. PHASE 2  — [multi-site] / [cross-module] → 1 finding per Agent, sequential dispatch
+6. COLLECT  — Merge results from both phases
+7. UPDATE   — Update review Markdown: [x] checkbox + <!-- fixed: memo --> comment
+8. COMMIT   — Stage modified code files + updated review Markdown, single commit
+9. REPORT   — Display summary: N fixed, N skipped
 ```
 
 ---
