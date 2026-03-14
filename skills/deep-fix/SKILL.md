@@ -47,7 +47,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
 3. VALIDATE — Verify Evidence snippets still match current code
 4. RANK     — LLM analyzes dependencies, selects up to 4 candidates
 5. SELECT   — User picks one finding (or browses all)
-6. APPROACH — User chooses brainstorming or Plan mode
+6. APPROACH — User chooses brainstorming, Plan mode, or discussion-board
 7. EXECUTE  — Delegate to chosen approach, collect fix summary
 8. VERIFY   — Check if source files were modified (HEAD or working tree)
 9. UPDATE   — Mark finding as [x], insert fixed comment
@@ -139,6 +139,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                     How would you like to approach this fix?
                       A) brainstorming — Detailed design discussion before implementation
                       B) Plan mode — Quick design proposal and implementation
+                      C) discussion-board — Team debate to explore the best approach
                     ```
 
                     Wait for user selection.
@@ -162,9 +163,16 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        block and ask for a fix proposal. After user approves
                        the plan, exit Plan mode and implement the fix.
 
-                    d. Implementation is complete when the user confirms the
+                    d. If option C (discussion-board):
+                       Invoke the discussion-board skill with the context block
+                       as the proposition. The discussion-board produces a
+                       Design Doc via structured team debate. After the
+                       discussion concludes, use the Design Doc as context
+                       to implement the fix.
+
+                    e. Implementation is complete when the user confirms the
                        fix is done, or the delegated workflow completes.
-                    e. After completion, ask the user for a one-line fix summary
+                    f. After completion, ask the user for a one-line fix summary
                        (used as the `<!-- fixed: ... -->` memo). If the user
                        declines or gives no summary, generate one from the
                        git diff of modified files.
@@ -230,6 +238,6 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
 | User enters invalid selection number | Re-prompt with valid range |
 | User cancels during finding selection | Display "Cancelled" and exit |
 | User cancels during approach selection | Display "Cancelled" and exit |
-| brainstorming/Plan mode abandoned by user | Do not update review file, do not commit, exit gracefully |
+| brainstorming/Plan mode/discussion-board abandoned by user | Do not update review file, do not commit, exit gracefully |
 | No source files modified after implementation | Skip commit, do not update review checkbox |
 | Commit failure (e.g., pre-commit hook) | Display error, leave review file unchanged |
