@@ -45,8 +45,8 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
              → Classify by scope tag:
                - Phase 1: [single-site]
                - Phase 2: [multi-site], [cross-module], or missing/malformed scope tag
-2. PRESENT  — Display finding list with checkbox UI (default: all selected)
-3. CONFIRM  — User toggles selection, confirms with "ok"
+2. PRESENT  — AskUserQuestion multiSelect UI (findings grouped in batches of 4)
+3. CONFIRM  — Deselected items are excluded; if none selected, exit
 4. PHASE 1  — [single-site] grouped by file → parallel Agent dispatch
 5. PHASE 2  — [multi-site] / [cross-module] → 1 finding per Agent, sequential dispatch
 6. COLLECT  — Merge results from both phases
@@ -89,37 +89,42 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                         display and exit:
                         "No unchecked findings with Solution found in {file}."
 
- 2. PRESENT       → Display extracted findings as a numbered checkbox list:
+ 2. PRESENT       → Present findings via AskUserQuestion with `multiSelect: true`.
 
-                     ```
-                     Found {N} fixable findings (with Solution) in {review-file}:
+                     Each option represents one finding:
+                       - label:       "[R-RD-001] Minor | utils.ts:12 | Variable name unclear"
+                       - description: "Solution: Rename to `descriptiveName`"
 
-                      1. [x] [R-RD-001] Minor | utils.ts:12 | Variable name unclear
-                         > Solution: Rename to `descriptiveName`
-                      2. [x] [R-RD-005] Minor | utils.ts:34 | Redundant type assertion
-                         > Solution: Remove `as string` cast
-                      3. [x] [R-PF-003] Major | api.ts:89  | Array.find in hot loop
-                         > Solution: Replace with Map lookup using precomputed index
-                      ...
+                     AskUserQuestion constraints:
+                       - Max 4 options per question, max 4 questions per call
+                       - Options require minItems: 2
+                       - No pre-selection API (user selects from scratch)
 
-                     Enter numbers to toggle (e.g., "3,5"), or "ok" to proceed:
-                     ```
+                     Grouping rules:
+                       - Pack up to 4 findings per question, up to 4 questions
+                         per AskUserQuestion call (max 16 findings per call).
+                       - If the last group would have only 1 finding, merge it
+                         into the previous group (minItems: 2 constraint).
+                       - If total findings > 16, issue multiple sequential
+                         AskUserQuestion calls.
 
-                     Use AskUserQuestion to present this list. The prompt MUST use exactly
-                     the `[x]`/`[ ]` checkbox format shown above — never a plain numbered
-                     list or other input format.
-                     Prompt text after the list:
-                       "Enter numbers to toggle (e.g., "3,5"), or "ok" to proceed:"
-                     All findings are selected by default (shown with [x]).
+                     Question text:
+                       - Single question:  "Select findings to fix:"
+                       - Multiple questions: "Select findings to fix (group {i}/{total}):"
 
- 3. CONFIRM       → a. Parse user input:
-                        - "ok" or empty → proceed with all selected
-                        - Comma-separated numbers → toggle those items
-                          (selected → deselected, deselected → selected)
-                     b. After each toggle input, redisplay the updated list
-                        and prompt again with the same prompt text.
-                     c. If all items deselected, display message and exit:
-                        "No findings selected. Exiting."
+                     The user selects the findings they WANT fixed.
+                     Unselected findings are skipped.
+
+                     IMPORTANT: Never fall back to a text-based numbered list
+                     or number-input toggling. Always use AskUserQuestion
+                     multiSelect.
+
+ 3. CONFIRM       → Collect responses from all AskUserQuestion calls.
+                     Findings the user selected → proceed to fix.
+                     Findings not selected → skip.
+                     "Other" text responses → ignore (not applicable).
+                     If no findings are selected across all calls:
+                       display "No findings selected. Exiting." and exit.
 
  4. PHASE 1       → [single-site] findings — parallel dispatch.
                      a. Group Phase 1 findings by file path.
