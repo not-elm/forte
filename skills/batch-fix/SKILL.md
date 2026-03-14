@@ -61,8 +61,36 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
 
 ```
  1. PARSE         → a. If target argument provided, use that path.
-                     b. Otherwise, glob `docs/reviews/*-review.md` and select the
-                        most recently modified file.
+                     b. Otherwise, glob `docs/reviews/*-review.md`:
+                        - **0 files** → fall through to step 1c error.
+                        - **1 file** → use it directly.
+                        - **2+ files** → present AskUserQuestion (single-select)
+                          listing files newest-first so the user can choose.
+
+                          ```json
+                          AskUserQuestion({
+                            "header": "Batch fix",
+                            "questions": [
+                              {
+                                "question": "Select review file:",
+                                "options": [
+                                  {
+                                    "label": "auth-review.md",
+                                    "description": "Modified 2 hours ago"
+                                  },
+                                  {
+                                    "label": "api-review.md",
+                                    "description": "Modified yesterday"
+                                  },
+                                  {
+                                    "label": "utils-review.md",
+                                    "description": "Modified 3 days ago"
+                                  }
+                                ]
+                              }
+                            ]
+                          })
+                          ```
                      c. If no review file found, display error and exit:
                         "No review file found. Run /code-review first or specify a path."
                      d. Read the review Markdown.
@@ -91,7 +119,11 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
 
  2. PRESENT       → Present findings via AskUserQuestion with `multiSelect: true`.
 
-                     Each option represents one finding:
+                     IMPORTANT: Never render findings as text in the question
+                     string. Each finding MUST be a separate `option` object
+                     with its own `label` and `description`.
+
+                     Option format (one per finding):
                        - label:       "[R-RD-001] Minor | utils.ts:12 | Variable name unclear"
                        - description: "Solution: Rename to `descriptiveName`"
 
@@ -112,19 +144,64 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                        - Single question:  "Select findings to fix:"
                        - Multiple questions: "Select findings to fix (group {i}/{total}):"
 
+                     ### Concrete example — 6 findings → 2 questions
+
+                     ```json
+                     AskUserQuestion({
+                       "header": "Batch fix",
+                       "questions": [
+                         {
+                           "question": "Select findings to fix (group 1/2):",
+                           "multiSelect": true,
+                           "options": [
+                             {
+                               "label": "[R-RD-001] Minor | src/utils.ts:12 | Variable name unclear",
+                               "description": "Solution: Rename `x` to `requestCount`"
+                             },
+                             {
+                               "label": "[R-CR-003] Major | src/api.ts:45 | Missing null check",
+                               "description": "Solution: Add early return when `response` is null"
+                             },
+                             {
+                               "label": "[R-AR-002] Minor | src/api.ts:78 | Unused import",
+                               "description": "Solution: Remove `import { debug } from './logger'`"
+                             },
+                             {
+                               "label": "[R-TD-001] Minor | src/helpers.ts:5 | Magic number",
+                               "description": "Solution: Extract `3600` to constant `SECONDS_PER_HOUR`"
+                             }
+                           ]
+                         },
+                         {
+                           "question": "Select findings to fix (group 2/2):",
+                           "multiSelect": true,
+                           "options": [
+                             {
+                               "label": "[R-RD-004] Minor | src/config.ts:22 | Hardcoded path",
+                               "description": "Solution: Read from `CONFIG_PATH` env var with fallback"
+                             },
+                             {
+                               "label": "[R-CR-005] Major | src/auth.ts:99 | Token not refreshed",
+                               "description": "Solution: Call `refreshToken()` before expiry check"
+                             }
+                           ]
+                         }
+                       ]
+                     })
+                     ```
+
                      The user selects the findings they WANT fixed.
                      Unselected findings are skipped.
 
-                     IMPORTANT: Never fall back to a text-based numbered list
-                     or number-input toggling. Always use AskUserQuestion
-                     multiSelect.
+                     IMPORTANT: Never fall back to a text-based numbered list,
+                     number-input toggling, or plain-text rendering of findings
+                     inside a question string. Always use AskUserQuestion
+                     multiSelect with one option per finding as shown above.
 
- 3. CONFIRM       → Collect responses from all AskUserQuestion calls.
-                     Findings the user selected → proceed to fix.
-                     Findings not selected → skip.
-                     "Other" text responses → ignore (not applicable).
-                     If no findings are selected across all calls:
-                       display "No findings selected. Exiting." and exit.
+ 3. CONFIRM       → Collect selected labels from all AskUserQuestion responses.
+                     Selected → proceed to fix. Not selected → skip.
+                     If no findings selected: display "No findings selected.
+                     Exiting." and exit.
 
  4. PHASE 1       → [single-site] findings — parallel dispatch.
                      a. Group Phase 1 findings by file path.
