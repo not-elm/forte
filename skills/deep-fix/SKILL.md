@@ -46,7 +46,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
 2. EXTRACT  — Parse unchecked [multi-site] / [cross-module] findings
 3. VALIDATE — Verify Evidence snippets still match current code
 4. RANK     — LLM analyzes dependencies, selects up to 4 candidates
-5. SELECT   — User picks one finding (or browses all)
+5. SELECT   — AskUserQuestion single-select: user picks one finding (or browses all)
 6. APPROACH — User chooses brainstorming, Plan mode, or discussion-board
 7. EXECUTE  — Delegate to chosen approach, collect fix summary
 8. VERIFY   — Check if source files were modified (HEAD or working tree)
@@ -65,8 +65,27 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        matches sorted by modification time (newest first).
                     c. If no review file found, display error and exit:
                        "No review file found. Run /code-review first or specify a path."
-                    d. If multiple files found, display numbered list and ask
-                       user to select by number.
+                    d. If multiple files found, present AskUserQuestion
+                       (single-select) listing files newest-first:
+
+                       ```json
+                       AskUserQuestion({
+                         "header": "Deep fix",
+                         "questions": [
+                           {
+                             "question": "Select review file:",
+                             "options": [
+                               { "label": "auth-review.md", "description": "Modified 2 hours ago" },
+                               { "label": "api-review.md", "description": "Modified yesterday" }
+                             ]
+                           }
+                         ]
+                       })
+                       ```
+
+                       If more than 4 files exist, pack up to 4 per question
+                       (max 4 questions per call). If only 1 file, use it
+                       directly without prompting.
 
  2. EXTRACT      → a. Read the review Markdown.
                     b. Extract findings matching ALL of:
@@ -111,36 +130,63 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                     c. Smaller impact scope within same severity — [multi-site]
                        before [cross-module] when severity is equal.
 
- 5. SELECT       → Display candidates as numbered list:
+ 5. SELECT       → Present candidates via AskUserQuestion (single-select).
 
+                    Each option:
+                    - label: `[R-AR-003] Major | [cross-module] | src/auth/session.ts:45`
+                    - description: Finding description + ` → ` + ranking reason
+
+                    If candidates < total valid findings, append a final option:
+                    - label: `Show all {total} findings...`
+                    - description: `Browse the complete list without ranking`
+
+                    Pack up to 4 options per question, max 4 questions per call.
+
+                    ```json
+                    AskUserQuestion({
+                      "header": "Deep fix — Select finding",
+                      "questions": [{
+                        "question": "Candidates ({N} of {total} findings):",
+                        "options": [
+                          {
+                            "label": "[R-AR-003] Major | [cross-module] | src/auth/session.ts:45",
+                            "description": "Session token storage format inconsistent → Prerequisite for R-SC-001 and R-CR-002"
+                          },
+                          {
+                            "label": "[R-CR-005] Major | [multi-site] | src/api/handler.ts:120",
+                            "description": "Error handling pattern inconsistent across 3 locations → Contained within single module"
+                          },
+                          {
+                            "label": "Show all 12 findings...",
+                            "description": "Browse the complete list without ranking"
+                          }
+                        ]
+                      }]
+                    })
                     ```
-                    ## Candidates ({N} of {total} findings)
 
-                    1. [R-AR-003] Major | [cross-module] | `src/auth/session.ts:45`
-                       Session token storage format inconsistent with new spec
-                       → Reason: Prerequisite for R-SC-001 and R-CR-002 (interface change)
+                    a. Finding selected → proceed to step 6.
+                    b. "Show all" selected → present a second AskUserQuestion
+                       with all valid findings (no ranking reasons in description).
+                       Same packing rules (4 options/question, 4 questions/call).
 
-                    2. [R-CR-005] Major | [multi-site] | `src/api/handler.ts:120`
-                       Error handling pattern inconsistent across 3 locations
-                       → Reason: Contained within single module, lower risk
+                    Do NOT fall back to text-based numbered lists or free-text
+                    input. All selection MUST use AskUserQuestion.
 
-                    3. ...
-                    4. ...
+ 6. APPROACH     → Present via AskUserQuestion (single-select):
 
-                    Enter a number to select, or "all" to see all findings:
-                    ```
-
-                    a. Number → select that finding, proceed to step 6.
-                    b. "all" → display full list of valid findings with same
-                       format (no ranking reasons), let user pick by number.
-
- 6. APPROACH     → Present two options:
-
-                    ```
-                    How would you like to approach this fix?
-                      A) brainstorming — Detailed design discussion before implementation
-                      B) Plan mode — Quick design proposal and implementation
-                      C) discussion-board — Team debate to explore the best approach
+                    ```json
+                    AskUserQuestion({
+                      "header": "Deep fix — Choose approach",
+                      "questions": [{
+                        "question": "How would you like to approach this fix?",
+                        "options": [
+                          { "label": "brainstorming", "description": "Detailed design discussion before implementation" },
+                          { "label": "Plan mode", "description": "Quick design proposal and implementation" },
+                          { "label": "discussion-board", "description": "Team debate to explore the best approach" }
+                        ]
+                      }]
+                    })
                     ```
 
                     Wait for user selection.
@@ -168,12 +214,20 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        Invoke the discussion-board skill with the context block
                        as the proposition. The discussion-board produces a
                        Design Doc via structured team debate. After the
-                       discussion concludes, ask the user:
+                       discussion concludes, present via AskUserQuestion
+                       (single-select):
 
-                       ```
-                       Design Doc created. How would you like to proceed?
-                         1) writing-plans — Create a detailed implementation plan from the Design Doc
-                         2) Implement directly — Use the Design Doc as context and start coding
+                       ```json
+                       AskUserQuestion({
+                         "header": "Deep fix — Post-discussion",
+                         "questions": [{
+                           "question": "Design Doc created. How would you like to proceed?",
+                           "options": [
+                             { "label": "writing-plans", "description": "Create a detailed implementation plan from the Design Doc" },
+                             { "label": "Implement directly", "description": "Use the Design Doc as context and start coding" }
+                           ]
+                         }]
+                       })
                        ```
 
                        - If 1: Invoke `superpowers:writing-plans` with the
@@ -247,7 +301,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
 | All findings already fixed (`- [x]`) | Display "All findings already fixed" and exit |
 | No unchecked findings without Solution (all have Solution or are already fixed) | Display message suggesting `/batch-fix` and exit |
 | All findings stale (Evidence mismatch or file missing) | Display "All findings are stale" and exit |
-| User enters invalid selection number | Re-prompt with valid range |
+| User enters unexpected response to AskUserQuestion | Re-prompt with valid range |
 | User cancels during finding selection | Display "Cancelled" and exit |
 | User cancels during approach selection | Display "Cancelled" and exit |
 | brainstorming/Plan mode/discussion-board abandoned by user | Do not update review file, do not commit, exit gracefully |
