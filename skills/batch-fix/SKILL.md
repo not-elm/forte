@@ -89,17 +89,17 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                         display and exit:
                         "No unchecked findings with Solution found in {file}."
 
- 2. PRESENT       → Display extracted findings as a numbered list:
+ 2. PRESENT       → Display extracted findings as a numbered checkbox list:
 
                      ```
-                     Found {N} single-site findings in {review-file}:
+                     Found {N} fixable findings (with Solution) in {review-file}:
 
                       1. [x] [R-RD-001] Minor | utils.ts:12 | Variable name unclear
                       2. [x] [R-RD-005] Minor | utils.ts:34 | Redundant type assertion
                       3. [x] [R-PF-003] Major | api.ts:89  | Array.find in hot loop
                       ...
 
-                     Enter numbers to deselect (e.g., "3,5"), or "ok" to proceed:
+                     Enter numbers to toggle (e.g., "3,5"), or "ok" to proceed:
                      ```
 
                      All findings are selected by default (shown with [x]).
@@ -107,9 +107,10 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
 
  3. CONFIRM       → a. Parse user input:
                         - "ok" or empty → proceed with all selected
-                        - Comma-separated numbers → deselect those items
-                     b. If user deselects items, redisplay the updated list and
-                        ask for confirmation again.
+                        - Comma-separated numbers → toggle those items
+                          (selected → deselected, deselected → selected)
+                     b. After each toggle input, redisplay the updated list
+                        and prompt again with the same prompt text.
                      c. If all items deselected, display message and exit:
                         "No findings selected. Exiting."
 
