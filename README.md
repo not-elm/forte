@@ -53,7 +53,7 @@ codex review docs/plans/api-design.md -- check for contradictions with the curre
 
 ### forte:discussion-board
 
-Structured team debate with iterative synthesis using 4–5 role-based agents. Explores open-ended questions through rounds of hypothesize, critique, audit (via Codex), synthesize, and ratify phases. Produces a design doc when concluded.
+Structured team debate with iterative synthesis using 4–10 role-based agents (scaled to topic complexity). Explores open-ended questions through rounds of hypothesize, critique, audit (via Codex), synthesize, and ratify phases. Produces a design doc when concluded.
 
 Arguments: free-form proposition or question to explore.
 

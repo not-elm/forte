@@ -39,7 +39,7 @@ setup → framing → [Round N: hypothesize → critique → audit → revise (i
 
 | Phase | Who | What |
 |-------|-----|------|
-| setup | Leader + User | Analyze proposition, suggest 4-5 roles, user approves, create team |
+| setup | Leader + User | Analyze proposition, suggest 4-10 roles, user approves, create team |
 | framing | All members | Document problem interpretation, constraints, criteria, unknowns |
 | hypothesize | All members | Write concrete, testable candidate answers as hypotheses |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
@@ -170,7 +170,7 @@ Members append corrections in their own subsection (append-only — original ent
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup | Suggest 4-5 roles, create team + files | — | WHITEBOARD.md + SYNTHESIS.md | Team spawned |
+| setup | Suggest 4-10 roles, create team + files | — | WHITEBOARD.md + SYNTHESIS.md | Team spawned |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
 | critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
@@ -184,7 +184,7 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### setup
 
-- Leader suggests 4-5 roles with distinct perspectives (NOT 5-7). Default 4 members, max 5. 3 or 6-7 not recommended.
+- Leader suggests 4-10 roles with distinct perspectives. Choose member count based on topic complexity: simple topics → 4-5, moderate → 6-7, complex/multifaceted → 8-10.
 - User approves or modifies roles before team creation.
 - Generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`).
 - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
@@ -315,23 +315,27 @@ Path: `docs/discussions/{discussion-id}/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective.}
 
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ## Framing
 ### {member-A}
 ### {member-B}
 ### {member-C}
 ### {member-D}
+<!-- ... up to {member-J} depending on team size -->
 
 ## Hypotheses
 ### {member-A}
 ### {member-B}
 ### {member-C}
 ### {member-D}
+<!-- ... up to {member-J} depending on team size -->
 
 ## Critique
 ### {member-A}
 ### {member-B}
 ### {member-C}
 ### {member-D}
+<!-- ... up to {member-J} depending on team size -->
 
 ## Audit
 ```
@@ -396,6 +400,11 @@ Note: This is a design document, not an implementation plan. To create an execut
 |---------|-------------------|
 | 4 | 3 |
 | 5 | 3 |
+| 6 | 4 |
+| 7 | 4 |
+| 8 | 5 |
+| 9 | 5 |
+| 10 | 6 |
 
 - **Max rounds**: 10 (configurable at board creation)
 - **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
