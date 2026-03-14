@@ -68,21 +68,26 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                      d. Read the review Markdown.
                      e. Extract findings matching ALL of:
                         - Line starts with `- [ ]` (unchecked only — skip `- [x]`)
-                        - Has `> Impact:` line starting with `[single-site]`
+                        - Has `> Solution:` line (presence required — content is the solution text)
                      f. For each matching finding, extract:
                         - Finding ID (e.g., [R-RD-001])
                         - Severity (Critical, Major, Minor)
                         - Perspective name
                         - File path and line number
                         - Description
-                        - Impact text (after [single-site])
+                        - Scope tag from `> Impact:` line ([single-site], [multi-site], or [cross-module])
+                          If `> Impact:` line is missing or malformed, default to [multi-site]
+                        - Impact text (after scope tag)
                         - Evidence snippet (if present)
-                        - Solution text (if present)
-                     g. If no unchecked findings exist at all (every finding is `- [x]`),
+                        - Solution text
+                     g. Classify extracted findings by scope tag:
+                        - Phase 1: [single-site]
+                        - Phase 2: [multi-site], [cross-module]
+                     h. If no unchecked findings exist at all (every finding is `- [x]`),
                         display and exit: "All findings already fixed in {file}."
-                     h. If unchecked findings exist but none are `[single-site]`,
+                     i. If unchecked findings exist but none have a `> Solution:` line,
                         display and exit:
-                        "No unchecked [single-site] findings found in {file}."
+                        "No unchecked findings with Solution found in {file}."
 
  2. PRESENT       → Display extracted findings as a numbered list:
 
