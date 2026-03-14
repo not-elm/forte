@@ -33,7 +33,8 @@ Enter numbers to toggle (e.g., "3,5"), or "ok" to proceed:
 ```
 
 - Default: all selected
-- User enters numbers to toggle selection
+- User enters numbers to toggle selection (entering a number again re-selects it)
+- After each toggle input, redisplay the updated list and prompt again
 - "ok" or empty input to confirm and proceed
 - If all items deselected: display message and exit
 
@@ -49,9 +50,10 @@ After user confirmation, classify selected findings by scope tag and dispatch in
 **Phase 2 — `[multi-site]` / `[cross-module]` findings (sequential)**
 - Dispatch 1 Agent per finding, sequentially
 - Each Agent can read and edit multiple files as needed
+- Prompt template adapted for multi-file context (see Phase 2 Agent Prompt below)
 - Same response format as Phase 1 (per-finding: description of change or SKIPPED with reason)
 
-**Scope tag fallback:** If a finding has `> Solution:` but a malformed or missing `> Impact:` line, treat it as `[single-site]`.
+**Scope tag fallback:** If a finding has `> Solution:` but a malformed or missing `> Impact:` line, treat it as Phase 2 (`[multi-site]`) for safety — the sequential, multi-file-capable dispatch is the safer default for findings with unknown scope.
 
 **Phase skipping:** If either phase has zero findings after classification, skip it entirely.
 
@@ -89,9 +91,11 @@ Triggers: /batch-fix, batch fix, 一括修正
 
 ### Error Handling Changes
 
-| Situation | Action |
-|-----------|--------|
-| No unchecked findings with `> Solution:` (but other unchecked exist) | Display "No unchecked findings with Solution found in {file}." and exit |
+| Situation | Current Message | New Message |
+|-----------|----------------|-------------|
+| No unchecked findings with `> Solution:` (but other unchecked exist) | "No unchecked [single-site] findings found in {file}." | "No unchecked findings with Solution found in {file}." |
+| All findings already fixed | "All findings already fixed in {file}." | Unchanged |
+| All findings deselected by user | "No findings selected. Exiting." | Unchanged |
 
 All other error handling remains unchanged.
 
@@ -104,15 +108,48 @@ All other error handling remains unchanged.
 ### Boundary with deep-fix
 
 - **batch-fix**: Findings with `> Solution:` line — automated fix following the described solution
-- **deep-fix**: Complex findings without `> Solution:`, or findings requiring design/planning before implementation
+- **deep-fix**: Findings without `> Solution:` line, or findings requiring design/planning before implementation
+
+**Required changes to deep-fix SKILL.md:**
+- Update extraction filter to exclude findings that have a `> Solution:` line (those belong to batch-fix)
+- Update "When NOT to Use" to reflect the new boundary: "`[single-site]` findings → use `/batch-fix`" becomes "Findings with `> Solution:` → use `/batch-fix`"
+- Update the exit message (line 91) from "Remaining unchecked findings are [single-site] — use /batch-fix." to "Remaining unchecked findings have Solution lines — use /batch-fix."
+
+### Phase 2 Agent Prompt
+
+Phase 2 findings may span multiple files. The prompt template is adapted from Phase 1:
+
+```
+Fix the following code review finding.
+
+INSTRUCTIONS:
+1. Read all files mentioned in the finding and Solution.
+2. If Evidence is provided, check if it matches the current code at or near
+   the specified line. If the code has changed (Evidence does not match), SKIP.
+   If Evidence is "none", skip this check and proceed to step 3.
+3. Follow the Solution description to apply the fix across all affected files.
+4. Do NOT make changes beyond what the finding and Solution describe.
+
+FINDING:
+- {finding_id} | {file}:{line} | {severity} | {description}
+  Impact: {impact_text}
+  Evidence: {evidence_snippet or "none"}
+  Solution: {solution_text}
+
+RESPONSE FORMAT (one line, no other output):
+{finding_id}: {description of changes made, including all files modified}
+{finding_id}: SKIPPED — {reason}
+```
+
+Key difference from Phase 1: no `file_path` scope restriction — the Agent reads and edits whatever files the Solution requires.
 
 ## Flow (Updated)
 
 ```
 1. PARSE    — Read review Markdown, extract unchecked findings with > Solution: line
              → Classify by scope tag into two groups:
-               - Phase 1: [single-site] (or missing/malformed scope tag)
-               - Phase 2: [multi-site], [cross-module]
+               - Phase 1: [single-site]
+               - Phase 2: [multi-site], [cross-module], or missing/malformed scope tag
 2. PRESENT  — Display finding list with checkbox UI (default: all selected)
 3. CONFIRM  — User toggles selection, confirms with "ok"
 4. PHASE 1  — [single-site] grouped by file → parallel Agent dispatch
@@ -125,7 +162,7 @@ All other error handling remains unchanged.
 
 ## Changes NOT in Scope
 
-- No changes to the Agent prompt template (Phase 1 reuses current template; Phase 2 uses same format with single finding)
+- No changes to the Phase 1 Agent prompt template (reuses current batch-fix template), except: update the Evidence check instruction to match Phase 2 ("If Evidence is 'none', skip this check")
 - No changes to the UPDATE logic (checkbox + fixed comment)
 - No changes to the REPORT format (other than removing "single-site" wording)
 - No changes to the code-review-board finding format or Solution line generation
