@@ -113,7 +113,7 @@ All other error handling remains unchanged.
 **Required changes to deep-fix SKILL.md:**
 - Update extraction filter to exclude findings that have a `> Solution:` line (those belong to batch-fix)
 - Update "When NOT to Use" to reflect the new boundary: "`[single-site]` findings → use `/batch-fix`" becomes "Findings with `> Solution:` → use `/batch-fix`"
-- Update the exit message (line 91) from "Remaining unchecked findings are [single-site] — use /batch-fix." to "Remaining unchecked findings have Solution lines — use /batch-fix."
+- Update the exit message (line 88-91) to: "No unchecked findings without Solution found in {file}. Findings with Solution lines can be fixed with /batch-fix."
 
 ### Phase 2 Agent Prompt
 
