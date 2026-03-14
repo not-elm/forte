@@ -182,14 +182,14 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                         each Agent to complete before launching the next).
                      c. If no Phase 2 findings, skip this step entirely.
 
- 5. COLLECT       → a. Gather responses from all Agents.
+ 6. COLLECT       → a. Gather responses from all Phase 1 and Phase 2 Agents.
                      b. Parse each response line:
                         - Lines containing ": SKIPPED" → record as skipped with reason
                         - Other lines → record as fixed with memo
                      c. If an Agent fails entirely (error, no response), record all
-                        findings for that file as skipped with reason "Agent error".
+                        findings for that Agent as skipped with reason "Agent error".
 
- 6. UPDATE        → For each successfully fixed finding, edit the review Markdown:
+ 7. UPDATE        → For each successfully fixed finding, edit the review Markdown:
                      a. Change `- [ ]` to `- [x]` on the finding's checkbox line
                         (match by finding ID, e.g., `[R-RD-001]`).
                      b. Find the last `>` blockquote line belonging to that finding
@@ -199,15 +199,15 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                      Existing `> Solution:` lines are preserved as-is.
                      Skipped findings remain unchanged (`- [ ]`).
 
- 7. COMMIT        → a. If no source files were modified (all findings skipped),
+ 8. COMMIT        → a. If no source files were modified (all findings skipped),
                         skip the commit entirely.
                      b. Stage all modified source files + the updated review Markdown.
                         Use specific file paths (not `git add -A`).
                      c. Commit with message:
-                        `fix: batch-fix {N} single-site findings from {review-file-name}`
+                        `fix: batch-fix {N} findings from {review-file-name}`
                         Include `Co-Authored-By: Claude <noreply@anthropic.com>`.
 
- 8. REPORT        → Display terminal summary:
+ 9. REPORT        → Display terminal summary:
 
                      ```
                      ## batch-fix Complete
@@ -233,9 +233,9 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
 |-----------|--------|
 | Review file not found (no argument, no files in docs/reviews/) | Display error message and exit |
 | All findings already fixed (`- [x]`) | Display "All findings already fixed" and exit |
-| No unchecked `[single-site]` findings (but other unchecked exist) | Display "No unchecked [single-site] findings" and exit |
+| No unchecked findings with `> Solution:` (but other unchecked exist) | Display "No unchecked findings with Solution found in {file}." and exit |
 | All findings deselected by user | Display message and exit |
 | File referenced by finding does not exist | Agent skips finding, reports "file not found" |
 | Evidence snippet does not match current code | Agent skips finding, reports "code changed since review" |
-| Agent fails entirely | Skip all findings for that file, report "Agent error" |
+| Agent fails entirely | Skip all findings for that Agent, report "Agent error" |
 | All findings skipped | Skip commit, display report only |
