@@ -1,24 +1,24 @@
 ---
 name: deep-fix
 description: >-
-  Deep-fix complex multi-site/cross-module code review findings one at a time.
-  Use for findings requiring design planning before implementation.
+  Deep-fix complex code review findings that require design planning.
+  Use for findings without a clear Solution that need discussion before implementation.
   Triggers: /deep-fix, deep fix, 個別修正
 ---
 
 # deep-fix — Deep Fix Complex Review Findings
 
-Address code-review-board findings with `[multi-site]` or `[cross-module]` scope one at a time. Parses the review Markdown, validates findings against current code, ranks candidates by dependency analysis, and delegates to brainstorming or Plan mode for design and implementation.
+Address code-review-board findings that lack a `> Solution:` line and require design discussion or planning before implementation. Parses the review Markdown, validates findings against current code, ranks candidates by dependency analysis, and delegates to brainstorming or Plan mode for design and implementation.
 
 ## When to Use
 
 - The user wants to fix a complex finding from a code review report: `/deep-fix`, "deep fix", "個別修正"
-- The finding requires changes across multiple locations (`[multi-site]`) or modules (`[cross-module]`)
+- The finding lacks a `> Solution:` line and requires design discussion or planning
 - The fix needs design discussion or planning before implementation
 
 ## When NOT to Use
 
-- Findings are `[single-site]` — use `/batch-fix` instead
+- Findings have a `> Solution:` line — use `/batch-fix` instead
 - The user wants to batch-fix multiple findings at once — use `/batch-fix` instead
 
 ## Arguments
@@ -72,6 +72,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                     b. Extract findings matching ALL of:
                        - Line starts with `- [ ]` (unchecked only — skip `- [x]`)
                        - Has `> Impact:` line starting with `[multi-site]` or `[cross-module]`
+                       - Does NOT have a `> Solution:` line (findings with Solution belong to batch-fix)
                     c. Finding line format (from code-review-board report):
                        `- [ ] [R-XX-NNN] **Severity** | `perspective` | `file:line` | Description`
                        For each matching finding, extract:
@@ -85,10 +86,10 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        - Solution text (if present)
                     d. If no unchecked findings exist at all (every finding is `- [x]`),
                        display and exit: "All findings already fixed in {file}."
-                    e. If unchecked findings exist but none are `[multi-site]` or
-                       `[cross-module]`, display and exit:
-                       "No unchecked [multi-site]/[cross-module] findings found in {file}.
-                        Remaining unchecked findings are [single-site] — use /batch-fix."
+                    e. If unchecked findings exist but none match (all have Solution
+                       lines or are [single-site] without Solution), display and exit:
+                       "No unchecked findings without Solution found in {file}.
+                        Findings with Solution lines can be fixed with /batch-fix."
 
  3. VALIDATE     → For each extracted finding:
                     a. Check if the file referenced in the finding exists.
@@ -220,7 +221,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                     Review: {review-file-path} (updated)
                     Commit: {short-hash}
 
-                    Remaining: multi-site {N}, cross-module {N}
+                    Remaining: {N} findings without Solution
                     ```
 ```
 
@@ -233,7 +234,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
 | Review file not found (no argument, no files in docs/reviews/) | Display error message and exit |
 | Review file argument points to nonexistent file | Display error message and exit |
 | All findings already fixed (`- [x]`) | Display "All findings already fixed" and exit |
-| No unchecked `[multi-site]`/`[cross-module]` findings | Display message suggesting `/batch-fix` and exit |
+| No unchecked findings without Solution (all have Solution or are already fixed) | Display message suggesting `/batch-fix` and exit |
 | All findings stale (Evidence mismatch or file missing) | Display "All findings are stale" and exit |
 | User enters invalid selection number | Re-prompt with valid range |
 | User cancels during finding selection | Display "Cancelled" and exit |
