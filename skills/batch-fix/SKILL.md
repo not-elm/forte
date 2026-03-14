@@ -1,24 +1,24 @@
 ---
 name: batch-fix
 description: >-
-  Batch-fix single-site code review findings.
-  Use when applying fixes for low-impact findings from code-review-board reports.
+  Batch-fix code review findings that have a clear Solution.
+  Use when applying batch fixes for code-review-board findings.
   Triggers: /batch-fix, batch fix, 一括修正
 ---
 
-# batch-fix — Batch Fix Single-Site Review Findings
+# batch-fix — Batch Fix Review Findings with Solution
 
-Parse a code-review-board report, extract unchecked `[single-site]` findings, let the user select which to fix, dispatch parallel Agents (one per file) to apply fixes, update the review Markdown, and commit.
+Parse a code-review-board report, extract unchecked findings that have a `> Solution:` line, let the user select which to fix via checkbox UI, dispatch Agents to apply fixes (parallel for single-site, sequential for multi-site/cross-module), update the review Markdown, and commit.
 
 ## When to Use
 
 - The user wants to batch-fix findings from a code review report: `/batch-fix`, "batch fix", "一括修正"
-- The user wants to auto-fix low-impact findings after running `/code-review`
+- The user wants to auto-fix findings that have a clear Solution after running `/code-review`
 
 ## When NOT to Use
 
-- Findings require cross-file or cross-module changes (`[multi-site]`, `[cross-module]`)
 - The user wants to manually fix specific findings one by one
+- Findings require design discussion or planning before implementation (use `/deep-fix`)
 
 ## Arguments
 
