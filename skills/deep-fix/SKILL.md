@@ -215,3 +215,21 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                     Remaining: multi-site {N}, cross-module {N}
                     ```
 ```
+
+---
+
+## Error Handling
+
+| Situation | Action |
+|-----------|--------|
+| Review file not found (no argument, no files in docs/reviews/) | Display error message and exit |
+| Review file argument points to nonexistent file | Display error message and exit |
+| All findings already fixed (`- [x]`) | Display "All findings already fixed" and exit |
+| No unchecked `[multi-site]`/`[cross-module]` findings | Display message suggesting `/batch-fix` and exit |
+| All findings stale (Evidence mismatch or file missing) | Display "All findings are stale" and exit |
+| User enters invalid selection number | Re-prompt with valid range |
+| User cancels during finding selection | Display "Cancelled" and exit |
+| User cancels during approach selection | Display "Cancelled" and exit |
+| brainstorming/Plan mode abandoned by user | Do not update review file, do not commit, exit gracefully |
+| No source files modified after implementation | Skip commit, do not update review checkbox |
+| Commit failure (e.g., pre-commit hook) | Display error, leave review file unchanged |
