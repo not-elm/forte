@@ -95,15 +95,22 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                      Found {N} fixable findings (with Solution) in {review-file}:
 
                       1. [x] [R-RD-001] Minor | utils.ts:12 | Variable name unclear
+                         > Solution: Rename to `descriptiveName`
                       2. [x] [R-RD-005] Minor | utils.ts:34 | Redundant type assertion
+                         > Solution: Remove `as string` cast
                       3. [x] [R-PF-003] Major | api.ts:89  | Array.find in hot loop
+                         > Solution: Replace with Map lookup using precomputed index
                       ...
 
                      Enter numbers to toggle (e.g., "3,5"), or "ok" to proceed:
                      ```
 
+                     Use AskUserQuestion to present this list. The prompt MUST use exactly
+                     the `[x]`/`[ ]` checkbox format shown above — never a plain numbered
+                     list or other input format.
+                     Prompt text after the list:
+                       "Enter numbers to toggle (e.g., "3,5"), or "ok" to proceed:"
                      All findings are selected by default (shown with [x]).
-                     Wait for user input.
 
  3. CONFIRM       → a. Parse user input:
                         - "ok" or empty → proceed with all selected
