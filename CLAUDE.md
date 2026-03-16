@@ -17,6 +17,7 @@ skills/
   codex-investigate/   # Bug root-cause investigation via Codex CLI
   codex-review/        # Design/code/hypothesis review via Codex CLI
   discussion-board/    # Structured team debate with iterative synthesis
+  investigation-board/ # Evidence-based bug investigation via structured team debate
 ```
 
 ## Plugin Architecture
@@ -26,7 +27,7 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 ### Key Patterns Across Skills
 
 - **Codex-based skills** (codex-investigate, codex-review): Use `codex exec` CLI in read-only mode. Prompts are always written to a temp file and piped via stdin to avoid shell argument length limits.
-- **Agent Team skills** (code-review-board, discussion-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a 2-file model (WHITEBOARD.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention.
+- **Agent Team skills** (code-review-board, discussion-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a 2-file model (WHITEBOARD.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention.
 
 ## Adding a New Skill
 
