@@ -294,11 +294,14 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
 - Generate a kebab-case `{investigation-id}` from the bug description (e.g., `cache-memory-spike-on-login`).
 - Create `docs/investigations/{investigation-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
 - Ensure `docs/investigations/` is in `.gitignore` (add if missing).
+- Each role should have a **Role-specific investigation checklist** — a list of 3-5 items the member should focus on during evidence-gathering and hypothesize phases (modeled after code-review-board's reviewer checklists and scope boundary rules).
+- **Optional: codex-investigate pre-injection** — Before creating files, leader runs `codex-investigate` with the bug symptoms. If successful, the output (Root Cause / Impact Scope / Suggested Fix / Confidence) is included in the Bug Report section as prior investigation context.
 
 ### framing
 
 - Members use full WHITEBOARD.md Read (file is small at this stage).
 - **Reproduction context gate**: Leader reviews framing entries before allowing evidence-gathering to begin. If any member has not provided concrete reproduction steps, leader requests clarification via SendMessage before proceeding.
+- Spawn-time prompt must include: (a) the member's **role-specific investigation checklist** (3-5 focus items), and (b) a **few-shot example** (1 pair: good hypothesis vs insufficient hypothesis, ~200-300 tokens) to calibrate output quality.
 - Leader combines completion confirmation + evidence-gathering kickoff in 1 broadcast to reduce round-trips.
 
 ### evidence-gathering
@@ -308,6 +311,7 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
 - Both positive evidence and negative evidence (ruling out causes) are valuable.
 - Members should prioritize: code-inspection of cited stack traces → log-analysis of error logs → git-history for recent changes → config-review for misconfiguration → test-result for reproduction attempts.
 - Report completion using the completion report format.
+- **Cross-boundary investigation permitted**: Members may investigate outside their primary area if they discover relevant leads.
 
 ### hypothesize
 
@@ -330,7 +334,7 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
 ### audit
 
 - **Layer 1 — Code-Specific Verification**:
-  - For every hypothesis and evidence entry that cites a specific `file:line`, leader uses Read tool to retrieve that file section and verifies the claim.
+  - For every hypothesis and evidence entry that cites a specific `file:line`, leader uses Read tool to retrieve that file section and checks the actual code at the referenced location **±10 lines** (following deep-fix's VALIDATE pattern) to verify the claim.
   - Record results in the Layer 1 table: Entry / Code Claim / File:Line / Verification / Verdict.
   - This layer runs first and may invalidate hypotheses before Layer 2.
 
@@ -401,6 +405,7 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
 - Draft Conclusion must include Root Cause, Confidence, Suggested Fix, Key claims, and Unresolved items.
 - Round 2+: add entry ID → summary mapping table in SYNTHESIS.md for members to reference efficiently.
 - Guideline: "When in doubt about summary accuracy, members should Grep original text."
+- **Information loss prevention**: Leader must list hypotheses NOT reflected in conclusion with exclusion reasons.
 
 ### ratify
 
@@ -436,7 +441,16 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 > Team: {comma-separated names}
 
 ## Bug Report
-{Clear statement of the bug. Include symptoms, environment, frequency, and impact.}
+
+{Clear description of the bug. Include symptoms, error messages, stack traces, affected components.}
+
+### Reproduction Context
+
+{Minimal reproduction steps. Environment, preconditions, input, expected behavior, actual behavior.}
+
+### Prior Investigation (codex-investigate)
+
+{Output from codex-investigate if available, or "(No prior investigation)" if not run.}
 
 ## How Our Work Connects
 {Each member's role and investigative perspective.}
@@ -455,6 +469,7 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
+### codex
 
 ## Hypotheses
 ### {member-A}
@@ -462,6 +477,7 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
+### codex
 
 ## Critique
 ### {member-A}
@@ -469,6 +485,7 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
+### codex
 
 ## Audit
 ```
@@ -565,6 +582,8 @@ Note: This is an investigation report, not an implementation plan. To create an 
 | 6 | `## Audit` section is leader-only (structural exception to per-member rule, same pattern as SYNTHESIS.md) | Single writer; audit results managed by leader |
 | 7 | Revisions are append-only in member's own subsection; original entries are never modified | Maintains append-only invariant from Core Principle #6 |
 | 8 | Debate Tally is leader-only in SYNTHESIS.md | Single writer; quantitative tally requires consistent state |
+| 9 | `### codex` subsection is leader-only (leader writes on Codex's behalf) | Same pattern as Audit rule |
+| 10 | Evidence gathering uses Read/Grep/Glob (read-only tools) — no file modifications during investigation | Read-only tools cannot conflict with write zones |
 
 ## Audit Notes
 
@@ -574,6 +593,93 @@ Note: This is an investigation report, not an implementation plan. To create an 
 - **Audit is incremental** — each round audits only new entries, not the full history
 - **Revisions are append-only** — never edit the original hypothesis, evidence, or critique text
 - **Layer 1 takes precedence** — if a code claim fails Layer 1 verification, it is flagged regardless of Layer 2 outcome
+
+## Codex Advisory Member
+
+### Prerequisites
+
+`codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, skip all Codex advisory steps with "(Codex advisory skipped: CLI not found)".
+
+### Workflow
+
+Leader waits for all voting members to complete their phase entries → reads WHITEBOARD.md → constructs prompt from template → runs `codex exec` → writes verbatim output to the `### codex` subsection in the relevant WHITEBOARD section.
+
+### Hypothesize Prompt Template
+
+```
+You are an advisory member in a structured bug investigation. The team is investigating the following bug:
+
+{bug description and reproduction context}
+
+The team's evidence and existing hypotheses are below. Generate 2-3 novel hypotheses that the team has NOT already proposed. Each hypothesis must be concrete, testable, and grounded in the evidence collected.
+
+Use this exact ID format: [H-X-001], [H-X-002], etc.
+
+Format each hypothesis as:
+- [H-X-NNN] **hypothesis**: {concrete claim about root cause}
+  > **Cause mechanism**: {causal chain}
+  > **Predicted evidence**: {what to look for in the codebase}
+  > **Falsification condition**: {what would disprove this}
+  > **Evidence chain**:
+  >   - Supporting [{strength}]: {evidence reference or description}
+  >   - Counter [{strength}]: {counter-evidence or "none found"}
+  >   - Unverified: {unverified assumptions}
+
+Existing content:
+{evidence + hypotheses from WHITEBOARD.md}
+```
+
+### Critique Prompt Template
+
+```
+You are an advisory member in a structured bug investigation. The team is investigating the following bug:
+
+{bug description and reproduction context}
+
+Review the hypotheses and existing critiques below. Write 2-4 critiques that fill gaps. Each critique must target a specific hypothesis using refs=[] and @codex.
+
+Use this exact ID format: [CR-X-R{round}-001], [CR-X-R{round}-002], etc.
+Label: **challenge**, **support**, **amend**, or **question**.
+Reference evidence entries [E-X-NNN] where possible.
+
+Existing content:
+{evidence + hypotheses + critiques from WHITEBOARD.md}
+```
+
+### Revise Prompt Template
+
+Same as discussion-board's revise prompt template.
+
+### Invocation Pattern
+
+Temp file + stdin:
+
+```bash
+TMPFILE=$(mktemp)
+cat <<'PROMPT_EOF' > "$TMPFILE"
+<constructed_prompt>
+PROMPT_EOF
+cat "$TMPFILE" | codex exec
+rm -f "$TMPFILE"
+```
+
+### Verbatim Copy Rule
+
+Leader MUST copy Codex output verbatim to the `### codex` subsection. Only ID prefix corrections are allowed (e.g., fixing `[H-1-001]` to `[H-X-001]`).
+
+### Error Handling
+
+| Situation | Action |
+|-----------|--------|
+| CLI not found | Skip Codex advisory with "(Codex advisory skipped: CLI not found)" |
+| Empty output | Note "(Codex returned empty output)" in `### codex` subsection |
+| Malformed IDs | Prepend correct ID format (e.g., `[H-X-NNN]`) before writing |
+| Non-zero exit | Skip with "(Codex advisory skipped: exit code {N})" |
+| Timeout (>2min) | Skip with "(Codex advisory skipped: timeout exceeded)" |
+
+### Budget
+
+Max 3 Codex CLI calls per round, 2-minute timeout per call.
 
 ## Timeout Policy
 
