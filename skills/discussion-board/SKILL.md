@@ -238,7 +238,7 @@ Members append corrections in their own subsection (append-only — original ent
   cat <<'PROMPT_EOF' > "$TMPFILE"
   <constructed_prompt>
   PROMPT_EOF
-  cat "$TMPFILE" | codex exec
+  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini --ephemeral -m gpt-5.4-mini
   rm -f "$TMPFILE"
   ```
 
@@ -247,6 +247,8 @@ Members append corrections in their own subsection (append-only — original ent
 - **Error handling:**
   - Codex exits non-zero or times out → record "Audit failed (Codex error)" in `### Round {N}`, skip revise, proceed to synthesize with warning
   - Codex returns partial/malformed output → leader writes available results, marks incomplete entries as ❓
+
+- Set Bash tool `timeout: 180000` (3 minutes) for the Codex invocation to prevent the default 120s timeout from killing longer runs.
 
 - **Decision logic:**
   - All ✅ or ❓ only → skip `revise`, proceed to `synthesize`

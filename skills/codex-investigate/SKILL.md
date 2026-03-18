@@ -69,7 +69,9 @@ Instructions:
 4. Suggest a fix approach — concrete steps to resolve the issue (do NOT modify files)
 5. If you cannot determine the root cause with confidence, state what additional information would be needed
 
-Important: You MUST cite specific file paths and line numbers for every claim. Do not speculate without evidence from the code.
+Important:
+- You MUST cite specific file paths and line numbers for every claim. Do not speculate without evidence from the code.
+- Be concise. If a section has no findings, write "N/A" and move on — do not pad with filler content.
 
 Format your response as:
 ## Root Cause
@@ -97,6 +99,10 @@ Additional Context:
 
 ### Phase 3: Run Codex CLI
 
+Before running Codex, display a brief status message to the user:
+
+> "Running Codex investigation — this typically takes 30-90 seconds..."
+
 Write the prompt to a temporary file, then pipe it to Codex via stdin to avoid shell argument length limits:
 
 ```bash
@@ -106,7 +112,7 @@ cat <<'PROMPT_EOF' > /tmp/codex-investigate-prompt.txt
 PROMPT_EOF
 
 # 2. Pipe to Codex via stdin (read-only mode)
-cat /tmp/codex-investigate-prompt.txt | codex exec
+cat /tmp/codex-investigate-prompt.txt | codex exec --ephemeral -m gpt-5.4-mini
 
 # 3. Clean up
 rm -f /tmp/codex-investigate-prompt.txt
@@ -115,6 +121,7 @@ rm -f /tmp/codex-investigate-prompt.txt
 - `exec`: Non-interactive subcommand (runs the prompt and exits)
 - Codex runs **read-only** — it can read files in the repo but cannot modify them
 - Using a temp file avoids shell argument length limits that cause hangs with long prompts
+- Set Bash tool `timeout: 180000` (3 minutes) to prevent the default 120s timeout from killing longer runs
 
 ### Phase 4: Display Results
 

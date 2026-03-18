@@ -404,7 +404,7 @@ Each solution entry must reference one or more finding IDs it addresses.
                     For codex-reviewer, additionally instruct:
                     - "Use the codex-review skill approach: build a Code Review prompt
                       with all target file contents, write it to a temp file, and run
-                      `cat /tmp/codex-review-prompt.txt | codex exec`. Convert the Codex
+                      `cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.4-mini`. Convert the Codex
                       response into [R-CX-NNN] finding format and write to your finding file."
 
                     Update SYNTHESIS.md: Status → "reviewing", Phase → "reviewing"
@@ -557,15 +557,16 @@ Each solution entry must reference one or more finding IDs it addresses.
    cat <<'PROMPT_EOF' > /tmp/codex-review-prompt.txt
    <constructed_prompt>
    PROMPT_EOF
-   cat /tmp/codex-review-prompt.txt | codex exec
+   cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.4-mini
    rm -f /tmp/codex-review-prompt.txt
    ```
 4. **Convert** Codex response into `[R-CX-NNN]` finding format with Evidence where applicable.
 5. **Write** converted findings to `findings/codex-reviewer.md`.
 6. **Handle errors**: If `codex` CLI is not installed or fails, retry once. On second failure, write: `- [R-CX-001] **Minor** | N/A | Codex review unavailable — codex CLI execution failed.`
-6. **Report** completion to the leader via SendMessage using the structured completion report format.
-7. **Debate** (when prompted): Same as other reviewers.
-8. **Resolve** (when prompted): Same as other reviewers.
+   - Set Bash tool `timeout: 180000` (3 minutes) for the Codex invocation.
+7. **Report** completion to the leader via SendMessage using the structured completion report format.
+8. **Debate** (when prompted): Same as other reviewers.
+9. **Resolve** (when prompted): Same as other reviewers.
 
 ---
 

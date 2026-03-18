@@ -357,7 +357,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
   cat <<'PROMPT_EOF' > "$TMPFILE"
   <constructed_prompt>
   PROMPT_EOF
-  cat "$TMPFILE" | codex exec
+  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini
   rm -f "$TMPFILE"
   ```
 
@@ -683,7 +683,7 @@ TMPFILE=$(mktemp)
 cat <<'PROMPT_EOF' > "$TMPFILE"
 <constructed_prompt>
 PROMPT_EOF
-cat "$TMPFILE" | codex exec
+cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini
 rm -f "$TMPFILE"
 ```
 
@@ -703,8 +703,7 @@ Leader MUST copy Codex output verbatim into `### codex` subsection. Formatting a
 
 ### Budget
 
-- **Max 4 Codex CLI calls per round** (hypothesize + critique + audit + conditional revise).
-- **2-minute timeout per call**; on timeout, skip with warning.
+Max 3 Codex CLI calls per round, 2-minute timeout per call. Set Bash tool `timeout: 180000` (3 minutes) for each Codex invocation.
 
 ## Audit Notes (Phase 2 only)
 

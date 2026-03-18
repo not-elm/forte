@@ -90,11 +90,28 @@ Verify the following hypothesis. Analyze from these perspectives:
 Reference files: {paths}
 ```
 
-**Note:** File contents can be freely inlined in the prompt — it is passed via temp file + stdin, not as a CLI argument, so there are no length restrictions.
+**Note:** File contents can be inlined in the prompt via temp file + stdin. However, prefer inlining only relevant excerpts (specific functions or sections) rather than entire files — shorter context produces faster, more focused results.
 
 ### Phase 3: Run Codex CLI
 
-Write the prompt to a temporary file, then pipe it to Codex via stdin to avoid shell argument length limits:
+Before running Codex, display a brief status message to the user:
+
+> "Running Codex review — this typically takes 30-90 seconds..."
+
+**For Code Review (preferred path):** Use the dedicated `codex exec review` subcommand which scopes context to diffs automatically:
+
+```bash
+# For uncommitted changes:
+codex exec review --uncommitted --ephemeral -m gpt-5.4-mini
+
+# For changes against a base branch:
+codex exec review --base main --ephemeral -m gpt-5.4-mini
+
+# With custom review instructions (from prompt):
+cat /tmp/codex-review-prompt.txt | codex exec review --uncommitted --ephemeral -m gpt-5.4-mini
+```
+
+**For Design Review and Hypothesis Verification** (no diff-scoping applicable): Use generic `codex exec` with optimization flags:
 
 ```bash
 # 1. Write prompt to temp file
@@ -103,14 +120,16 @@ cat <<'PROMPT_EOF' > /tmp/codex-review-prompt.txt
 PROMPT_EOF
 
 # 2. Pipe to Codex via stdin
-cat /tmp/codex-review-prompt.txt | codex exec
+cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.4-mini
 
 # 3. Clean up
 rm -f /tmp/codex-review-prompt.txt
 ```
 
-- `exec`: Non-interactive subcommand (runs the prompt and exits)
-- Using a temp file avoids shell argument length limits that cause hangs with long prompts
+- `exec review`: Purpose-built subcommand that scopes context to relevant diffs, reducing context size and latency
+- `--ephemeral`: Skip session persistence (skills never resume sessions)
+- `-m gpt-5.4-mini`: Use a faster model optimized for speed (override with `-m gpt-5.4` if deeper reasoning is needed)
+- Set Bash tool `timeout: 180000` (3 minutes) to prevent the default 120s timeout from killing longer runs
 
 **Important:** Codex runs read-only. It can read files in the repo but cannot modify them.
 

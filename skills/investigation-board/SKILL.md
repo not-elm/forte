@@ -365,7 +365,7 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
     cat <<'PROMPT_EOF' > "$TMPFILE"
     <constructed_prompt>
     PROMPT_EOF
-    cat "$TMPFILE" | codex exec
+    cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini
     rm -f "$TMPFILE"
     ```
 
@@ -659,7 +659,7 @@ TMPFILE=$(mktemp)
 cat <<'PROMPT_EOF' > "$TMPFILE"
 <constructed_prompt>
 PROMPT_EOF
-cat "$TMPFILE" | codex exec
+cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini
 rm -f "$TMPFILE"
 ```
 
@@ -679,7 +679,7 @@ Leader MUST copy Codex output verbatim to the `### codex` subsection. Only ID pr
 
 ### Budget
 
-Max 3 Codex CLI calls per round, 2-minute timeout per call.
+Max 3 Codex CLI calls per round, 2-minute timeout per call. Set Bash tool `timeout: 180000` (3 minutes) for each Codex invocation.
 
 ## Timeout Policy
 
