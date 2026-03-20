@@ -404,7 +404,7 @@ Each solution entry must reference one or more finding IDs it addresses.
                     For codex-reviewer, additionally instruct:
                     - "Use the codex-review skill approach: build a Code Review prompt
                       with all target file contents, write it to a temp file, and run
-                      `cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.4-mini`. Convert the Codex
+                      `cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex`. Convert the Codex
                       response into [R-CX-NNN] finding format and write to your finding file."
 
                     Update SYNTHESIS.md: Status → "reviewing", Phase → "reviewing"
@@ -557,7 +557,7 @@ Each solution entry must reference one or more finding IDs it addresses.
    cat <<'PROMPT_EOF' > /tmp/codex-review-prompt.txt
    <constructed_prompt>
    PROMPT_EOF
-   cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.4-mini
+   cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
    rm -f /tmp/codex-review-prompt.txt
    ```
 4. **Convert** Codex response into `[R-CX-NNN]` finding format with Evidence where applicable.

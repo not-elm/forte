@@ -220,7 +220,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 | Step | Leader Action | Member Action | Output | Next Trigger |
 |------|---------------|---------------|--------|--------------|
-| setup | Suggest 4-5 roles, create team + phase files | — | phase-1/WHITEBOARD.md + SYNTHESIS.md | Team spawned |
+| setup | Suggest 4-10 roles, create team + phase files | — | phase-1/WHITEBOARD.md + SYNTHESIS.md | Team spawned |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast kickoff; after members, invoke Codex → `### codex` | Write hypotheses in own section | Hypothesis entries | All complete + Codex written |
 | critique | Broadcast instructions; after members, invoke Codex → `### codex` | Write critiques with labels + refs | Critique entries | All complete + Codex written |
@@ -254,7 +254,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 ### setup
 
-- Leader suggests 4-5 roles with distinct perspectives. Default 4 members, max 5.
+- Leader suggests 4-10 roles with distinct perspectives. Choose member count based on topic complexity: simple topics → 4-5, moderate → 6-7, complex/multifaceted → 8-10.
 - Roles should cover both technology evaluation AND implementation design perspectives (same team serves both phases).
 - User approves or modifies roles before team creation.
 - Generate a kebab-case `{discussion-id}` from the design topic (e.g., `auth-system-design`).
@@ -357,7 +357,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
   cat <<'PROMPT_EOF' > "$TMPFILE"
   <constructed_prompt>
   PROMPT_EOF
-  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini
+  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
   rm -f "$TMPFILE"
   ```
 
@@ -434,23 +434,23 @@ Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
 - **codex** (advisory, non-voting): Cross-model perspective via Codex CLI. Contributes hypotheses and critiques but does not vote.
 
 ## Framing
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 
 ## Hypotheses
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 ### codex
 
 ## Critique
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 ### codex
 ```
 
@@ -473,23 +473,23 @@ Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
 - **codex** (advisory, non-voting): Cross-model perspective via Codex CLI. Contributes hypotheses and critiques but does not vote.
 
 ## Framing
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 
 ## Hypotheses
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 ### codex
 
 ## Critique
+<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 ### codex
 
 ## Audit
@@ -585,6 +585,11 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 |----------------|-------------------|
 | 4 | 3 |
 | 5 | 3 |
+| 6 | 4 |
+| 7 | 4 |
+| 8 | 5 |
+| 9 | 5 |
+| 10 | 6 |
 | codex | (advisory — no vote) |
 
 - **Advisory members** (e.g., Codex) do NOT count toward majority threshold and cannot vote.
@@ -683,7 +688,7 @@ TMPFILE=$(mktemp)
 cat <<'PROMPT_EOF' > "$TMPFILE"
 <constructed_prompt>
 PROMPT_EOF
-cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.4-mini
+cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
 rm -f "$TMPFILE"
 ```
 
