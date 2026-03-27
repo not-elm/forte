@@ -34,12 +34,13 @@ Explore an open-ended proposition through structured team debate, iterative synt
 ## Phase Model
 
 ```
-setup → framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] → concluded
+setup/explore → setup/confirm → framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] → concluded
 ```
 
 | Phase | Who | What |
 |-------|-----|------|
-| setup | Leader + User | Analyze proposition, suggest 4-10 roles, user approves, create team |
+| setup/explore | Leader + User | Analyze proposition, ask user questions one at a time to discover perspectives |
+| setup/confirm | Leader + User | Present perspective list (name + description + rationale), user approves, create team + files |
 | framing | All members | Document problem interpretation, constraints, criteria, unknowns |
 | hypothesize | All members | Write concrete, testable candidate answers as hypotheses |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
@@ -170,7 +171,8 @@ Members append corrections in their own subsection (append-only — original ent
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup | Suggest 4-10 roles, create team + files | — | WHITEBOARD.md + SYNTHESIS.md | Team spawned |
+| setup/explore | Analyze proposition, ask user questions one at a time to explore perspectives | — | Perspective insights from user dialogue | Leader has enough info for perspectives |
+| setup/confirm | Generate perspective list (name + description + rationale), present to user for approval | — | Approved perspective list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves perspectives |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
 | critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
@@ -182,13 +184,48 @@ Members append corrections in their own subsection (append-only — original ent
 
 ## Phase Notes
 
-### setup
+### setup/explore
 
-- Leader suggests 4-10 roles with distinct perspectives. Choose member count based on topic complexity: simple topics → 4-5, moderate → 6-7, complex/multifaceted → 8-10.
-- User approves or modifies roles before team creation.
-- Generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`).
-- Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
-- Ensure `docs/discussions/` is in `.gitignore` (add if missing).
+- Leader analyzes the proposition and assesses its clarity before asking questions.
+- Ask the user one question at a time (never combine multiple questions in one message).
+- Prefer multiple-choice questions where possible; open-ended questions are also acceptable.
+- Question focus areas:
+  - Background and motivation (why is this discussion needed?)
+  - Goals (what outcome defines success?)
+  - Known constraints and assumptions
+  - Perspectives to emphasize or exclude
+- Adapt depth to proposition clarity: 2-3 questions if clear, 4-6 if ambiguous or broad.
+- **Transition to setup/confirm** when either condition is met:
+  1. Leader can articulate enough independent perspectives to match topic complexity (simple: 4-5, moderate: 6-7, complex: 8-10).
+  2. Maximum 6 questions reached — proceed with best available perspectives.
+- Question count is **cumulative** across all explore visits (does not reset if returning from confirm).
+- If user specifies roles upfront, skip explore and enter confirm directly (name constraint check only).
+
+### setup/confirm
+
+- Generate a perspective list from explore results. Each perspective is presented as:
+  ```
+  1. **{Name}** — {one-line description}
+     > Why needed: {rationale for this perspective in this discussion}
+  ```
+- Perspective count = team size (range 4-10).
+  - If fewer than 4: leader proposes supplementary perspectives with explicit rationale.
+  - If more than 10: leader presents consolidation candidates for user to choose.
+- **Name constraints** (perspectives become role names = subsection headers = ID initials):
+  - Short English names (1-2 words, space-separated).
+  - Must work as `### {name}` subsection headers.
+  - First-letter initials (uppercase) must be unique within the team (prevents `[H-{initial}-{seq}]` ID collisions).
+  - If initial collision is unavoidable with meaningful names, use first two letters as the initial fallback.
+- User approval gate: "These are the perspectives for the team. Add, remove, or modify as needed."
+  - User requests modification → leader revises and re-presents (loop within confirm).
+  - User requests more questions → return to explore (max 2 returns; question count is cumulative).
+  - Max 3 re-presentations without convergence → ask user to specify roles in free text.
+- After user approves:
+  - Each perspective name becomes a role name (= member name) for team creation.
+  - Generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`).
+  - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
+  - Ensure `docs/discussions/` is in `.gitignore` (add if missing).
+  - SYNTHESIS.md initializes with `> Status: setup` as before; leader transitions to framing immediately.
 
 ### framing
 
