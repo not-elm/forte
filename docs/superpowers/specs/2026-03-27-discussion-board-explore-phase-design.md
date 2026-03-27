@@ -57,10 +57,12 @@ framing 以降の行は変更なし。
 
 **遷移条件（いずれかを満たしたら confirm へ）:**
 
-1. **十分な観点が導出可能** — 命題の複雑さに見合う数の観点を導出できる情報が揃った（リーダーが判断）。目安: 命題の目的・背景が把握でき、主要な制約・前提が明らかになり、互いに独立した観点を4つ以上言語化できる状態。
+1. **十分な観点が導出可能** — 命題の複雑さに見合う数の独立した観点を導出できる情報が揃った（リーダーが判断）。目安: 命題の目的・背景が把握でき、主要な制約・前提が明らかになり、トピックの複雑さに応じた観点数（単純: 4-5、中程度: 6-7、複雑: 8-10）を言語化できる状態。
 2. **最大6問に到達** — 情報が不十分でも打ち切り、得られた情報で最善の観点リストを生成する。
 
 6問到達時に観点が4つ未満の場合は、リーダーが補完して最低4つにする（setup/confirm の補完ルールに従う）。
+
+**質問カウントは累積** — confirm から explore に戻った場合、質問カウントはリセットされず通算で6問が上限。
 
 ### setup/confirm 仕様
 
@@ -86,11 +88,11 @@ framing 以降の行は変更なし。
 - 英語の短い名前（1-2語、スペース区切り）
 - サブセクションヘッダー（`### {name}`）として使えること
 - イニシャル（先頭1文字大文字）がチーム内で重複しないこと（ID形式 `[H-{initial}-{seq}]` の衝突防止）
-- イニシャル重複時はリーダーが名前を調整して回避する
+- イニシャル重複が避けられない場合、リーダーが名前を調整して回避する。意味のある名前を維持できない場合は、先頭2文字をイニシャルとして使用するフォールバックも可
 
 **ユーザー却下時のフロー:**
 - ユーザーが修正を要求 → リーダーがフィードバックを反映して観点リストを再提示（confirm 内でループ）
-- ユーザーが「もっと質問して」と要求 → explore に戻る
+- ユーザーが「もっと質問して」と要求 → explore に戻る（最大2回まで。質問カウントは累積）
 - 最大3回の再提示で収束しない場合、ユーザーに自由記述でロールを指定してもらう
 
 **補完・統合ルール:**
@@ -104,6 +106,19 @@ framing 以降の行は変更なし。
 - 各観点名をそのままロール名（= メンバー名）としてチーム作成
 - WHITEBOARD.md + SYNTHESIS.md を作成（既存テンプレート通り）
 - `docs/discussions/{discussion-id}/` を `.gitignore` に追加（既存ルール通り）
+
+### SYNTHESIS.md Status の扱い
+
+setup/explore と setup/confirm の間は SYNTHESIS.md がまだ作成されていない（チーム作成は confirm 完了後）。そのため SYNTHESIS.md の Status 行への影響はない。SYNTHESIS.md 作成時の初期値は既存通り `> Status: setup` とし、直後に framing へ遷移する。
+
+### Workflow Overview テーブル変更
+
+現行の `setup` 行を以下の2行に置き換える:
+
+| Phase | Leader Action | Member Action | Output | Next Trigger |
+|-------|---------------|---------------|--------|--------------|
+| setup/explore | Analyze proposition, ask user questions one at a time to explore perspectives | — | Perspective insights from user dialogue | Leader has enough info for perspectives |
+| setup/confirm | Generate perspective list (name + description + rationale), present to user for approval | — | Approved perspective list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves perspectives |
 
 ### 既存仕様への影響範囲
 
@@ -126,6 +141,11 @@ framing 以降の行は変更なし。
 | Conflict Prevention Rules | per-member write zones 等のルールは不変 |
 | Communication Rules | broadcast ルールは不変 |
 | Ratification Rules / Timeout Policy | 不変 |
+
+## Implementation Notes
+
+- SKILL.md は英語で記述されている。実装時は本設計の内容を英語に翻訳して SKILL.md に反映すること。
+- frontmatter の `description` フィールドへのトリガーキーワード追加は任意（現行トリガーで十分機能する）。
 
 ## Codex Review Summary
 
