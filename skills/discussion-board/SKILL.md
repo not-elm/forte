@@ -275,7 +275,7 @@ Members append corrections in their own subsection (append-only — original ent
   cat <<'PROMPT_EOF' > "$TMPFILE"
   <constructed_prompt>
   PROMPT_EOF
-  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
+  cat "$TMPFILE" | codex exec --ephemeral
   rm -f "$TMPFILE"
   ```
 
