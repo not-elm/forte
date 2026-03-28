@@ -39,8 +39,8 @@ setup/explore → setup/confirm → framing → [Round N: hypothesize → critiq
 
 | Phase | Who | What |
 |-------|-----|------|
-| setup/explore | Leader + User | Analyze proposition, ask user questions one at a time to discover perspectives |
-| setup/confirm | Leader + User | Present perspective list (name + description + rationale), user approves, create team + files |
+| setup/explore | Leader + User | Analyze proposition, ask user questions, generate fault-line map of key disagreement axes |
+| setup/confirm | Leader + User | Construct 3-layer roles (discipline + stance + constraint) from fault-line map, present with expected arguments, user approves, create team + files |
 | framing | All members | Document problem interpretation, constraints, criteria, unknowns |
 | hypothesize | All members | Write concrete, testable candidate answers as hypotheses |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
@@ -171,8 +171,8 @@ Members append corrections in their own subsection (append-only — original ent
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup/explore | Analyze proposition, ask user questions one at a time to explore perspectives | — | Perspective insights from user dialogue | Leader has enough info for perspectives |
-| setup/confirm | Generate perspective list (name + description + rationale), present to user for approval | — | Approved perspective list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves perspectives |
+| setup/explore | Analyze proposition, ask user questions, generate fault-line map (3-5 axes of disagreement) | — | Fault-line map + perspective insights from user dialogue | Leader has fault-line map + enough info for roles |
+| setup/confirm | Construct 3-layer roles from fault-line map (discipline + stance + epistemic constraint), present with expected arguments to user | — | Approved role list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves roles |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
 | critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
@@ -200,28 +200,41 @@ Members append corrections in their own subsection (append-only — original ent
   2. Maximum 6 questions reached — proceed with best available perspectives.
 - Question count is **cumulative** across all explore visits (does not reset if returning from confirm).
 - If user specifies roles upfront, skip explore and enter confirm directly (name constraint check only).
+- **Fault-line mapping:** Before generating roles, the leader produces a fault-line map — 3-5 axes of disagreement for the proposition. The fault-line prompt must explicitly target latent axes not visible in the proposition's surface framing:
+  - Contested assumptions the proposition takes for granted
+  - Second-order consequences not addressed in the proposition
+  - Premise challenges that reframe the question itself
+  - At least one fault line that complicates the proposition's implicit premise
+- **Propositional entropy check:** If the leader cannot generate 3 distinct fault lines without inferring major unstated assumptions, ask the user one clarifying question before proceeding. This does not count toward the 6-question limit.
+- The fault-line map is presented to the user alongside the role list in setup/confirm (not separately approved).
 
 ### setup/confirm
 
-- Generate a perspective list from explore results. Each perspective is presented as:
+- Generate roles from the fault-line map produced in setup/explore. Each role is **constructed with three layers**:
+  1. **Discipline-grounded identity** — activates domain-specific knowledge (e.g., "Economist", "Systems Engineer")
+  2. **Epistemic stance** — constrains the reasoning path (e.g., "argues from empirical precedent", "prioritizes second-order systemic effects")
+  3. **Explicit epistemic constraint** — specifies what counts as evidence and what blind spots to guard against (e.g., "treats theoretical arguments as insufficient without empirical data")
+- **Mandatory Proposition Challenger:** One role must be explicitly mandated to attack the proposition's framing, not just its conclusion. This role asks: Is this the right question? Are the implicit assumptions warranted? This is distinct from a generic Devil's Advocate.
+- Each role is presented in the following format:
   ```
-  1. **{Name}** — {one-line description}
-     > Why needed: {rationale for this perspective in this discussion}
+  1. **{Role Name}** — {discipline + stance}
+     > Expected argument: {one-sentence description of what this role will argue}
+     > Guards against: {blind spot this role covers}
   ```
-- Perspective count = team size (range 4-10).
-  - If fewer than 4: leader proposes supplementary perspectives with explicit rationale.
+- Role count = team size (range 4-10).
+  - If fewer than 4: leader proposes supplementary roles with explicit rationale.
   - If more than 10: leader presents consolidation candidates for user to choose.
-- **Name constraints** (perspectives become role names = subsection headers = ID initials):
+- **Name constraints** (role names = subsection headers = ID initials):
   - Short English names (1-2 words, space-separated).
   - Must work as `### {name}` subsection headers.
   - First-letter initials (uppercase) must be unique within the team (prevents `[H-{initial}-{seq}]` ID collisions).
   - If initial collision is unavoidable with meaningful names, use first two letters as the initial fallback.
-- User approval gate: "These are the perspectives for the team. Add, remove, or modify as needed."
+- User approval gate: "These are the roles for the team. Each role's expected argument and blind-spot coverage is shown. Add, remove, or modify as needed."
   - User requests modification → leader revises and re-presents (loop within confirm).
   - User requests more questions → return to explore (max 2 returns; question count is cumulative).
   - Max 3 re-presentations without convergence → ask user to specify roles in free text.
 - After user approves:
-  - Each perspective name becomes a role name (= member name) for team creation.
+  - Each role name becomes a member name for team creation. The full 3-layer role description is used as the member's briefing context in all subsequent broadcasts.
   - Generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`).
   - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
   - Ensure `docs/discussions/` is in `.gitignore` (add if missing).
@@ -234,12 +247,15 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### hypothesize
 
-- Members read all framings via full WHITEBOARD.md Read (~200 lines at this stage).
+- **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (3-layer description from setup/confirm). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
+- **Round 2+:** Members read all prior content via full WHITEBOARD.md Read.
+- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's core epistemic commitments (the epistemic stance + epistemic constraint from their 3-layer role description). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
 - Each member aims for 2-5 hypotheses, each concrete and testable.
 - Report completion using the completion report format.
 
 ### critique
 
+- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's core epistemic commitments (the epistemic stance + epistemic constraint from their 3-layer role description).
 - **IMPORTANT**: Use 2-step Grep extraction when WHITEBOARD exceeds ~350 lines:
   1. `Grep pattern="## Hypotheses"` to extract the H2 section
   2. `Grep pattern="### {member-name}"` to narrow to a specific member
@@ -294,6 +310,7 @@ Members append corrections in their own subsection (append-only — original ent
 ### revise
 
 - Only runs when audit found ⚠️ Partially accurate or ❌ Inaccurate entries.
+- **Per-round role re-anchoring:** The broadcast that kicks off this phase must restate each affected member's core epistemic commitments alongside the audit findings.
 - Leader broadcasts audit results and instructs affected members to review and correct their entries.
 - Members **append** corrections in their own `### {name}` subsection under the relevant section (Hypotheses or Critique). Original entries are NEVER modified (append-only).
 - Revision format:
