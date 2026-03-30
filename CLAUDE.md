@@ -13,10 +13,14 @@ This is "forte" — notelm's personal collection of Claude Code skills, packaged
   plugin.json          # Plugin metadata
   marketplace.json     # Marketplace definition for git URL installation
 skills/
+  batch-fix/           # Batch-fix code review findings with clear solutions
   code-review-board/   # Multi-perspective parallel code review (8 reviewer agents)
   codex-investigate/   # Bug root-cause investigation via Codex CLI
   codex-review/        # Design/code/hypothesis review via Codex CLI
+  deep-fix/            # Deep-fix complex code review findings requiring design
+  design-board/        # Implementation design via 2-phase structured team debate
   discussion-board/    # Structured team debate with iterative synthesis
+  frontend-design-board/ # Frontend design discussion via 2-phase team debate
   investigation-board/ # Evidence-based bug investigation via structured team debate
 ```
 
@@ -27,7 +31,7 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 ### Key Patterns Across Skills
 
 - **Codex-based skills** (codex-investigate, codex-review): Use `codex exec` CLI in read-only mode. Prompts are always written to a temp file and piped via stdin to avoid shell argument length limits.
-- **Agent Team skills** (code-review-board, discussion-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a 2-file model (WHITEBOARD.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention.
+- **Agent Team skills** (code-review-board, design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a 2-file model (WHITEBOARD.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention.
 
 ## Adding a New Skill
 

@@ -23,6 +23,15 @@ Produce a concrete Design Spec through structured 2-phase team debate: Phase 1 (
 - Use `design-board` for implementation design with technology selection (backend/architecture focus)
 - Use `discussion-board` for open-ended exploration not specific to frontend design
 
+## Scope Exclusions
+
+The following are explicitly outside this skill's scope:
+
+- **Component API design / Props design** → Use `frontend-design` skill after obtaining the Design Spec
+- **State transition tables / copy CSV** → Responsibility of implementation skills
+- **i18n / RTL locale support as mandatory gate** → May be mentioned in Phase 1 framing as context, but is NOT a required gate
+- **Non-AI handoff pack** → Out of scope; the Design Spec is the sole output artifact
+
 ## Core Principles
 
 1. **Design-direction-centric** — All activity targets producing an actionable Design Spec for frontend implementation.
