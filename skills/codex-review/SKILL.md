@@ -63,6 +63,12 @@ Analyze the following design document. Identify issues from these perspectives:
 - Ambiguous descriptions or insufficient definitions
 - Missing considerations
 - Feasibility concerns
+
+Evidence requirements:
+- For each issue, cite the specific section or line that contains the problem.
+- Quote the relevant text directly.
+- If you cannot point to specific text, mark the issue as [unverified].
+
 Files: {paths}
 {free_text}
 ```
@@ -75,6 +81,12 @@ Analyze the following code. Identify issues from these perspectives:
 - Security issues
 - Performance concerns
 - Deviation from design (if design information is available)
+
+Evidence requirements:
+- You MUST cite specific file paths and line numbers for every finding.
+- Include a brief code snippet (max 3 lines) as evidence for each issue.
+- Do not speculate — if you cannot find concrete evidence in the code, write N/A.
+
 Files: {paths}
 {free_text}
 ```
@@ -86,6 +98,12 @@ Verify the following hypothesis. Analyze from these perspectives:
 - Counterexamples or counterarguments
 - Overlooked factors
 - Possible alternative hypotheses
+
+Evidence requirements:
+- For each point, cite specific file paths and line numbers, or quote the relevant text from the hypothesis.
+- Distinguish between evidence found in code [code-verified] and general technical knowledge [general-knowledge].
+- Do not speculate — if you cannot verify a claim, state what additional information would be needed.
+
 {free_text}
 Reference files: {paths}
 ```
@@ -137,9 +155,14 @@ rm -f /tmp/codex-review-prompt.txt
 
 Parse Codex output and organize into:
 
-1. **Issues Found** — with severity (Critical / Warning / Info)
-2. **Improvement Suggestions**
+1. **Issues Found** — with severity (Critical / Warning / Info) and evidence
+   - Each issue must include: `Evidence: {file:line or quoted text}`. Issues without evidence are marked [unverified].
+2. **Improvement Suggestions** — with rationale
 3. **Positive Points** (if any)
+4. **Confidence** — High / Medium / Low with reasoning
+   - High: All findings backed by specific code/text evidence
+   - Medium: Most findings backed, some based on general knowledge
+   - Low: Many findings lack concrete evidence
 
 Display organized results in the terminal.
 

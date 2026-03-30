@@ -70,7 +70,13 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 ```markdown
 - [H-S-001] **hypothesis**: Use WebSocket-based real-time sync with CRDTs for offline mode.
   > Rationale: CRDTs allow concurrent edits without coordination.
+  > Grounding: [general-knowledge] CRDTs are a well-established approach for distributed state (Shapiro et al., 2011). [code-verified] Current sync logic at src/sync/engine.ts:45 assumes single-writer.
 ```
+
+Grounding labels:
+- `[code-verified]` — Confirmed at a specific file:line in the codebase
+- `[data-backed]` — Based on concrete data, measurements, or benchmarks
+- `[general-knowledge]` — Based on widely recognized technical knowledge (always valid as escape valve)
 
 ### Critique
 
@@ -80,6 +86,8 @@ Common mistake: `[CR-P-1-001]` (missing R prefix) → Correct: `[CR-P-R1-001]`
 
 Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**question**`), `refs=[...]`, `@{member}`
 
+Critiques making factual claims (challenge/amend) should include grounding for those claims. Questions and support labels may omit grounding. Example: `**challenge** ... [code-verified] The current implementation at file:line does X, contradicting this hypothesis.`
+
 ```markdown
 #### Round 1
 - [CR-P-R1-001] **challenge** @security-expert refs=[H-S-001]: CRDTs introduce unbounded state growth. How do we handle tombstone GC?
@@ -87,9 +95,9 @@ Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**
 
 ### Evidence Map (Leader only)
 
-| # | Claim | Support | Counterpoint | Confidence |
-|---|-------|---------|--------------|------------|
-| 1 | {claim} | refs=[H-X-001, CR-Y-R1-002] | refs=[CR-Z-R1-001] | high/medium/low |
+| # | Claim | Support | Counterpoint | Grounding | Confidence |
+|---|-------|---------|--------------|-----------|------------|
+| 1 | {claim} | refs=[H-X-001, CR-Y-R1-002] | refs=[CR-Z-R1-001] | code-verified/data-backed/general-knowledge/ungrounded | high/medium/low |
 
 ### Draft Conclusion (Leader only)
 
@@ -127,6 +135,7 @@ Members send this via SendMessage after each sub-phase:
 Entries added: {N}
 Key insight: {most important finding}
 Current position: {stance in one sentence}
+Evidence basis: {code-verified: N, data-backed: N, general-knowledge: N}
 Remaining concerns: {description or "none"}
 ```
 
@@ -251,6 +260,7 @@ Members append corrections in their own subsection (append-only — original ent
 - **Round 2+:** Members read all prior content via full WHITEBOARD.md Read.
 - **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's core epistemic commitments (the epistemic stance + epistemic constraint from their 3-layer role description). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
 - Each member aims for 2-5 hypotheses, each concrete and testable.
+- Each hypothesis should include a `Grounding:` line citing evidence basis. `[general-knowledge]` is always valid — the goal is transparency about evidence strength, not blocking non-code claims. Hypotheses without grounding will be flagged during audit.
 - Report completion using the completion report format.
 
 ### critique
@@ -278,6 +288,7 @@ Members append corrections in their own subsection (append-only — original ent
   2. Note any inaccuracies, outdated information, or unsupported assertions
   3. Provide brief evidence or references for your assessment
   4. Skip opinions, value judgments, and forecasts — mark them as ❓ Unverifiable
+  5. If a hypothesis cites a specific file:line reference, verify that the cited code actually supports the claim
 
   Rate each claim: ✅ Verified / ⚠️ Partially accurate / ❌ Inaccurate / ❓ Unverifiable
 

@@ -71,14 +71,15 @@ Instructions:
 
 Important:
 - You MUST cite specific file paths and line numbers for every claim. Do not speculate without evidence from the code.
+- Label each piece of evidence as [code-verified] (found in specific file:line) or [general-knowledge] (based on known behavior of frameworks/libraries). Prioritize [code-verified] evidence.
 - Be concise. If a section has no findings, write "N/A" and move on — do not pad with filler content.
 
 Format your response as:
 ## Root Cause
-[Explanation with file:line references as evidence]
+[Explanation with file:line references as evidence. Label each reference: [code-verified] or [general-knowledge]]
 
 ## Impact Scope
-[What else is affected, with file references]
+[What else is affected, with file references. Label each reference: [code-verified] or [general-knowledge]]
 
 ## Suggested Fix
 [Concrete steps to fix]
