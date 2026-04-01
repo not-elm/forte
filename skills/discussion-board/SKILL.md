@@ -134,7 +134,7 @@ Members send this via SendMessage after each sub-phase:
 ```
 Entries added: {N}
 Key insight: {most important finding}
-Current position: {stance in one sentence}
+Current position: {view in one sentence}
 Evidence basis: {code-verified: N, data-backed: N, general-knowledge: N}
 Remaining concerns: {description or "none"}
 ```
@@ -180,7 +180,7 @@ Members append corrections in their own subsection (append-only — original ent
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup/explore | Analyze proposition, ask user questions, generate expertise map (6-10 required domains) | — | Expertise map + topic insights from user dialogue | Leader has expertise map + enough info for roles |
+| setup/explore | Analyze proposition, ask user questions, generate expertise map (6-10 required domains) | — | Expertise map + topic insights from user dialogue | Leader has expertise map with 6-10 domains |
 | setup/confirm | Generate discipline-only roles from expertise map, present with expected contributions to user | — | Approved role list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves roles |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
@@ -465,8 +465,6 @@ Note: This is a design document, not an implementation plan. To create an execut
 
 | Members | Majority Threshold |
 |---------|-------------------|
-| 4 | 3 |
-| 5 | 3 |
 | 6 | 4 |
 | 7 | 4 |
 | 8 | 5 |
