@@ -202,20 +202,22 @@ Members append corrections in their own subsection (append-only — original ent
   - Background and motivation (why is this discussion needed?)
   - Goals (what outcome defines success?)
   - Known constraints and assumptions
-  - Perspectives to emphasize or exclude
-- Adapt depth to proposition clarity: 2-3 questions if clear, 4-6 if ambiguous or broad.
+  - Specific domains or expertise to emphasize or exclude
+- Adapt depth to proposition clarity: 2-3 questions if clear, up to 4 if ambiguous or broad.
 - **Transition to setup/confirm** when either condition is met:
-  1. Leader can articulate enough independent perspectives to match topic complexity (simple: 4-5, moderate: 6-7, complex: 8-10).
-  2. Maximum 6 questions reached — proceed with best available perspectives.
+  1. Leader can identify enough independent expertise domains to match topic complexity (focused: 6, moderate: 7-8, complex: 9-10).
+  2. Maximum 4 questions reached — proceed with best available domains.
 - Question count is **cumulative** across all explore visits (does not reset if returning from confirm).
 - If user specifies roles upfront, skip explore and enter confirm directly (name constraint check only).
-- **Fault-line mapping:** Before generating roles, the leader produces a fault-line map — 3-5 axes of disagreement for the proposition. The fault-line prompt must explicitly target latent axes not visible in the proposition's surface framing:
-  - Contested assumptions the proposition takes for granted
-  - Second-order consequences not addressed in the proposition
-  - Premise challenges that reframe the question itself
-  - At least one fault line that complicates the proposition's implicit premise
-- **Propositional entropy check:** If the leader cannot generate 3 distinct fault lines without inferring major unstated assumptions, ask the user one clarifying question before proceeding. This does not count toward the 6-question limit.
-- The fault-line map is presented to the user alongside the role list in setup/confirm (not separately approved).
+- **Expertise mapping:** Before generating roles, the leader produces an expertise map — 6-10 domains of expertise directly required to discuss the proposition in depth. Each domain must be **directly relevant** to the topic; do not include "nice to have" domains. The same domain with different focus areas may appear as separate entries (e.g., "Performance × Latency", "Performance × Throughput"). Format:
+  ```
+  Expertise Map — {topic}
+  1. {domain}: {why this topic requires this expertise}
+  2. {domain}: {why this topic requires this expertise}
+  ...
+  ```
+- **Domain sufficiency check:** If the leader cannot identify 6 independent domains without inferring major unstated assumptions, ask the user one clarifying question before proceeding. This does not count toward the 4-question limit.
+- The expertise map is presented to the user alongside the role list in setup/confirm (not separately approved).
 
 ### setup/confirm
 
