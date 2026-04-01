@@ -221,31 +221,29 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### setup/confirm
 
-- Generate roles from the fault-line map produced in setup/explore. Each role is **constructed with three layers**:
-  1. **Discipline-grounded identity** — activates domain-specific knowledge (e.g., "Economist", "Systems Engineer")
-  2. **Epistemic stance** — constrains the reasoning path (e.g., "argues from empirical precedent", "prioritizes second-order systemic effects")
-  3. **Explicit epistemic constraint** — specifies what counts as evidence and what blind spots to guard against (e.g., "treats theoretical arguments as insufficient without empirical data")
-- **Mandatory Proposition Challenger:** One role must be explicitly mandated to attack the proposition's framing, not just its conclusion. This role asks: Is this the right question? Are the implicit assumptions warranted? This is distinct from a generic Devil's Advocate.
+- Generate roles from the expertise map produced in setup/explore. Each role has a **single layer**:
+  - **Discipline** — the specific expertise domain this member brings (e.g., "Cluster Operations Specialist", "Cost Optimization Analyst")
 - Each role is presented in the following format:
   ```
-  1. **{Role Name}** — {discipline + stance}
-     > Expected argument: {one-sentence description of what this role will argue}
-     > Guards against: {blind spot this role covers}
+  1. **{Role Name}** — {discipline/expertise domain}
+     > Expected contribution: {concrete contribution this member brings to the discussion}
   ```
-- Role count = team size (range 4-10).
-  - If fewer than 4: leader proposes supplementary roles with explicit rationale.
+- Multiple members may share the same domain if they cover different focus areas (e.g., two security experts with different specializations). Names must be distinct and meaningful (e.g., "Sentinel" and "Bastion" rather than "Security1" and "Security2").
+- Role count = team size (range 6-10).
+  - Default: 6. Leader adjusts based on topic complexity: focused → 6, moderate → 7-8, complex → 9-10.
+  - Fewer than 6 is not permitted.
   - If more than 10: leader presents consolidation candidates for user to choose.
 - **Name constraints** (role names = subsection headers = ID initials):
   - Short English names (1-2 words, space-separated).
   - Must work as `### {name}` subsection headers.
   - First-letter initials (uppercase) must be unique within the team (prevents `[H-{initial}-{seq}]` ID collisions).
   - If initial collision is unavoidable with meaningful names, use first two letters as the initial fallback.
-- User approval gate: "These are the roles for the team. Each role's expected argument and blind-spot coverage is shown. Add, remove, or modify as needed."
+- User approval gate: "These are the team members. Add, remove, or modify as needed."
   - User requests modification → leader revises and re-presents (loop within confirm).
   - User requests more questions → return to explore (max 2 returns; question count is cumulative).
   - Max 3 re-presentations without convergence → ask user to specify roles in free text.
 - After user approves:
-  - Each role name becomes a member name for team creation. The full 3-layer role description is used as the member's briefing context in all subsequent broadcasts.
+  - Each role name becomes a member name for team creation. The discipline + expected contribution is used as the member's briefing context in all subsequent broadcasts.
   - Generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`).
   - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
   - Ensure `docs/discussions/` is in `.gitignore` (add if missing).
