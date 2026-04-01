@@ -382,7 +382,7 @@ Path: `docs/discussions/{discussion-id}/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective.}
 
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member (6-10 members) -->
 ## Framing
 ### {member-A}
 ### {member-B}
