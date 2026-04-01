@@ -39,8 +39,8 @@ setup/explore → setup/confirm → framing → [Round N: hypothesize → critiq
 
 | Phase | Who | What |
 |-------|-----|------|
-| setup/explore | Leader + User | Analyze proposition, ask user questions, generate fault-line map of key disagreement axes |
-| setup/confirm | Leader + User | Construct 3-layer roles (discipline + stance + constraint) from fault-line map, present with expected arguments, user approves, create team + files |
+| setup/explore | Leader + User | Analyze proposition, ask user questions, generate expertise map of required domains |
+| setup/confirm | Leader + User | Generate discipline-only roles from expertise map, present with expected contributions, user approves, create team + files |
 | framing | All members | Document problem interpretation, constraints, criteria, unknowns |
 | hypothesize | All members | Write concrete, testable candidate answers as hypotheses |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
