@@ -180,8 +180,8 @@ Members append corrections in their own subsection (append-only — original ent
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup/explore | Analyze proposition, ask user questions, generate fault-line map (3-5 axes of disagreement) | — | Fault-line map + perspective insights from user dialogue | Leader has fault-line map + enough info for roles |
-| setup/confirm | Construct 3-layer roles from fault-line map (discipline + stance + epistemic constraint), present with expected arguments to user | — | Approved role list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves roles |
+| setup/explore | Analyze proposition, ask user questions, generate expertise map (6-10 required domains) | — | Expertise map + topic insights from user dialogue | Leader has expertise map + enough info for roles |
+| setup/confirm | Generate discipline-only roles from expertise map, present with expected contributions to user | — | Approved role list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves roles |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
 | critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
