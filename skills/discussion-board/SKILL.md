@@ -256,16 +256,16 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### hypothesize
 
-- **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (3-layer description from setup/confirm). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
+- **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (discipline + expected contribution from setup/confirm). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
 - **Round 2+:** Members read all prior content via full WHITEBOARD.md Read.
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's core epistemic commitments (the epistemic stance + epistemic constraint from their 3-layer role description). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
+- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup/confirm). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
 - Each member aims for 2-5 hypotheses, each concrete and testable.
 - Each hypothesis should include a `Grounding:` line citing evidence basis. `[general-knowledge]` is always valid — the goal is transparency about evidence strength, not blocking non-code claims. Hypotheses without grounding will be flagged during audit.
 - Report completion using the completion report format.
 
 ### critique
 
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's core epistemic commitments (the epistemic stance + epistemic constraint from their 3-layer role description).
+- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup/confirm).
 - **IMPORTANT**: Use 2-step Grep extraction when WHITEBOARD exceeds ~350 lines:
   1. `Grep pattern="## Hypotheses"` to extract the H2 section
   2. `Grep pattern="### {member-name}"` to narrow to a specific member
@@ -321,7 +321,7 @@ Members append corrections in their own subsection (append-only — original ent
 ### revise
 
 - Only runs when audit found ⚠️ Partially accurate or ❌ Inaccurate entries.
-- **Per-round role re-anchoring:** The broadcast that kicks off this phase must restate each affected member's core epistemic commitments alongside the audit findings.
+- **Per-round role re-anchoring:** The broadcast that kicks off this phase must restate each affected member's discipline and expected contribution alongside the audit findings.
 - Leader broadcasts audit results and instructs affected members to review and correct their entries.
 - Members **append** corrections in their own `### {name}` subsection under the relevant section (Hypotheses or Critique). Original entries are NEVER modified (append-only).
 - Revision format:
