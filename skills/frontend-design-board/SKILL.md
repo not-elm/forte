@@ -1,16 +1,17 @@
 ---
 name: frontend-design-board
 description: >-
-  Frontend design discussion via 2-phase structured team debate.
+  Frontend design discussion via 2-phase structured team debate with visual mockup feedback loops.
   Phase 1 builds design direction consensus (tone, purpose, target user),
   Phase 2 specifies design tokens, responsive strategy, and motion policy.
+  After each phase, presents visual mockups (moodboard / UI) via browser and loops on user feedback.
   Outputs a Design Spec mapped to frontend-design skill input format.
   Triggers: UIデザイン議論, デザイン方針を議論, UIの方向性, frontend design discussion, UI discussion, フロントエンドデザイン議論
 ---
 
 # Frontend Design Board — 2-Phase Design Discussion via Team Debate
 
-Produce a concrete Design Spec through structured 2-phase team debate: Phase 1 (Design Direction) builds consensus on aesthetic direction, tone, and target user; Phase 2 (Design Specification) defines tokens, responsive strategy, and motion policy. Outputs a Design Spec that maps directly to the frontend-design skill's Design Thinking input format. Uses TeamCreate + SendMessage + AskUserQuestion.
+Produce a concrete Design Spec through structured 2-phase team debate with visual mockup feedback loops: Phase 1 (Design Direction) builds consensus on aesthetic direction, tone, and target user; Phase 2 (Design Specification) defines tokens, responsive strategy, and motion policy. After each phase, the leader presents visual mockups via the superpowers visual companion and collects user feedback — looping back to hypothesize until approved. Outputs a Design Spec that maps directly to the frontend-design skill's Design Thinking input format. Uses TeamCreate + SendMessage + AskUserQuestion + Visual Companion.
 
 ## When to Use
 
@@ -49,7 +50,7 @@ The following are explicitly outside this skill's scope:
 ## Phase Model
 
 ```
-setup/explore → setup/confirm → [Phase 1: framing → hypothesize → critique → synthesize → ratify] → user-review → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → concluded
+setup/explore → setup/confirm → [Phase 1: framing → hypothesize → critique → synthesize → ratify] → user-review-1 (moodboard mockup ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
 ```
 
 ### Phase 1 — Design Direction (5 steps)
@@ -64,12 +65,21 @@ setup/explore → setup/confirm → [Phase 1: framing → hypothesize → critiq
 
 Phase 1 does NOT include audit or revise. Hypotheses are linguistic descriptions; code snippets are optional.
 
-### User Review
+### User Review 1 — Visual Moodboard (after Phase 1)
 
-Leader presents Phase 1 direction conclusion to the user via AskUserQuestion:
-- Include: selected design direction (tone, mood, purpose), key trade-offs, rejected alternatives with reasons
-- User choices: "Proceed to Phase 2" or "Provide feedback on the design direction"
-- If user provides feedback: Leader records feedback in phase-1/SYNTHESIS.md `## User Review Outcome`, then incorporates it as additional constraints for Phase 2 framing. Phase 1 files are NOT re-executed.
+Leader presents Phase 1 direction as a visual moodboard via the visual companion server:
+- Include: color palette, typography samples, tone/mood CSS visualization, comparison cards if multiple directions remain
+- User choices: "Proceed to Phase 2" or "Provide feedback" (via AskUserQuestion in terminal)
+- If user provides feedback: Leader records feedback in phase-1/SYNTHESIS.md `## User Feedback History`, resets ratification round counter, re-enters Phase 1 hypothesize with feedback as new constraint. Loop until approved.
+- No skip option — user confirmation is mandatory
+
+### User Review 2 — Visual UI Mockup (after Phase 2)
+
+Leader presents Phase 2 specification as a UI mockup via the visual companion server:
+- Include: design tokens applied to components, responsive demo, theme switching (light/dark/high-contrast), motion preview
+- User choices: "Approve specification" or "Provide feedback" (via AskUserQuestion in terminal)
+- If user provides feedback (Phase 2 scope): Leader records feedback in phase-2/SYNTHESIS.md `## User Feedback History`, resets ratification round counter, re-enters Phase 2 hypothesize. Loop until approved.
+- If user feedback requires Phase 1 direction change: Leader presents escalation confirmation to user, and if confirmed, suspends conflict rule #9, discards Phase 2 files, re-enters Phase 1 hypothesize with feedback as constraint.
 - No skip option — user confirmation is mandatory
 
 ### Phase 2 — Design Specification (6 steps + conditional revise)
@@ -277,11 +287,12 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 | synthesize | Read all WHITEBOARD, write Evidence Map + Direction Conclusion | — | phase-1/SYNTHESIS.md updated | Conclusion written |
 | ratify | Broadcast ratify request to voting members | Send vote via SendMessage | Ratification History | Majority reached or next round |
 
-### User Review
+### User Review 1 — Visual Moodboard
 
 | Step | Leader Action | Output | Next Trigger |
 |------|---------------|--------|--------------|
-| user-review | Present Phase 1 Direction Conclusion via AskUserQuestion | User approval or feedback | User responds |
+| user-review-1 | Start visual companion server; generate moodboard HTML from Direction Conclusion; present via AskUserQuestion with browser URL | User approval or feedback | User responds |
+| (feedback loop) | Record feedback in User Feedback History; reset Round to 0; increment Feedback Cycle; broadcast feedback as constraint; re-enter Phase 1 hypothesize | Updated hypotheses → critique → synthesize → ratify → new moodboard | Ratify succeeds → present user-review-1 again |
 
 ### Phase 2 — Design Specification
 
@@ -294,6 +305,14 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 | revise | Broadcast audit findings to affected members | Append corrections (append-only) | Revised entries | All affected complete (or skipped if all clean) |
 | synthesize | Read all WHITEBOARD, write Evidence Map + Draft Design Spec | — | phase-2/SYNTHESIS.md updated | Draft written |
 | ratify | Broadcast ratify request to voting members | Send vote via SendMessage | Ratification History | Majority reached or next round |
+
+### User Review 2 — Visual UI Mockup
+
+| Step | Leader Action | Output | Next Trigger |
+|------|---------------|--------|--------------|
+| user-review-2 | Generate UI mockup HTML from Draft Design Spec; present via AskUserQuestion with browser URL | User approval or feedback | User responds |
+| (feedback loop — Phase 2 scope) | Record feedback in User Feedback History; reset Round to 0; increment Feedback Cycle; broadcast feedback as constraint; re-enter Phase 2 hypothesize | Updated hypotheses → critique → audit → revise → synthesize → ratify → new UI mockup | Ratify succeeds → present user-review-2 again |
+| (feedback loop — Phase 1 escalation) | Present escalation confirmation to user; if confirmed: suspend rule #9, discard Phase 2 files, re-enter Phase 1 hypothesize with feedback | Phase 1 re-discussion → user-review-1 → new Phase 2 | Phase 1 approved → create new Phase 2 |
 
 ### Concluded
 
@@ -348,6 +367,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Each hypothesis MUST include at least one `axis=` tag.
 - Report completion using the completion report format.
 - **Codex advisory step:** After all members report complete, leader reads WHITEBOARD.md, constructs Codex hypothesize prompt, runs `codex exec`, writes results to `### codex`.
+- **Feedback re-entry:** When re-entering hypothesize from user-review-1 feedback, the broadcast includes user feedback as a new constraint. Members add new hypotheses addressing the feedback. Previous WHITEBOARD.md entries remain (append-only). The `Independent generation` rule applies only to Feedback Cycle 1, Round 1 — subsequent cycles allow reading existing entries.
 
 ### Phase 1: critique
 
@@ -371,12 +391,15 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - If not ratified: incorporate push-back, start next critique round (within Phase 1).
 - Max 10 rounds. On exhaustion: leader writes "best available direction" with uncertainty markers.
 
-### user-review
+### user-review-1
 
+- Leader starts visual companion server (if not already running): `scripts/start-server.sh --project-dir {project-root}` from superpowers plugin scripts directory. If server fails, fall back to text-based review (see Visual Companion → Fallback).
 - Leader reads phase-1/SYNTHESIS.md Direction Conclusion.
-- Presents to user via AskUserQuestion with structured summary:
+- Leader generates moodboard HTML content fragment and writes to `screen_dir` (see Visual Companion → Phase 1 Mockup Content).
+- Presents to user via AskUserQuestion:
   ```
-  Phase 1 (Design Direction) is complete.
+  Phase 1 (Design Direction) の結果をモックアップにしました。
+  ブラウザで確認してください: {url}
 
   **Design Direction:**
   {selected tone/mood/aesthetic with brief rationale}
@@ -391,15 +414,61 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
   {bullet list with reasons}
 
   Options:
-  1. Proceed to Phase 2 (Design Specification) with this direction
-  2. Provide feedback on the design direction (will be incorporated as Phase 2 constraints)
+  1. この方向で Phase 2 に進む
+  2. フィードバックを伝える（Phase 1 を再議論します）
   ```
-- If user provides feedback: record in `## User Review Outcome`, incorporate as Phase 2 constraints.
+- On approval: push waiting screen to `screen_dir`, proceed to Phase 2 framing.
+- On feedback:
+  1. Record in phase-1/SYNTHESIS.md `## User Feedback History` → `### Feedback Cycle {N}`:
+     ```markdown
+     ### Feedback Cycle {N}
+     - **Feedback:** {user's feedback content}
+     - **Action:** Re-entered hypothesize with feedback as constraint
+     ```
+  2. Reset `> Round:` to 0 in SYNTHESIS.md header; increment `> Feedback Cycle:`.
+  3. Broadcast to members: restate 3-layer roles + "ユーザーからのフィードバック: {content}。これを新たな制約として hypothesize を再開してください"
+  4. Re-enter Phase 1 hypothesize.
+  5. After ratify succeeds: generate updated moodboard, present user-review-1 again.
+  6. After ratify succeeds and new moodboard presented, append outcome:
+     ```markdown
+     ### Feedback Cycle {N} Outcome
+     - **Result:** {summary of how feedback was addressed}
+     ```
+
+### user-review-2
+
+- Leader reads phase-2/SYNTHESIS.md Draft Design Spec.
+- Leader generates UI mockup HTML content fragment and writes to `screen_dir` (see Visual Companion → Phase 2 Mockup Content).
+- Presents to user via AskUserQuestion:
+  ```
+  Phase 2 (Design Specification) の結果をモックアップにしました。
+  ブラウザで確認してください: {url}
+
+  **Design Spec 概要:** {トークン定義・レスポンシブ戦略の要約}
+
+  Options:
+  1. この仕様で確定する
+  2. フィードバックを伝える（Phase 2 を再議論します）
+  ```
+- On approval: stop visual companion server (`scripts/stop-server.sh $SESSION_DIR`), proceed to concluded.
+- On feedback:
+  1. Leader assesses scope: is this Phase 2 internal or does it require Phase 1 direction change?
+  2. **If Phase 2 scope:** Same feedback recording and re-entry flow as user-review-1 but for Phase 2 (record in phase-2/SYNTHESIS.md, reset Round, re-enter Phase 2 hypothesize, loop).
+  3. **If Phase 1 escalation needed:** Present escalation confirmation via AskUserQuestion:
+     ```
+     このフィードバックは Phase 1 のデザイン方向性の変更を必要とします。
+     Phase 1 の hypothesize に戻って再議論しますか？
+
+     1. はい、Phase 1 から再議論する
+     2. いいえ、Phase 2 の範囲内で対応する
+     ```
+     - If user confirms Phase 1 escalation: suspend conflict rule #9, delete phase-2/ directory (new Phase 2 will be created after Phase 1 re-approval), record escalation in phase-1/SYNTHESIS.md User Feedback History, re-enter Phase 1 hypothesize with feedback as constraint.
+     - If user chooses Phase 2 scope: proceed with Phase 2 internal feedback flow.
 
 ### Phase 2: framing
 
 - **Context injection (Push-based):** Leader reads phase-1/SYNTHESIS.md, extracts Direction Conclusion, and includes it in the framing broadcast. Members do NOT read phase-1/ files directly.
-- If user provided feedback during user-review, include it as additional constraints.
+- If user provided feedback during user-review-1 (recorded in User Feedback History), include the final approved direction and any feedback that shaped it as additional context.
 - Framing should focus on specification scope, acceptance criteria, and which token categories to define.
 
 ### Phase 2: hypothesize
@@ -410,6 +479,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Each hypothesis MUST include at least one `axis=` tag.
 - Report completion using the completion report format.
 - **Codex advisory step:** Same pattern as Phase 1.
+- **Feedback re-entry:** When re-entering hypothesize from user-review-2 feedback, same rules as Phase 1 feedback re-entry. The broadcast includes user feedback as a new constraint. Members add new hypotheses with required token definition blocks. Previous entries remain (append-only).
 
 ### Phase 2: critique
 
@@ -468,6 +538,61 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Use structured short format: Phase / Step / Action / Format-ref (~80-120 tokens).
 - Combine phase transitions: completion confirmation + next phase instruction in 1 broadcast.
 - Phase 2 framing broadcast MUST include Phase 1 Direction Conclusion summary (Push-based context injection).
+
+## Visual Companion
+
+### Overview
+
+Uses the superpowers brainstorming visual companion to present mockups in the user's browser during user-review phases. The visual companion is an external dependency from the superpowers plugin — its `scripts/` directory must be resolved via the superpowers plugin installation path.
+
+### Server Lifecycle
+
+- **Start:** At user-review-1 start, leader runs `scripts/start-server.sh --project-dir {project-root}` from the superpowers plugin scripts directory. Save `screen_dir` and `state_dir` from the response.
+- **Maintain:** During Phase 2 discussion, push a waiting screen to `screen_dir`:
+  ```html
+  <!-- filename: waiting.html -->
+  <div style="display:flex;align-items:center;justify-content:center;min-height:60vh">
+    <p class="subtitle">Phase 2 議論中...</p>
+  </div>
+  ```
+- **Stop:** After user-review-2 approval, leader runs `scripts/stop-server.sh $SESSION_DIR`.
+
+### Fallback
+
+If the visual companion server fails to start (superpowers plugin not installed, port conflict, no browser available):
+1. Log warning in SYNTHESIS.md: `(Visual companion unavailable: {reason}. Falling back to text-based review.)`
+2. Proceed with text-based AskUserQuestion only (same content as mockup, but described in text)
+3. All other feedback loop mechanics remain unchanged
+
+### Mockup Generation Rules
+
+- **Responsibility:** Leader-only. Members do not generate mockups.
+- **Source:** SYNTHESIS.md content (Direction Conclusion for Phase 1, Draft Design Spec for Phase 2).
+- **Format:** Content fragments only (no full HTML documents). The visual companion frame template provides CSS/JS infrastructure.
+- **Google Fonts:** system-ui fallback is required for all font declarations.
+- **Scope:** Leader uses discretion to produce minimum viable mockup that conveys the design. Phase 2 mockups need not demonstrate every token — focus on what helps the user evaluate the specification.
+
+### Phase 1 Mockup Content (Moodboard)
+
+- Color palette visualization (proposed color directions)
+- Typography samples (Google Fonts loaded with system-ui fallback)
+- Tone/mood CSS-based atmosphere
+- Multiple directions shown as cards layout for comparison (if applicable)
+- File naming: `moodboard.html`, `moodboard-v2.html`, ...
+
+### Phase 2 Mockup Content (UI Mockup)
+
+- Design tokens applied to component samples
+- Responsive breakpoint switching demo
+- Light/dark/high-contrast theme switching
+- Motion token animation preview (with `prefers-reduced-motion` policy applied)
+- File naming: `ui-mockup.html`, `ui-mockup-v2.html`, ...
+
+### Approval Contract
+
+- **Primary:** AskUserQuestion text response in terminal determines approval/feedback.
+- **Secondary:** Browser click events (`state_dir/events`) are supplementary information for leader context only.
+- Approval/feedback decision is always via terminal text, never via browser clicks alone.
 
 ---
 
@@ -565,12 +690,15 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 ```markdown
 # SYNTHESIS — {discussion-id} / Phase 1: Design Direction
 > Status: setup
+> Round: 0
+> Max Rounds: 10
+> Feedback Cycle: 1
 
 ## Evidence Map
 ## Direction Conclusion
 ## Ratification History
 ## Minority Report
-## User Review Outcome
+## User Feedback History
 ```
 
 **Phase 2:**
@@ -579,11 +707,13 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 > Status: setup
 > Round: 0
 > Max Rounds: 10
+> Feedback Cycle: 1
 
 ## Evidence Map
 ## Draft Design Spec
 ## Ratification History
 ## Minority Report
+## User Feedback History
 ## Final Design Spec
 ```
 
@@ -720,7 +850,8 @@ Note: This is a design specification, not an implementation plan. To create exec
 | 6 | `## Audit` section is leader-only | Single writer; Codex results managed by leader |
 | 7 | Revisions are append-only in member's own subsection | Maintains append-only invariant |
 | 8 | `### codex` subsection is leader-only (leader writes on Codex's behalf) | Same pattern as Rule #6 |
-| 9 | Phase 1 files are read-only during Phase 2 | Prevents retroactive modification of settled design direction |
+| 9 | Phase 1 files are read-only during Phase 2 (suspended during Phase 2 → Phase 1 escalation) | Prevents retroactive modification of settled design direction. Suspension requires explicit user confirmation via escalation flow in user-review-2. When suspended: Phase 2 files are discarded, Phase 1 re-enters hypothesize, rule reinstates when new Phase 2 begins. |
+| 10 | Ratification round counter resets on user feedback re-entry; feedback cycle counter is separate and unbounded | Distinguishes internal loops (ratify failure → critique) from external loops (user feedback → hypothesize). Max Rounds (10) applies per feedback cycle. |
 
 ## Codex Advisory Member
 
