@@ -247,13 +247,14 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
   - `domain_hints`: extracted from user answers + design-domain seed axes (美的方向性, ユーザビリティ vs 表現性, パフォーマンス vs リッチネス, ブランド一貫性 vs 革新性)
 - After team-composer completes (Handoff Contract received):
   - Create `docs/discussions/{discussion-id}/phase-1/` and `phase-2/` directories.
-  - In each phase directory, create base WHITEBOARD.md + SYNTHESIS.md using templates below.
+  - Read `skills/frontend-design-board/references/whiteboard-templates.md` and `skills/frontend-design-board/references/synthesis-templates.md`.
+  - In each phase directory, create base WHITEBOARD.md + SYNTHESIS.md using template reference files (see Template References section).
   - Do NOT create per-round WHITEBOARD files yet — created at each round's hypothesize phase.
   - Ensure `docs/discussions/` is in `.gitignore`.
   - Spawn all members with frontend-design-board-specific prompts:
-    - Normal members: 3-layer role description (discipline + epistemic stance + epistemic constraint) as briefing.
-    - `-cx` members: same 3-layer prompt + codex exec exploration template (see team-composer skill for template).
-  - **Important: 3-layer role enrichment** — team-composer provides role name + discipline only. The board adds epistemic stance (layer 2) and epistemic constraint (layer 3) at spawn time, using team-composer's role names and disciplines as the base.
+    - Normal members: discipline + expected contribution as briefing.
+    - `-cx` members: same briefing + codex exec exploration template (see team-composer skill for template).
+  - **Lean role briefing policy:** For recurring broadcasts (hypothesize/critique/revise/re-entry), restate only discipline + expected contribution. This minimizes token overhead while preserving role separation.
 
 ### Phase 1: framing
 
@@ -265,14 +266,15 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 ### Phase 1: hypothesize
 
 - Leader creates WHITEBOARD-R{N}.md in phase-1/ at the start of each round.
-- **Independent generation (Round 1, Feedback Cycle 1 only):** Members generate hypotheses WITHOUT reading other members' entries. Each member receives only the topic and their own role briefing (3-layer description). This eliminates first-mover anchoring. Subsequent feedback cycles allow reading existing entries.
-- Each member aims for 2-5 hypotheses about design direction. Hypotheses are primarily linguistic (mood, tone, references). Code snippets (CSS variables, font-family declarations) are permitted but NOT required.
+- **Independent generation (Round 1, Feedback Cycle 1 only):** Members generate hypotheses WITHOUT reading other members' entries. Each member receives only the topic and their own role briefing (discipline + expected contribution). This eliminates first-mover anchoring. Subsequent feedback cycles allow reading existing entries.
+- Each member aims for 1-3 hypotheses about design direction. Hypotheses are linguistic (mood, tone, references). No code snippets in Phase 1.
 - Each hypothesis MUST include at least one `axis=` tag.
 - **Feedback re-entry:** When re-entering hypothesize from user-review-1 feedback, the broadcast includes user feedback as a new constraint. Members write new hypotheses in a new WHITEBOARD-R{N}.md file (round number continues monotonically). Previous round files remain read-only.
 
 ### Phase 1: critique
 
 - Members read the current round's WHITEBOARD-R{N}.md `## Hypotheses` section.
+- Each member writes at most 2 critiques per round, prioritizing highest-risk disagreements.
 - **Feldman template encouraged** (記述→分析→解釈→判断) but not enforced.
 
 ### Phase 1: synthesize
@@ -320,7 +322,7 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
      - **Action:** Re-entered hypothesize with feedback as constraint
      ```
   2. Increment `> Feedback Cycle:` in SYNTHESIS.md header.
-  3. Broadcast to members: restate 3-layer roles + "ユーザーからのフィードバック: {content}。これを新たな制約として hypothesize を再開してください"
+  3. Broadcast to members: restate discipline + expected contribution + "ユーザーからのフィードバック: {content}。これを新たな制約として hypothesize を再開してください"
   4. Re-enter Phase 1 hypothesize (new WHITEBOARD-R{N}.md, round number continues).
   5. After ratify succeeds: generate updated moodboard, present user-review-1 again.
   6. After approval, append outcome:
@@ -339,6 +341,7 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 ### Phase 2: hypothesize
 
 - Leader creates WHITEBOARD-R{N}.md in phase-2/ at the start of each round (round number continues from Phase 1).
+- Each member aims for 1-2 hypotheses per round, prioritizing coverage over quantity.
 - **Token definition block is REQUIRED** in Phase 2 hypotheses. Each hypothesis must include at least one CSS Custom Properties code block defining design tokens. Hypotheses without token definitions are returned for revision.
 - **Theme matrix:** Token hypotheses that define color tokens MUST include light/dark/high-contrast variants. Motion token hypotheses MUST address `prefers-reduced-motion` handling policy (disable, shorten, or provide alternatives — WCAG does not mandate 0ms specifically).
 - **Feedback re-entry:** When re-entering hypothesize from user-review-2 feedback, the broadcast includes user feedback as a new constraint. Members write new hypotheses in a new WHITEBOARD-R{N}.md file.
@@ -346,6 +349,7 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 ### Phase 2: critique
 
 - Same rules as Phase 1 critique, plus: critiques of token definitions SHOULD include quantitative checks (contrast ratio, spacing ratio, type scale ratio) when applicable.
+- Each member writes at most 2 critiques per round, prioritizing highest-risk disagreements.
 
 ### Phase 2: audit
 
@@ -398,7 +402,8 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 ### concluded
 
 - Leader writes `## Final Design Spec` in phase-2/SYNTHESIS.md.
-- Leader generates the Design Spec file at `docs/plans/YYYY-MM-DD-{topic}-design-spec.md` (see Design Spec Template below).
+- Read `skills/frontend-design-board/references/design-spec-template.md`.
+- Leader generates the Design Spec file at `docs/plans/YYYY-MM-DD-{topic}-design-spec.md` (see template reference files).
 - Content is derived from both phase-1/SYNTHESIS.md (design direction) and phase-2/SYNTHESIS.md (specifications).
 - Verify the file was created successfully.
 - Delete `docs/discussions/{discussion-id}/` directory after successful export.
@@ -468,199 +473,18 @@ If the visual companion server fails to start (superpowers plugin not installed,
 
 ---
 
-# Reference Layer
+# Template References
 
-## WHITEBOARD.md Templates (Base Files)
+To reduce static token overhead in this SKILL.md, templates are externalized.
 
-### Phase 1 Base WHITEBOARD
+- `skills/frontend-design-board/references/whiteboard-templates.md`
+  - Phase 1/2 base WHITEBOARD templates
+  - Use during setup when creating `phase-1/WHITEBOARD.md` and `phase-2/WHITEBOARD.md`
+- `skills/frontend-design-board/references/synthesis-templates.md`
+  - Phase 1/2 SYNTHESIS templates
+  - Use during setup when creating `phase-1/SYNTHESIS.md` and `phase-2/SYNTHESIS.md`
+- `skills/frontend-design-board/references/design-spec-template.md`
+  - Final Design Spec export template
+  - Use during concluded when writing `docs/plans/YYYY-MM-DD-{topic}-design-spec.md`
 
-Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
-
-Created during setup. Becomes **read-only after framing phase** completes.
-
-```markdown
-# WHITEBOARD — {discussion-id} / Phase 1: Design Direction
-> Topic: {design topic}
-> Created: {YYYY-MM-DD}
-> Team: {comma-separated names}
-
-## Topic
-{Clear statement of the design challenge. Include context, target user, and motivation.}
-
-## How Our Work Connects
-{Each member's role and perspective — full 3-layer description.}
-
-## Framing
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-```
-
-### Phase 2 Base WHITEBOARD
-
-Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
-
-Created during setup. Becomes **read-only after framing phase** completes.
-
-```markdown
-# WHITEBOARD — {discussion-id} / Phase 2: Design Specification
-> Topic: {design topic}
-> Created: {YYYY-MM-DD}
-> Team: {comma-separated names}
-
-## Topic
-{Clear statement of the design challenge. Include context, target user, and motivation.}
-
-## How Our Work Connects
-{Each member's role and perspective — full 3-layer description.}
-
-## Framing
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-```
-
-Per-round WHITEBOARD-R{N}.md files use the template from board-engine REFERENCE.md. Phase 1 round files omit `## Audit` (no audit in Phase 1).
-
-## SYNTHESIS.md Templates
-
-Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
-
-**Phase 1:**
-```markdown
-# SYNTHESIS — {discussion-id} / Phase 1: Design Direction
-> Status: setup
-> Round: 0
-> Max Rounds: 10
-> Feedback Cycle: 1
-
-## Evidence Map
-## Direction Conclusion
-## Round Context Packet
-## Ratification History
-## User Feedback History
-```
-
-**Phase 2:**
-```markdown
-# SYNTHESIS — {discussion-id} / Phase 2: Design Specification
-> Status: setup
-> Round: 0
-> Max Rounds: 10
-> Feedback Cycle: 1
-
-## Evidence Map
-## Draft Design Spec
-## Round Context Packet
-## Ratification History
-## Minority Report
-## User Feedback History
-## Final Design Spec
-```
-
-Leader-only files. See board-engine REFERENCE.md for section content structure.
-
-## Design Spec Template
-
-Path: `docs/plans/YYYY-MM-DD-{topic}-design-spec.md`
-
-Exported by leader during `concluded` phase. This is the permanent record of the frontend design board outcome.
-
-```markdown
-# {Topic} Design Spec
-
-> Date: {YYYY-MM-DD}
-> Status: Approved ({accept_count}/{total} {unanimous/majority})
-> Method: Frontend Design Board ({N}-member 2-phase structured debate)
-
-## Summary
-{2-3 sentence summary of the design direction and key specifications}
-
-## Design Thinking Mapping
-
-> This section maps directly to the frontend-design skill's Design Thinking input format.
-
-- **Purpose**: {what problem this interface solves and who uses it}
-- **Tone**: {selected aesthetic direction — e.g., "editorial minimalism with warm earth tones"}
-- **Target User**: {who the design serves — demographics, context, needs}
-- **Constraints**: {technical requirements, brand guidelines, accessibility requirements}
-- **Differentiation**: {what makes this design unforgettable — the one thing someone will remember}
-
-## Design Token Definition
-
-### Color Tokens
-
-| Token | Light | Dark | High Contrast |
-|-------|-------|------|---------------|
-| --color-surface | {value} | {value} | {value} |
-| --color-on-surface | {value} | {value} | {value} |
-| --color-primary | {value} | {value} | {value} |
-| --color-accent | {value} | {value} | {value} |
-
-### Typography Tokens
-
-```css
---font-display: '{display font}', {fallback};
---font-body: '{body font}', {fallback};
---font-size-base: {value};
---line-height-base: {value};
---type-scale-ratio: {value};
-```
-
-### Spacing Tokens
-
-```css
---space-unit: {base unit, e.g., 8px};
---space-xs: {value};
---space-sm: {value};
---space-md: {value};
---space-lg: {value};
---space-xl: {value};
-```
-
-### Motion Tokens
-
-```css
---duration-fast: {value};
---duration-normal: {value};
---duration-slow: {value};
---easing-default: {value};
-/* prefers-reduced-motion policy: {disable | shorten | alternative} */
-```
-
-### Elevation Tokens
-
-```css
---shadow-sm: {value};
---shadow-md: {value};
---shadow-lg: {value};
-```
-
-## Responsive Strategy
-
-- **Approach**: {mobile-first | desktop-first} — {rationale}
-- **Breakpoints**:
-  - sm: {value}
-  - md: {value}
-  - lg: {value}
-  - xl: {value}
-
-## Design Decisions
-{Key design decisions from Phase 1 direction + Phase 2 specification with rationale}
-
-## Unresolved Items
-{Low-confidence claims, open questions, or items deferred for implementation. Omit section if none.}
-
-## Minority Report
-{Dissenting views from ratification, if any. Omit section if unanimous.}
-
-## Discussion Artifacts
-- Team: {comma-separated member names}
-- Phase 1: {hypothesis_count} hypotheses, {critique_count} critiques
-- Phase 2: {hypothesis_count} hypotheses, {critique_count} critiques
-- Ratification: Phase 1 Round {N} ({count}/{total}), Phase 2 Round {N} ({count}/{total})
-```
-
-Note: This is a design specification, not an implementation plan. To create executable code, use the `frontend-design` skill with this Design Spec as input context.
+Per-round WHITEBOARD-R{N}.md files continue to use the template from `board-engine/REFERENCE.md` (Phase 1 round files omit `## Audit`).
