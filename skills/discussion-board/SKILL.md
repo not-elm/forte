@@ -46,7 +46,7 @@ setup/explore → setup/confirm → framing → [Round N: hypothesize → critiq
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
 | audit | Leader only | Run Codex CLI to fact-check hypotheses and critiques from current round; write results to WHITEBOARD `## Audit` |
 | revise | All members | Review audit findings and append corrections to own entries (skipped if no ⚠️/❌ found) |
-| synthesize | Leader only | Read all content, write Evidence Map + Draft Conclusion in SYNTHESIS.md |
+| synthesize | Leader only | Read all content, write Evidence Map + Draft Conclusion + Round Context Packet in SYNTHESIS.md |
 | ratify | All members | Vote accept or push-back via SendMessage. Simple majority ratifies |
 | concluded | Leader only | Record final conclusion (and Minority Report if dissent exists) |
 
@@ -107,6 +107,23 @@ Critiques making factual claims (challenge/amend) should include grounding for t
 **Key claims:** 1, 2, 3 (from Evidence Map)
 **Unresolved:** {low-confidence or unaddressed claims}
 ```
+
+### Round Context Packet (Leader only)
+
+Compact handoff context for the next round. This is the default read target for members in Round 2+.
+
+```markdown
+## Round Context Packet
+### Round {N}
+- Key points (with entry IDs): {5-10 bullets}
+- Open disputes: refs=[...]
+- Next-round focus: {what members should challenge or extend}
+```
+
+Rules:
+- Keep concise: target 150-250 tokens, hard cap 350 tokens
+- Reference entry IDs instead of pasting long excerpts
+- Members read this first in Round 2+, then pull original text via Grep only when needed
 
 ### Ratification History (Leader only)
 
@@ -171,6 +188,7 @@ Members append corrections in their own subsection (append-only — original ent
 | Critique | `[CR-{initial}-R{round}-{seq}]` | Critique → Round N | critique |
 | Audit | (no ID — table format) | Audit → Round N | audit |
 | Revision | `[{original-ID}] **revised**` | Hypotheses or Critique | revise |
+| Context Packet | (no ID — compact summary with refs) | Round Context Packet → Round N | synthesize |
 
 ---
 
@@ -187,7 +205,7 @@ Members append corrections in their own subsection (append-only — original ent
 | critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
 | audit | Run Codex CLI on current round's claims, write Audit table | — | WHITEBOARD.md `## Audit → Round {N}` updated | Audit written |
 | revise | Broadcast audit findings to affected members | Append corrections in own section (append-only) | Revised entries | All affected members report complete (or skipped if all ✅/❓) |
-| synthesize | Read all WHITEBOARD, write Evidence Map + Draft | — | SYNTHESIS.md updated | Draft written |
+| synthesize | Read all WHITEBOARD, write Evidence Map + Draft + Round Context Packet | — | SYNTHESIS.md updated | Draft + Context Packet written |
 | ratify | Broadcast ratify request | Send vote via SendMessage | Ratification History | Majority reached or next round |
 | concluded | Write Final Conclusion (+ Minority Report) | — | Final SYNTHESIS.md | — |
 
@@ -251,13 +269,18 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### framing
 
-- Members use full WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- Members read only `## Proposition`, `## How Our Work Connects`, and their own `## Framing` subsection (`### {name}`).
+- Full WHITEBOARD.md Read is fallback-only (use only if targeted extraction fails).
 - Leader combines completion confirmation + hypothesize kickoff in 1 broadcast to reduce round-trips.
 
 ### hypothesize
 
 - **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (discipline + expected contribution from setup/confirm). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
-- **Round 2+:** Members read all prior content via full WHITEBOARD.md Read.
+- **Round 2+ context protocol (mandatory):**
+  1. Read latest `## Round Context Packet` in SYNTHESIS.md first.
+  2. Extract `## Hypotheses` via Grep.
+  3. Narrow with `Grep pattern="### {member-name}"`, then pull only referenced entry IDs as needed.
+- Do NOT use full WHITEBOARD.md Read in Round 2+ unless Grep-based extraction fails.
 - **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup/confirm). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
 - Each member aims for 2-5 hypotheses, each concrete and testable.
 - Each hypothesis should include a `Grounding:` line citing evidence basis. `[general-knowledge]` is always valid — the goal is transparency about evidence strength, not blocking non-code claims. Hypotheses without grounding will be flagged during audit.
@@ -266,12 +289,13 @@ Members append corrections in their own subsection (append-only — original ent
 ### critique
 
 - **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup/confirm).
-- **IMPORTANT**: Use 2-step Grep extraction when WHITEBOARD exceeds ~350 lines:
+- **IMPORTANT**: Use section extraction instead of full WHITEBOARD.md Read (mandatory in Round 2+):
   1. `Grep pattern="## Hypotheses"` to extract the H2 section
   2. `Grep pattern="### {member-name}"` to narrow to a specific member
+  3. If needed, Grep by specific entry ID from `refs=[...]`
 - Members must label each critique: challenge/support/amend/question.
 - Cite refs=[] and @member for every entry.
-- Round 2+: also read Draft Conclusion in SYNTHESIS.md.
+- Round 2+: read both `Draft Conclusion` and latest `Round Context Packet` in SYNTHESIS.md before writing.
 
 ### audit
 
@@ -323,6 +347,11 @@ Members append corrections in their own subsection (append-only — original ent
 - Only runs when audit found ⚠️ Partially accurate or ❌ Inaccurate entries.
 - **Per-round role re-anchoring:** The broadcast that kicks off this phase must restate each affected member's discipline and expected contribution alongside the audit findings.
 - Leader broadcasts audit results and instructs affected members to review and correct their entries.
+- Affected members read only:
+  1. `## Audit` → `### Round {N}`
+  2. Referenced entries (by ID) in Hypotheses/Critique
+  3. Latest `## Round Context Packet`
+- Do NOT use full WHITEBOARD.md Read in revise unless targeted extraction fails.
 - Members **append** corrections in their own `### {name}` subsection under the relevant section (Hypotheses or Critique). Original entries are NEVER modified (append-only).
 - Revision format:
 
@@ -340,6 +369,7 @@ Members append corrections in their own subsection (append-only — original ent
 
 - Leader reads ALL WHITEBOARD.md content (framing, hypotheses, all critiques).
 - Writes Evidence Map + Draft Conclusion in SYNTHESIS.md.
+- Writes `## Round Context Packet` → `### Round {N}` as a compact handoff for next-round members.
 - Round 2+: add entry ID → summary mapping table in SYNTHESIS.md for members to reference efficiently.
 - Guideline: "When in doubt about summary accuracy, members should Grep original text."
 
@@ -361,6 +391,7 @@ Members append corrections in their own subsection (append-only — original ent
 - All leader → member instructions via **broadcast** (NOT individual SendMessage).
 - Use structured short format: Phase / Round / Action / Format-ref (~80-120 tokens).
 - Combine phase transitions: completion confirmation + next phase instruction in 1 broadcast.
+- Round 2+ broadcasts should reference `Round Context Packet` and entry IDs instead of pasting long excerpts.
 
 ---
 
@@ -421,6 +452,7 @@ Path: `docs/discussions/{discussion-id}/SYNTHESIS.md`
 
 ## Evidence Map
 ## Draft Conclusion
+## Round Context Packet
 ## Ratification History
 ## Minority Report
 ## Final Conclusion
