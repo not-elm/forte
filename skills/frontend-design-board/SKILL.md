@@ -41,16 +41,15 @@ The following are explicitly outside this skill's scope:
 4. **Per-member write zones** — Each teammate writes only to their own `### {name}` subsection in WHITEBOARD.md.
 5. **Leader-only SYNTHESIS.md** — Teammates read but never write to SYNTHESIS.md.
 6. **Append-only** — Teammates add content, never delete or modify existing entries.
-7. **Leader as synthesizer, not participant** — Leader does NOT write hypotheses or critiques. Leader MAY write process artifacts (audit results, evidence maps, conclusions). **Exception:** Leader acts as scribe/proxy for advisory members (e.g., Codex).
+7. **Leader as synthesizer, not participant** — Leader does NOT write hypotheses or critiques. Leader MAY write process artifacts (audit results, evidence maps, conclusions).
 8. **Structured phase handoff** — Phase 1 SYNTHESIS.md is the mandatory context injection source for Phase 2. Leader pushes Phase 1 conclusions via broadcast at Phase 2 framing start.
-9. **Advisory members** — Non-voting participants (e.g., Codex) contribute hypotheses and critiques but do not vote in ratification. Leader manages their participation directly.
-10. **Principle-based critique** — Critiques must reference design principles (contrast, repetition, alignment, proximity, visual hierarchy, Gestalt), not subjective preferences. "I don't like it" is never valid; "this violates the alignment principle because..." is required.
-11. **Staged concreteness** — Phase 1 uses linguistic descriptions (mood, direction, references); Phase 2 requires CSS Custom Properties token definitions. This prevents premature specificity from suppressing creative exploration.
+9. **Principle-based critique** — Critiques must reference design principles (contrast, repetition, alignment, proximity, visual hierarchy, Gestalt), not subjective preferences. "I don't like it" is never valid; "this violates the alignment principle because..." is required.
+10. **Staged concreteness** — Phase 1 uses linguistic descriptions (mood, direction, references); Phase 2 requires CSS Custom Properties token definitions. This prevents premature specificity from suppressing creative exploration.
 
 ## Phase Model
 
 ```
-setup/explore → setup/confirm → [Phase 1: framing → hypothesize → critique → synthesize → ratify] → user-review-1 (moodboard mockup ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
+setup → [Phase 1: framing → hypothesize → critique → synthesize → ratify] → user-review-1 (moodboard mockup ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
 ```
 
 ### Phase 1 — Design Direction (5 steps)
@@ -58,8 +57,8 @@ setup/explore → setup/confirm → [Phase 1: framing → hypothesize → critiq
 | Step | Who | What |
 |------|-----|------|
 | framing | All members | Document design context: purpose, aesthetic instincts, target user, constraints, unknowns |
-| hypothesize | All members + Codex (advisory) | Propose design directions: tone, mood, aesthetic stance, reference points |
-| critique | All members + Codex (advisory) | Challenge/support/amend/question directions using design principles |
+| hypothesize | All members | Propose design directions: tone, mood, aesthetic stance, reference points |
+| critique | All members | Challenge/support/amend/question directions using design principles |
 | synthesize | Leader only | Read all content, write Evidence Map + Direction Conclusion in SYNTHESIS.md |
 | ratify | All voting members | Vote accept or push-back on design direction. Simple majority ratifies |
 
@@ -87,8 +86,8 @@ Leader presents Phase 2 specification as a UI mockup via the visual companion se
 | Step | Who | What |
 |------|-----|------|
 | framing | All members | Document specification constraints, scope, acceptance criteria (informed by Phase 1 direction) |
-| hypothesize | All members + Codex (advisory) | Propose concrete design specifications: token definitions (required), responsive strategy, motion policy |
-| critique | All members + Codex (advisory) | Challenge/support/amend/question specifications with design principle references and axis tags |
+| hypothesize | All members | Propose concrete design specifications: token definitions (required), responsive strategy, motion policy |
+| critique | All members | Challenge/support/amend/question specifications with design principle references and axis tags |
 | audit | Leader only | Run Codex CLI to fact-check: a11y (WCAG 2.1/2.2 AA), browser compat, performance (CLS/LCP). Aesthetic judgments excluded |
 | revise | All members (conditional) | Append corrections if audit found inaccuracies (skipped if all clean) |
 | synthesize | Leader only | Read all content, write Evidence Map + Draft Design Spec in SYNTHESIS.md |
@@ -267,7 +266,7 @@ Members append corrections in their own subsection (append-only — original ent
 | Audit | (no ID — table format) | Audit → Round N | audit (Phase 2 only) |
 | Revision | `[{original-ID}] **revised**` | Hypotheses or Critique | revise (Phase 2 only) |
 
-Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex (advisory) uses fixed initial `X` (eXternal). Entry IDs: `[H-1-X-NNN]`, `[CR-2-X-R{N}-NNN]`.
+Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` members use their normal member's initial + `X`. Example: backend → `B`, backend-cx → `BX`. Entry IDs: `[H-1-BX-001]`.
 
 ---
 
@@ -279,11 +278,10 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 | Step | Leader Action | Member Action | Output | Next Trigger |
 |------|---------------|---------------|--------|--------------|
-| setup/explore | Analyze topic, ask user questions, generate fault-line map with design-domain seeds | — | Fault-line map + design context | Leader has map + enough info for roles |
-| setup/confirm | Construct 3-layer roles from fault-line map, ensure a11y non-negotiable axis, present to user | — | Approved role list → team + phase files created | User approves roles |
+| setup | Analyze design topic, ask questions, invoke team-composer, create phase files, spawn members | — | phase-1/ + phase-2/ created, team spawned | Team ready |
 | framing | Broadcast framing instructions | Document design context in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff; after members, invoke Codex → `### codex` | Write direction hypotheses (linguistic, code optional) | Hypothesis entries | All complete + Codex written |
-| critique | Broadcast instructions; after members, invoke Codex → `### codex` | Write critiques with labels + axis tags + refs | Critique entries | All complete + Codex written |
+| hypothesize | Broadcast kickoff | Write direction hypotheses (linguistic, code optional) | Hypothesis entries | All complete |
+| critique | Broadcast instructions | Write critiques with labels + axis tags + refs | Critique entries | All complete |
 | synthesize | Read all WHITEBOARD, write Evidence Map + Direction Conclusion | — | phase-1/SYNTHESIS.md updated | Conclusion written |
 | ratify | Broadcast ratify request to voting members | Send vote via SendMessage | Ratification History | Majority reached or next round |
 
@@ -299,8 +297,8 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 | Step | Leader Action | Member Action | Output | Next Trigger |
 |------|---------------|---------------|--------|--------------|
 | framing | Broadcast Phase 1 conclusions + framing instructions | Document specification constraints in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff; after members, invoke Codex → `### codex` | Write specification hypotheses (token definitions required) | Hypothesis entries | All complete + Codex written |
-| critique | Broadcast instructions; after members, invoke Codex → `### codex` | Write critiques with labels + axis tags + refs | Critique entries | All complete + Codex written |
+| hypothesize | Broadcast kickoff | Write specification hypotheses (token definitions required) | Hypothesis entries | All complete |
+| critique | Broadcast instructions | Write critiques with labels + axis tags + refs | Critique entries | All complete |
 | audit | Run Codex CLI on current round (a11y/compat/perf only, NO aesthetic judgment) | — | phase-2/WHITEBOARD.md `## Audit → Round {N}` updated | Audit written |
 | revise | Broadcast audit findings to affected members | Append corrections (append-only) | Revised entries | All affected complete (or skipped if all clean) |
 | synthesize | Read all WHITEBOARD, write Evidence Map + Draft Design Spec | — | phase-2/SYNTHESIS.md updated | Draft written |
@@ -322,36 +320,27 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 ## Phase Notes
 
-### setup/explore
+### setup
 
-- Leader analyzes the design topic and assesses its clarity before asking questions.
-- Ask the user one question at a time (never combine multiple questions in one message).
-- **Design-domain question templates** (use as starting points, adapt to topic):
+- Leader analyzes the design topic and assesses clarity. Ask user 1 question at a time (max 4):
   1. このデザインの対象ユーザーは誰ですか？（年齢層、利用コンテキスト、技術リテラシー）
-  2. 既存のブランドガイドラインやデザインシステムはありますか？（パス指定 or なし）
-  3. 技術スタック上の制約はありますか？（フレームワーク、CSS制限、パフォーマンス要件）
-  4. デザイン上の最大の懸念は何ですか？（方向性の迷い、既存デザインとの整合性、a11y等）
-- Maximum 4 questions (design domain is constrained enough to not need 6).
-- Question count is cumulative across all explore visits (does not reset if returning from confirm).
-- **Optional arguments:** If user provides `--design-system {path}` or `--brand-guide {path}`, read these files during explore and incorporate as constraints.
-- **Fault-line mapping:** Before generating roles, produce a fault-line map — 3-5 axes of disagreement. Use **design-domain seed axes** to guide generation:
-  - 美的方向性の対立（ミニマリズム vs マキシマリズム, ブルータリスト vs リファインド, etc.）
-  - ユーザビリティ vs 表現性
-  - パフォーマンス vs リッチネス
-  - ブランド一貫性 vs 革新性
-  - **Non-negotiable axis: アクセシビリティ** — At least one fault line MUST position accessibility as a tension against another value (e.g., "WCAG AAA compliance vs. aesthetic freedom"). This is NOT optional; it ensures a11y perspective is structurally guaranteed in the team.
-- The fault-line map is presented to the user alongside the role list in setup/confirm (not separately approved).
-
-### setup/confirm
-
-- Generate roles from the fault-line map. Each role is **constructed with three layers**:
-  1. **Discipline-grounded identity** — activates domain-specific design knowledge (e.g., "Typography Specialist", "Motion Designer", "UX Researcher")
-  2. **Epistemic stance** — constrains reasoning toward a design perspective (e.g., "prioritizes readability metrics over aesthetic novelty", "argues from user research data")
-  3. **Explicit epistemic constraint** — specifies evidence requirements and blind spots to guard (e.g., "rejects aesthetic arguments without WCAG compliance data", "requires user context before accepting layout changes")
-- Default 4 members, max 5. Codex is automatic and does not count toward this limit.
-- Due to the non-negotiable a11y fault line, at least one member WILL have accessibility as a primary concern in their 3-layer role — this is guaranteed by construction, not by a fixed role slot.
-- Present the fault-line map + roles to user via AskUserQuestion. User may: approve, request modifications, or request more questions (return to explore, max 2 returns).
-- After approval: create `docs/discussions/{discussion-id}/phase-1/` and `docs/discussions/{discussion-id}/phase-2/` with WHITEBOARD.md + SYNTHESIS.md using templates. Ensure `docs/discussions/` is in `.gitignore`.
+  2. 既存のブランドガイドラインやデザインシステムはありますか？
+  3. 技術スタック上の制約はありますか？
+  4. デザイン上の最大の懸念は何ですか？
+- **Optional arguments:** If user provides `--design-system {path}` or `--brand-guide {path}`, read during setup.
+- Invoke `forte:team-composer` with:
+  - `topic`: the design topic
+  - `team_name`: generate a kebab-case `{discussion-id}`
+  - `role_count`: `"3-6"`
+  - `constraints`: `["a11y non-negotiable axis"]`
+  - `domain_hints`: extracted from user answers + design-domain seed axes (美的方向性, ユーザビリティ vs 表現性, パフォーマンス vs リッチネス, ブランド一貫性 vs 革新性)
+- After team-composer completes (Handoff Contract received):
+  - Create `docs/discussions/{discussion-id}/phase-1/` and `phase-2/` with WHITEBOARD.md + SYNTHESIS.md.
+  - Ensure `docs/discussions/` is in `.gitignore`.
+  - Spawn all members with frontend-design-board-specific prompts:
+    - Normal members: 3-layer role description (discipline + epistemic stance + epistemic constraint) as briefing.
+    - `-cx` members: same 3-layer prompt + codex exec exploration template (see team-composer skill for template).
+  - **Important: 3-layer role enrichment** — team-composer provides role name + discipline only. The board adds epistemic stance (layer 2) and epistemic constraint (layer 3) at spawn time, using team-composer's role names and disciplines as the base.
 
 ### Phase 1: framing
 
@@ -366,7 +355,6 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Each member aims for 2-5 hypotheses about design direction. Hypotheses are primarily linguistic (mood, tone, references). Code snippets (CSS variables, font-family declarations) are permitted but NOT required.
 - Each hypothesis MUST include at least one `axis=` tag.
 - Report completion using the completion report format.
-- **Codex advisory step:** After all members report complete, leader reads WHITEBOARD.md, constructs Codex hypothesize prompt, runs `codex exec`, writes results to `### codex`.
 - **Feedback re-entry:** When re-entering hypothesize from user-review-1 feedback, the broadcast includes user feedback as a new constraint. Members add new hypotheses addressing the feedback. Previous WHITEBOARD.md entries remain (append-only). The `Independent generation` rule applies only to Feedback Cycle 1, Round 1 — subsequent cycles allow reading existing entries.
 
 ### Phase 1: critique
@@ -376,7 +364,6 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Members must label each critique: challenge/support/amend/question.
 - Cite refs=[], @member, and axis= for every entry.
 - **Feldman template encouraged** (記述→分析→解釈→判断) but not enforced.
-- **Codex advisory step:** Same pattern as hypothesize.
 
 ### Phase 1: synthesize
 
@@ -478,13 +465,11 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - **Theme matrix:** Token hypotheses that define color tokens MUST include light/dark/high-contrast variants. Motion token hypotheses MUST address `prefers-reduced-motion` handling policy (disable, shorten, or provide alternatives — WCAG does not mandate 0ms specifically).
 - Each hypothesis MUST include at least one `axis=` tag.
 - Report completion using the completion report format.
-- **Codex advisory step:** Same pattern as Phase 1.
 - **Feedback re-entry:** When re-entering hypothesize from user-review-2 feedback, same rules as Phase 1 feedback re-entry. The broadcast includes user feedback as a new constraint. Members add new hypotheses with required token definition blocks. Previous entries remain (append-only).
 
 ### Phase 2: critique
 
 - Same rules as Phase 1 critique, plus: critiques of token definitions SHOULD include quantitative checks (contrast ratio, spacing ratio, type scale ratio) when applicable.
-- **Codex advisory step:** Same pattern as Phase 1.
 
 ### Phase 2: audit
 
@@ -511,7 +496,6 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 - Only runs when audit found ⚠️ or ❌.
 - Members append corrections (append-only). Max 1 revise round per audit.
-- **Codex advisory revise:** If Codex entries flagged, leader re-invokes Codex with flagged entries.
 
 ### Phase 2: synthesize
 
@@ -616,27 +600,23 @@ Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective — full 3-layer description.}
 
-- **codex** (advisory, non-voting): Cross-model perspective via Codex CLI. Contributes hypotheses and critiques but does not vote.
-
 ## Framing
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 
 ## Hypotheses
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
-### codex
+...
 
 ## Critique
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
-### codex
+...
 ```
 
 ### Phase 2 WHITEBOARD
@@ -655,27 +635,23 @@ Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective — full 3-layer description.}
 
-- **codex** (advisory, non-voting): Cross-model perspective via Codex CLI. Contributes hypotheses and critiques but does not vote.
-
 ## Framing
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
+...
 
 ## Hypotheses
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
-### codex
+...
 
 ## Critique
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
-### {member-C}
-### {member-D}
-### codex
+...
 
 ## Audit
 ```
@@ -814,7 +790,7 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 {Dissenting views from ratification, if any. Omit section if unanimous.}
 
 ## Discussion Artifacts
-- Team: {comma-separated member names} (+ codex advisory)
+- Team: {comma-separated member names}
 - Phase 1: {hypothesis_count} hypotheses, {critique_count} critiques
 - Phase 2: {hypothesis_count} hypotheses, {critique_count} critiques
 - Ratification: Phase 1 Round {N} ({count}/{total}), Phase 2 Round {N} ({count}/{total})
@@ -824,13 +800,17 @@ Note: This is a design specification, not an implementation plan. To create exec
 
 ## Ratification Rules
 
-| Voting Members | Majority Threshold |
-|----------------|-------------------|
-| 4 | 3 |
-| 5 | 3 |
-| codex | (advisory — no vote) |
+- **Voting members**: All members (normal + -cx). Count = role count × 2.
+- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
+- **No advisory members**: All team members have voting rights.
 
-- **Advisory members** (e.g., Codex) do NOT count toward majority threshold and cannot vote.
+| Total Members | Majority Threshold |
+|---------------|-------------------|
+| 6 | 4 |
+| 8 | 5 |
+| 10 | 6 |
+| 12 | 7 |
+
 - **Max rounds**: 10 (configurable at board creation)
 - **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
 - **Exhaustion**: If max rounds reached with no majority, leader writes "best available conclusion" with explicit uncertainty markers
@@ -849,110 +829,16 @@ Note: This is a design specification, not an implementation plan. To create exec
 | 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
 | 6 | `## Audit` section is leader-only | Single writer; Codex results managed by leader |
 | 7 | Revisions are append-only in member's own subsection | Maintains append-only invariant |
-| 8 | `### codex` subsection is leader-only (leader writes on Codex's behalf) | Same pattern as Rule #6 |
+| 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 9 | Phase 1 files are read-only during Phase 2 (suspended during Phase 2 → Phase 1 escalation) | Prevents retroactive modification of settled design direction. Suspension requires explicit user confirmation via escalation flow in user-review-2. When suspended: Phase 2 files are discarded, Phase 1 re-enters hypothesize, rule reinstates when new Phase 2 begins. |
 | 10 | Ratification round counter resets on user feedback re-entry; feedback cycle counter is separate and unbounded | Distinguishes internal loops (ratify failure → critique) from external loops (user feedback → hypothesize). Max Rounds (10) applies per feedback cycle. |
 
-## Codex Advisory Member
+## Audit Notes (Phase 2 only)
 
-### Prerequisites
-
-- `codex` CLI must be installed (`npm i -g @openai/codex`).
-- If unavailable, skip all Codex advisory steps with `(Codex advisory skipped: CLI not found)` in `### codex` subsections.
-
-### Workflow
-
-1. Leader waits for all voting members to report completion.
-2. Leader reads WHITEBOARD.md to gather context.
-3. Leader constructs the appropriate Codex prompt (see templates below).
-4. Leader runs `codex exec` via temp file + stdin.
-5. Leader writes Codex output **verbatim** to `### codex` subsection.
-
-### Hypothesize Prompt Template
-
-```
-You are an advisory member in a structured frontend design discussion.
-The team is working on: {design topic}
-Current phase: {Phase 1: Design Direction | Phase 2: Design Specification}
-
-The team's framing and existing hypotheses are below. Generate 2-3 novel hypotheses that the team has NOT already proposed. Each hypothesis must be concrete and include axis= tags.
-
-{Phase 2 addition: Each hypothesis MUST include CSS Custom Properties token definitions in a code block.}
-
-Use this exact ID format: [H-{phase}-X-001], [H-{phase}-X-002], etc.
-
-Format each hypothesis as:
-- [H-{phase}-X-NNN] **hypothesis** axis={tag}: {concrete claim}
-  > Rationale: {why this is worth considering}
-
-Existing content:
-{framing + hypotheses from WHITEBOARD.md}
-```
-
-### Critique Prompt Template
-
-```
-You are an advisory member in a structured frontend design discussion.
-The team is working on: {design topic}
-Current phase: {Phase 1: Design Direction | Phase 2: Design Specification}
-
-Review the hypotheses and existing critiques below. Write 2-4 critiques that fill gaps in the existing critique coverage. Reference design principles where applicable.
-
-Use this exact ID format: [CR-{phase}-X-R{round}-001], etc.
-
-Label each critique: **challenge**, **support**, **amend**, or **question**.
-
-Format each critique as:
-- [CR-{phase}-X-R{N}-NNN] **{label}** @codex refs=[{target ID}] axis={tag}: {critique text}
-
-Existing content:
-{hypotheses + critiques from WHITEBOARD.md}
-```
-
-### Audit Prompt Template (Phase 2 only)
-
-```
-Fact-check the following claims from a frontend design specification discussion. For each claim:
-1. Verify accessibility claims against WCAG 2.1/2.2 AA standards
-2. Check browser compatibility claims for CSS features
-3. Verify performance impact claims (CLS, LCP)
-4. Do NOT evaluate aesthetic quality, visual appeal, or design taste — mark these as Unverifiable
-5. Skip opinions, value judgments, and forecasts — mark them as Unverifiable
-
-Rate each claim: Verified / Partially accurate / Inaccurate / Unverifiable
-
-Claims:
-{hypotheses and critique claims from current round}
-```
-
-### Invocation Pattern
-
-```bash
-TMPFILE=$(mktemp)
-cat <<'PROMPT_EOF' > "$TMPFILE"
-<constructed_prompt>
-PROMPT_EOF
-cat "$TMPFILE" | codex exec
-rm -f "$TMPFILE"
-```
-
-### Verbatim Copy Rule
-
-Leader MUST copy Codex output verbatim into `### codex` subsection. Formatting adjustments (ID prefix corrections) are permitted; content changes are not.
-
-### Error Handling
-
-| Situation | Action |
-|-----------|--------|
-| `codex` CLI not found | Skip advisory step; write `(Codex advisory skipped: CLI not found)` |
-| Empty output | Write `(Codex provided no additional content)` |
-| Malformed IDs in output | Leader prepends correct ID prefix + quotes raw text in blockquote |
-| Non-zero exit code | Write `(Codex advisory skipped: exit code {N})` and proceed |
-| Timeout (>2 min) | Write `(Codex advisory skipped: timeout)` and proceed |
-
-### Budget
-
-Max 3 Codex CLI calls per round (hypothesize + critique + audit), 2-minute timeout per call. Set Bash tool `timeout: 180000` (3 minutes).
+- **Prerequisite:** `codex` CLI must be installed. If unavailable, skip audit, record warning in SYNTHESIS.md status line, and proceed to synthesize.
+- **Do NOT audit aesthetic quality** — only verify factual claims about accessibility standards, browser support, and performance metrics
+- **Audit is incremental** — each round audits only new entries, not the full history
+- **Revisions are append-only** — never edit the original hypothesis or critique text
 
 ## Timeout Policy
 
