@@ -43,8 +43,8 @@ setup → [Phase 1: framing → hypothesize → critique → synthesize] → use
 | Step | Who | What |
 |------|-----|------|
 | framing | All members | Document problem interpretation, technology constraints, evaluation criteria, unknowns |
-| hypothesize | All members + Codex (advisory) | Propose concrete technology choices, library candidates, architecture patterns |
-| critique | All members + Codex (advisory) | Challenge/support/amend/question hypotheses with cross-references |
+| hypothesize | All members | Propose concrete technology choices, library candidates, architecture patterns |
+| critique | All members | Challenge/support/amend/question hypotheses with cross-references |
 | synthesize | Leader only | Read all content, write Evidence Map + Technology Conclusion in SYNTHESIS.md |
 
 Phase 1 does NOT include audit, revise, or ratify. The user-review step after Phase 1 serves as the ratification gate.
@@ -62,8 +62,8 @@ Leader presents Phase 1 conclusions to the user via AskUserQuestion:
 | Step | Who | What |
 |------|-----|------|
 | framing | All members | Document design constraints, scope, acceptance criteria (informed by Phase 1 conclusions) |
-| hypothesize | All members + Codex (advisory) | Propose concrete implementation designs: file structure, APIs, data models |
-| critique | All members + Codex (advisory) | Challenge/support/amend/question designs with cross-references |
+| hypothesize | All members | Propose concrete implementation designs: file structure, APIs, data models |
+| critique | All members | Challenge/support/amend/question designs with cross-references |
 | audit | Leader only | Run Codex CLI to fact-check claims from current round |
 | revise | All members (conditional) | Append corrections if audit found inaccuracies (skipped if all clean) |
 | synthesize | Leader only | Read all content, write Evidence Map + Draft Design in SYNTHESIS.md |
@@ -208,7 +208,7 @@ Members append corrections in their own subsection (append-only — original ent
 | Audit | (no ID — table format) | Audit → Round N | audit (Phase 2 only) |
 | Revision | `[{original-ID}] **revised**` | Hypotheses or Critique | revise (Phase 2 only) |
 
-Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex (advisory) uses fixed initial `X` (eXternal). Entry IDs: `[H-1-X-NNN]`, `[CR-2-X-R{N}-NNN]`.
+Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` members use their normal member's initial + `X`. Example: backend → `B`, backend-cx → `BX`. Entry IDs: `[H-1-BX-001]`.
 
 ---
 
@@ -220,10 +220,10 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 | Step | Leader Action | Member Action | Output | Next Trigger |
 |------|---------------|---------------|--------|--------------|
-| setup | Suggest 4-10 roles, create team + phase files | — | phase-1/WHITEBOARD.md + SYNTHESIS.md | Team spawned |
+| setup | Invoke team-composer, create phase files, spawn members | — | phase-1/ + phase-2/ WHITEBOARD.md + SYNTHESIS.md | Team spawned |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff; after members, invoke Codex → `### codex` | Write hypotheses in own section | Hypothesis entries | All complete + Codex written |
-| critique | Broadcast instructions; after members, invoke Codex → `### codex` | Write critiques with labels + refs | Critique entries | All complete + Codex written |
+| hypothesize | Broadcast kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
+| critique | Broadcast instructions | Write critiques with labels + refs | Critique entries | All members report complete |
 | synthesize | Read all WHITEBOARD, write Evidence Map + Technology Conclusion | — | phase-1/SYNTHESIS.md updated | Conclusion written |
 
 ### User Review
@@ -237,8 +237,8 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 | Step | Leader Action | Member Action | Output | Next Trigger |
 |------|---------------|---------------|--------|--------------|
 | framing | Broadcast Phase 1 conclusions + framing instructions | Document design constraints in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff; after members, invoke Codex → `### codex` | Write design hypotheses in own section | Hypothesis entries | All complete + Codex written |
-| critique | Broadcast instructions; after members, invoke Codex → `### codex` | Write critiques with labels + refs | Critique entries | All complete + Codex written |
+| hypothesize | Broadcast kickoff | Write design hypotheses in own section | Hypothesis entries | All members report complete |
+| critique | Broadcast instructions | Write critiques with labels + refs | Critique entries | All members report complete |
 | audit | Run Codex CLI on current round's claims, write Audit table | — | phase-2/WHITEBOARD.md `## Audit → Round {N}` updated | Audit written |
 | revise | Broadcast audit findings to affected members | Append corrections (append-only) | Revised entries | All affected complete (or skipped if all clean) |
 | synthesize | Read all WHITEBOARD, write Evidence Map + Draft Design | — | phase-2/SYNTHESIS.md updated | Draft written |
@@ -254,13 +254,18 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 
 ### setup
 
-- Leader suggests 4-10 roles with distinct perspectives. Choose member count based on topic complexity: simple topics → 4-5, moderate → 6-7, complex/multifaceted → 8-10.
+- Invoke `forte:team-composer` with:
+  - `topic`: the design topic
+  - `team_name`: generate a kebab-case `{discussion-id}` from the design topic (e.g., `auth-system-design`)
+  - `role_count`: `"3-6"`
 - Roles should cover both technology evaluation AND implementation design perspectives (same team serves both phases).
-- User approves or modifies roles before team creation.
-- Generate a kebab-case `{discussion-id}` from the design topic (e.g., `auth-system-design`).
-- Create `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md` + `SYNTHESIS.md` using templates.
-- Create `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md` + `SYNTHESIS.md` using templates.
-- Ensure `docs/discussions/` is in `.gitignore` (add if missing).
+- After team-composer completes (Handoff Contract received):
+  - Create `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md` + `SYNTHESIS.md` using templates.
+  - Create `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md` + `SYNTHESIS.md` using templates.
+  - Ensure `docs/discussions/` is in `.gitignore` (add if missing).
+  - Spawn all members with design-board-specific prompts:
+    - Normal members: standard design discussion prompt.
+    - `-cx` members: same prompt + codex exec exploration template (see team-composer skill for template).
 
 ### Phase 1: framing
 
@@ -273,14 +278,12 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Members read all framings via full WHITEBOARD.md Read (~200 lines at this stage).
 - Each member aims for 2-5 hypotheses about technology choices, library candidates, or architecture patterns.
 - Report completion using the completion report format.
-- **Codex advisory step:** After all members report complete, leader reads WHITEBOARD.md, constructs Codex hypothesize prompt (see Codex Advisory Member section), runs `codex exec`, and writes results verbatim to `### codex` under Hypotheses.
 
 ### Phase 1: critique
 
 - **IMPORTANT**: Use 2-step Grep extraction when WHITEBOARD exceeds ~350 lines.
 - Members must label each critique: challenge/support/amend/question.
 - Cite refs=[] and @member for every entry.
-- **Codex advisory step:** After all members report complete, leader invokes Codex critique and writes results to `### codex` under Critique.
 
 ### Phase 1: synthesize
 
@@ -322,12 +325,10 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Members read all Phase 2 framings via full WHITEBOARD.md Read.
 - Hypotheses should propose concrete implementation designs: file structure, APIs, data models, component boundaries.
 - Report completion using the completion report format.
-- **Codex advisory step:** Same pattern as Phase 1.
 
 ### Phase 2: critique
 
 - Same rules as Phase 1 critique.
-- **Codex advisory step:** Same pattern as Phase 1.
 
 ### Phase 2: audit
 
@@ -378,7 +379,6 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. Codex 
 - Members **append** corrections in their own `### {name}` subsection (append-only).
 - **Max 1 revise round per audit** — no recursive auditing of revisions.
 - **Unresolved ❌ after revise:** Leader notes unresolved inaccuracies in the Evidence Map with low confidence rating.
-- **Codex advisory revise:** If any Codex entries were flagged, leader re-invokes Codex with flagged entries + audit notes and appends revisions to `### codex`.
 
 ### Phase 2: synthesize
 
@@ -431,27 +431,23 @@ Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective.}
 
-- **codex** (advisory, non-voting): Cross-model perspective via Codex CLI. Contributes hypotheses and critiques but does not vote.
-
 ## Framing
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
 ...
 
 ## Hypotheses
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
 ...
-### codex
 
 ## Critique
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
 ...
-### codex
 ```
 
 ### Phase 2 WHITEBOARD
@@ -470,27 +466,23 @@ Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective.}
 
-- **codex** (advisory, non-voting): Cross-model perspective via Codex CLI. Contributes hypotheses and critiques but does not vote.
-
 ## Framing
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
 ...
 
 ## Hypotheses
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
 ...
-### codex
 
 ## Critique
-<!-- Repeat ### {member-name} subsections for each team member (4-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ### {member-A}
 ### {member-B}
 ...
-### codex
 
 ## Audit
 ```
@@ -573,7 +565,7 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 {Dissenting views from ratification, if any. Omit section if unanimous.}
 
 ## Discussion Artifacts
-- Team: {comma-separated member names} (+ codex advisory)
+- Team: {comma-separated member names}
 - Phase 1: {hypothesis_count} hypotheses, {critique_count} critiques
 - Phase 2: {hypothesis_count} hypotheses, {critique_count} critiques
 - Ratification: Round {N}, {accept_count}/{total} (voting members only)
@@ -581,18 +573,17 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 
 ## Ratification Rules (Phase 2 only)
 
-| Voting Members | Majority Threshold |
-|----------------|-------------------|
-| 4 | 3 |
-| 5 | 3 |
-| 6 | 4 |
-| 7 | 4 |
-| 8 | 5 |
-| 9 | 5 |
-| 10 | 6 |
-| codex | (advisory — no vote) |
+- **Voting members**: All members (normal + -cx). Count = role count × 2.
+- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
+- **No advisory members**: All team members have voting rights.
 
-- **Advisory members** (e.g., Codex) do NOT count toward majority threshold and cannot vote.
+| Total Members | Majority Threshold |
+|---------------|-------------------|
+| 6 | 4 |
+| 8 | 5 |
+| 10 | 6 |
+| 12 | 7 |
+
 - **Max rounds**: 10 (configurable at board creation)
 - **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
 - **Exhaustion**: If max rounds reached with no majority, leader writes "best available design" with explicit uncertainty markers
@@ -610,105 +601,8 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 | 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
 | 6 | `## Audit` section is leader-only | Single writer; Codex results managed by leader |
 | 7 | Revisions are append-only in member's own subsection | Maintains append-only invariant |
-| 8 | `### codex` subsection is leader-only (leader writes on Codex's behalf) | Same pattern as Rule #6 |
+| 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 9 | Phase 1 files are read-only during Phase 2 | Prevents retroactive modification of settled technology decisions |
-
-## Codex Advisory Member
-
-### Prerequisites
-
-- `codex` CLI must be installed (`npm i -g @openai/codex`).
-- If unavailable, skip all Codex advisory steps with `(Codex advisory skipped: CLI not found)` in `### codex` subsections. Discussion proceeds normally with voting members only.
-
-### Workflow
-
-1. Leader waits for all voting members to report completion for the current step (hypothesize or critique).
-2. Leader reads WHITEBOARD.md to gather context.
-3. Leader constructs the appropriate Codex prompt (see templates below).
-4. Leader runs `codex exec` via temp file + stdin.
-5. Leader writes Codex output **verbatim** to `### codex` subsection in WHITEBOARD.md.
-6. Step is complete; leader proceeds to next step.
-
-### Hypothesize Prompt Template
-
-```
-You are an advisory member in a structured team discussion about implementation design.
-The team is working on: {design topic}
-Current phase: {Phase 1: Technical Investigation | Phase 2: Design}
-
-The team's framing and existing hypotheses are below. Generate 2-3 novel hypotheses that the team has NOT already proposed. Each hypothesis must be concrete and testable.
-
-Use this exact ID format: [H-{phase}-X-001], [H-{phase}-X-002], etc. (where {phase} is 1 or 2)
-
-Format each hypothesis as:
-- [H-{phase}-X-NNN] **hypothesis**: {concrete, testable claim}
-  > Rationale: {why this is worth considering}
-
-Existing content:
-{framing + hypotheses from WHITEBOARD.md}
-```
-
-### Critique Prompt Template
-
-```
-You are an advisory member in a structured team discussion about implementation design.
-The team is working on: {design topic}
-Current phase: {Phase 1: Technical Investigation | Phase 2: Design}
-
-Review the hypotheses and existing critiques below. Write 2-4 critiques that fill gaps in the existing critique coverage.
-
-Use this exact ID format: [CR-{phase}-X-R{round}-001], [CR-{phase}-X-R{round}-002], etc. (where {phase} is 1 or 2)
-
-Label each critique: **challenge**, **support**, **amend**, or **question**.
-
-Format each critique as:
-- [CR-{phase}-X-R{N}-NNN] **{label}** @codex refs=[{target hypothesis ID}]: {critique text}
-
-Existing content:
-{hypotheses + critiques from WHITEBOARD.md}
-```
-
-### Revise Prompt Template (Phase 2 only)
-
-```
-The following entries you previously contributed were flagged during audit. Review the audit feedback and provide corrections.
-
-Use the format:
-- [{original-ID}] **revised**: {corrected statement}
-  > Original: {original claim}. Audit note: {audit note}.
-
-Flagged entries:
-{flagged Codex entries with audit notes}
-```
-
-### Invocation Pattern
-
-```bash
-TMPFILE=$(mktemp)
-cat <<'PROMPT_EOF' > "$TMPFILE"
-<constructed_prompt>
-PROMPT_EOF
-cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
-rm -f "$TMPFILE"
-```
-
-### Verbatim Copy Rule
-
-Leader MUST copy Codex output verbatim into `### codex` subsection. Formatting adjustments (ID prefix corrections) are permitted; content changes are not.
-
-### Error Handling
-
-| Situation | Action |
-|-----------|--------|
-| `codex` CLI not found | Skip advisory step; write `(Codex advisory skipped: CLI not found)` |
-| Empty output | Write `(Codex provided no additional content)` |
-| Malformed IDs in output | Leader prepends correct ID prefix + quotes raw text in blockquote |
-| Non-zero exit code | Write `(Codex advisory skipped: exit code {N})` and proceed |
-| Timeout (>2 min) | Write `(Codex advisory skipped: timeout)` and proceed |
-
-### Budget
-
-Max 3 Codex CLI calls per round, 2-minute timeout per call. Set Bash tool `timeout: 180000` (3 minutes) for each Codex invocation.
 
 ## Audit Notes (Phase 2 only)
 
@@ -716,7 +610,6 @@ Max 3 Codex CLI calls per round, 2-minute timeout per call. Set Bash tool `timeo
 - **Do NOT audit opinions or forecasts** — only verifiable factual claims
 - **Audit is incremental** — each round audits only new entries, not the full history
 - **Revisions are append-only** — never edit the original hypothesis or critique text
-- **Codex entries** (initial `X`) are audited like any other entry. When auditing Codex entries about codebase-specific claims, the audit prompt SHOULD include: "Verify this claim against specific files in the codebase." For technology-landscape claims, standard fact-checking applies.
 
 ## Timeout Policy
 

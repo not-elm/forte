@@ -34,13 +34,12 @@ Explore an open-ended proposition through structured team debate, iterative synt
 ## Phase Model
 
 ```
-setup/explore → setup/confirm → framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] → concluded
+setup → framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] → concluded
 ```
 
 | Phase | Who | What |
 |-------|-----|------|
-| setup/explore | Leader + User | Analyze proposition, ask user questions, generate expertise map of required domains |
-| setup/confirm | Leader + User | Generate discipline-only roles from expertise map, present with expected contributions, user approves, create team + files |
+| setup | Leader | Invoke team-composer, create discussion files, spawn members |
 | framing | All members | Document problem interpretation, constraints, criteria, unknowns |
 | hypothesize | All members | Write concrete, testable candidate answers as hypotheses |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
@@ -66,6 +65,8 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 ### Hypothesis
 
 **ID format:** `[H-{initial}-{seq}]` — `{initial}` = first letter of name (uppercase); `{seq}` = 001, 002, ...
+
+**-cx member initials:** `-cx` members use their normal member's initial + `X`. Example: `[H-BX-001]` = backend-cx member's hypothesis. See team-composer skill for full initial rules.
 
 ```markdown
 - [H-S-001] **hypothesis**: Use WebSocket-based real-time sync with CRDTs for offline mode.
@@ -198,8 +199,7 @@ Members append corrections in their own subsection (append-only — original ent
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup/explore | Analyze proposition, ask user questions, generate expertise map (6-10 required domains) | — | Expertise map + topic insights from user dialogue | Leader has expertise map with 6-10 domains |
-| setup/confirm | Generate discipline-only roles from expertise map, present with expected contributions to user | — | Approved role list → team created, WHITEBOARD.md + SYNTHESIS.md | User approves roles |
+| setup | Invoke team-composer, create discussion files, spawn members | — | WHITEBOARD.md + SYNTHESIS.md created, team spawned | Team ready |
 | framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
 | critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
@@ -211,61 +211,21 @@ Members append corrections in their own subsection (append-only — original ent
 
 ## Phase Notes
 
-### setup/explore
+### setup
 
-- Leader analyzes the proposition and assesses its clarity before asking questions.
-- Ask the user one question at a time (never combine multiple questions in one message).
-- Prefer multiple-choice questions where possible; open-ended questions are also acceptable.
-- Question focus areas:
-  - Background and motivation (why is this discussion needed?)
-  - Goals (what outcome defines success?)
-  - Known constraints and assumptions
-  - Specific domains or expertise to emphasize or exclude
-- Adapt depth to proposition clarity: 2-3 questions if clear, up to 4 if ambiguous or broad.
-- **Transition to setup/confirm** when either condition is met:
-  1. Leader can identify enough independent expertise domains to match topic complexity (focused: 6, moderate: 7-8, complex: 9-10).
-  2. Maximum 4 questions reached — proceed with best available domains.
-- Question count is **cumulative** across all explore visits (does not reset if returning from confirm).
-- If user specifies roles upfront, skip explore and enter confirm directly (name constraint check only).
-- **Expertise mapping:** Before generating roles, the leader produces an expertise map — 6-10 domains of expertise directly required to discuss the proposition in depth. Each domain must be **directly relevant** to the topic; do not include "nice to have" domains. The same domain with different focus areas may appear as separate entries (e.g., "Performance × Latency", "Performance × Throughput"). Format:
-  ```
-  Expertise Map — {topic}
-  1. {domain}: {why this topic requires this expertise}
-  2. {domain}: {why this topic requires this expertise}
-  ...
-  ```
-- **Domain sufficiency check:** If the leader cannot identify 6 independent domains without inferring major unstated assumptions, ask the user one clarifying question before proceeding. This does not count toward the 4-question limit.
-- The expertise map is presented to the user alongside the role list in setup/confirm (not separately approved).
-
-### setup/confirm
-
-- Generate roles from the expertise map produced in setup/explore. Each role has a **single layer**:
-  - **Discipline** — the specific expertise domain this member brings (e.g., "Cluster Operations Specialist", "Cost Optimization Analyst")
-- Each role is presented in the following format:
-  ```
-  1. **{Role Name}** — {discipline/expertise domain}
-     > Expected contribution: {concrete contribution this member brings to the discussion}
-  ```
-- Multiple members may share the same domain if they cover different focus areas (e.g., two security experts with different specializations). Names must be distinct and meaningful (e.g., "Sentinel" and "Bastion" rather than "Security1" and "Security2").
-- Role count = team size (range 6-10).
-  - Default: 6. Leader adjusts based on topic complexity: focused → 6, moderate → 7-8, complex → 9-10.
-  - Fewer than 6 is not permitted.
-  - If more than 10: leader presents consolidation candidates for user to choose.
-- **Name constraints** (role names = subsection headers = ID initials):
-  - Short English names (1-2 words, space-separated).
-  - Must work as `### {name}` subsection headers.
-  - First-letter initials (uppercase) must be unique within the team (prevents `[H-{initial}-{seq}]` ID collisions).
-  - If initial collision is unavoidable with meaningful names, use first two letters as the initial fallback.
-- User approval gate: "These are the team members. Add, remove, or modify as needed."
-  - User requests modification → leader revises and re-presents (loop within confirm).
-  - User requests more questions → return to explore (max 2 returns; question count is cumulative).
-  - Max 3 re-presentations without convergence → ask user to specify roles in free text.
-- After user approves:
-  - Each role name becomes a member name for team creation. The discipline + expected contribution is used as the member's briefing context in all subsequent broadcasts.
-  - Generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`).
+- Invoke `forte:team-composer` with:
+  - `topic`: the proposition
+  - `team_name`: generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`)
+  - `role_count`: `"3-6"`
+  - `domain_hints`: extracted from any pre-context given by user
+- After team-composer completes (Handoff Contract received):
   - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
   - Ensure `docs/discussions/` is in `.gitignore` (add if missing).
-  - SYNTHESIS.md initializes with `> Status: setup` as before; leader transitions to framing immediately.
+  - SYNTHESIS.md initializes with `> Status: setup`.
+  - Spawn all members with discussion-board-specific prompts:
+    - Normal members: standard discussion participation prompt (discipline + expected contribution as briefing context).
+    - `-cx` members: same prompt + codex exec exploration template (see team-composer skill for template).
+  - Leader transitions to framing immediately.
 
 ### framing
 
@@ -275,20 +235,20 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### hypothesize
 
-- **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (discipline + expected contribution from setup/confirm). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
+- **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (discipline + expected contribution from setup). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
 - **Round 2+ context protocol (mandatory):**
   1. Read latest `## Round Context Packet` in SYNTHESIS.md first.
   2. Extract `## Hypotheses` via Grep.
   3. Narrow with `Grep pattern="### {member-name}"`, then pull only referenced entry IDs as needed.
 - Do NOT use full WHITEBOARD.md Read in Round 2+ unless Grep-based extraction fails.
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup/confirm). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
+- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
 - Each member aims for 2-5 hypotheses, each concrete and testable.
 - Each hypothesis should include a `Grounding:` line citing evidence basis. `[general-knowledge]` is always valid — the goal is transparency about evidence strength, not blocking non-code claims. Hypotheses without grounding will be flagged during audit.
 - Report completion using the completion report format.
 
 ### critique
 
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup/confirm).
+- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup).
 - **IMPORTANT**: Use section extraction instead of full WHITEBOARD.md Read (mandatory in Round 2+):
   1. `Grep pattern="## Hypotheses"` to extract the H2 section
   2. `Grep pattern="### {member-name}"` to narrow to a specific member
@@ -413,7 +373,7 @@ Path: `docs/discussions/{discussion-id}/WHITEBOARD.md`
 ## How Our Work Connects
 {Each member's role and perspective.}
 
-<!-- Repeat ### {member-name} subsections for each team member (6-10 members) -->
+<!-- Repeat ### {member-name} subsections for each team member -->
 ## Framing
 ### {member-A}
 ### {member-B}
@@ -495,13 +455,16 @@ Note: This is a design document, not an implementation plan. To create an execut
 
 ## Ratification Rules
 
-| Members | Majority Threshold |
-|---------|-------------------|
+- **Voting members**: All members (normal + -cx). Count = role count × 2.
+- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
+- **No advisory members**: All team members have voting rights.
+
+| Total Members | Majority Threshold |
+|---------------|-------------------|
 | 6 | 4 |
-| 7 | 4 |
 | 8 | 5 |
-| 9 | 5 |
 | 10 | 6 |
+| 12 | 7 |
 
 - **Max rounds**: 10 (configurable at board creation)
 - **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
@@ -520,6 +483,7 @@ Note: This is a design document, not an implementation plan. To create an execut
 | 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
 | 6 | `## Audit` section is leader-only (structural exception to per-member rule, same pattern as SYNTHESIS.md) | Single writer; Codex results managed by leader |
 | 7 | Revisions are append-only in member's own subsection; original entries are never modified | Maintains append-only invariant from Core Principle #5 |
+| 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 
 ## Audit Notes
 

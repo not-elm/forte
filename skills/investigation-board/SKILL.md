@@ -36,8 +36,7 @@ Investigate bugs through structured evidence gathering, hypothesis testing, and 
 9. **Dual-layer audit** — Audit runs two layers: Layer 1 (code-specific) uses Read/Grep tools to verify code claims at specific file:line references; Layer 2 (general fact-checking) uses Codex CLI for broader factual verification, same as discussion-board.
 10. **Debate tally** — Leader maintains a quantitative tally per hypothesis: challenge count, support count, amend count, question count, and Net score (support minus challenge). Hypotheses with net < 0 are marked [low-confidence]; hypotheses with net ≥ 0 remain [active].
 11. **Leader as synthesizer, not participant** — Leader does NOT write evidence entries, hypotheses, or critiques. Leader MAY write process artifacts (audit results, evidence maps, debate tallies, conclusions) to facilitate investigation quality.
-12. **Advisory members (Codex non-voting)** — A Codex advisory agent may participate using fixed initial `X`. Advisory entries carry the prefix `[advisory]` and are non-voting. Entry IDs follow the same format: `[E-X-NNN]`, `[H-X-NNN]`, `[CR-X-R{N}-NNN]`.
-13. **Reproduction context required** — The Framing phase must capture a concrete reproduction context (steps, environment, observed vs. expected behavior) before evidence-gathering begins. Investigations without reproduction context are blocked from proceeding to evidence-gathering.
+12. **Reproduction context required** — The Framing phase must capture a concrete reproduction context (steps, environment, observed vs. expected behavior) before evidence-gathering begins. Investigations without reproduction context are blocked from proceeding to evidence-gathering.
 
 ## Phase Model
 
@@ -47,7 +46,7 @@ setup → framing (with reproduction context) → evidence-gathering → [Round 
 
 | Phase | Who | What |
 |-------|-----|------|
-| setup | Leader + User | Analyze bug report, suggest 4-10 investigator roles, user approves, create team + files |
+| setup | Leader | Invoke team-composer, create investigation files, spawn members |
 | framing | All members | Document bug interpretation, reproduction steps, environment, constraints, success criteria, unknowns |
 | evidence-gathering | All members | Collect concrete evidence entries (code inspection, logs, test results, config review, git history) in own section |
 | hypothesize | All members | Write structured hypotheses (cause mechanism + predicted evidence + falsification condition) citing gathered evidence |
@@ -75,6 +74,8 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 ### Evidence
 
 **ID format:** `[E-{initial}-{seq}]` — `{initial}` = first letter of name (uppercase); `{seq}` = 001, 002, ...
+
+**-cx member initials:** `-cx` members use their normal member's initial + `X`. Example: `[E-BX-001]` = backend-cx member's evidence. See team-composer skill for full initial rules.
 
 Each evidence entry MUST include:
 - **Source**: `file:line` reference (or log file / external source with timestamp)
@@ -115,6 +116,8 @@ Each evidence entry MUST include:
 ### Hypothesis
 
 **ID format:** `[H-{initial}-{seq}]` — `{initial}` = first letter of name (uppercase); `{seq}` = 001, 002, ...
+
+**-cx member initials:** `-cx` members use their normal member's initial + `X`. Example: `[H-BX-001]` = backend-cx member's hypothesis. See team-composer skill for full initial rules.
 
 Every hypothesis MUST include all three required fields and an evidence chain:
 
@@ -264,7 +267,7 @@ Members append corrections in their own subsection (append-only — original ent
 | Ratification History | (no ID — table format, leader-only) | SYNTHESIS.md | ratify |
 | Minority Report | (no ID — leader-only) | SYNTHESIS.md | concluded |
 
-Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NNN]`, `[CR-X-R{N}-NNN]`. All advisory entries are prefixed with `[advisory]` and are non-voting.
+Note on -cx members: `-cx` members use their normal member's initial + `X`. Entry IDs: `[E-BX-001]`, `[H-BX-001]`, `[CR-BX-R1-001]`. All `-cx` members have voting rights (no advisory designation).
 
 ---
 
@@ -274,7 +277,7 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
 
 | Phase | Leader Action | Member Action | Output | Next Trigger |
 |-------|---------------|---------------|--------|--------------|
-| setup | Analyze bug report, suggest 4-10 roles, create team + files | — | WHITEBOARD.md + SYNTHESIS.md | Team spawned |
+| setup | Invoke team-composer, create investigation files, spawn members | — | WHITEBOARD.md + SYNTHESIS.md | Team spawned |
 | framing | Broadcast framing instructions with reproduction context requirement | Document bug interpretation, reproduction, constraints in own section | Framing entries | All members report complete AND reproduction context present |
 | evidence-gathering | Broadcast evidence-gathering kickoff | Collect evidence entries (E-NNN) in own section | Evidence entries | All members report complete |
 | hypothesize | Broadcast hypothesize kickoff | Write structured hypotheses with evidence chain in own section | Hypothesis entries | All members report complete |
@@ -289,13 +292,17 @@ Note on Codex advisory: uses fixed initial `X`. Entry IDs: `[E-X-NNN]`, `[H-X-NN
 
 ### setup
 
-- Leader suggests 4-10 roles with distinct investigative perspectives (e.g., frontend-engineer, backend-engineer, database-specialist, security-analyst, performance-engineer, qa-engineer, devops-engineer, architect). Choose count based on bug complexity: simple/localized → 4-5, moderate/cross-system → 6-7, complex/systemic → 8-10.
-- User approves or modifies roles before team creation.
-- Generate a kebab-case `{investigation-id}` from the bug description (e.g., `cache-memory-spike-on-login`).
-- Create `docs/investigations/{investigation-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
-- Ensure `docs/investigations/` is in `.gitignore` (add if missing).
-- Each role should have a **Role-specific investigation checklist** — a list of 3-5 items the member should focus on during evidence-gathering and hypothesize phases (modeled after code-review-board's reviewer checklists and scope boundary rules).
-- **Optional: codex-investigate pre-injection** — Before creating files, leader runs `codex-investigate` with the bug symptoms. If successful, the output (Root Cause / Impact Scope / Suggested Fix / Confidence) is included in the Bug Report section as prior investigation context.
+- Invoke `forte:team-composer` with:
+  - `topic`: the bug description / symptom
+  - `team_name`: generate a kebab-case `{investigation-id}` from the bug description (e.g., `cache-memory-spike-on-login`)
+  - `role_count`: `"3-6"`
+- After team-composer completes (Handoff Contract received):
+  - Create `docs/investigations/{investigation-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates.
+  - Ensure `docs/investigations/` is in `.gitignore` (add if missing).
+  - **Optional: codex-investigate pre-injection** — Before creating files, leader runs `codex-investigate` with the bug symptoms. If successful, output is included in Bug Report section as prior investigation context.
+  - Spawn all members with investigation-board-specific prompts:
+    - Normal members: standard investigation prompt + **role-specific investigation checklist** (3-5 focus items) + **few-shot example** (1 pair: good vs insufficient hypothesis, ~200-300 tokens).
+    - `-cx` members: same prompt (including checklist + few-shot) + codex exec exploration template (see team-composer skill for template).
 
 ### framing
 
@@ -469,7 +476,6 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
-### codex
 
 ## Hypotheses
 ### {member-A}
@@ -477,7 +483,6 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
-### codex
 
 ## Critique
 ### {member-A}
@@ -485,7 +490,6 @@ Path: `docs/investigations/{investigation-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
-### codex
 
 ## Audit
 ```
@@ -554,15 +558,16 @@ Note: This is an investigation report, not an implementation plan. To create an 
 
 ## Ratification Rules
 
-| Members | Majority Threshold |
-|---------|-------------------|
-| 4 | 3 |
-| 5 | 3 |
+- **Voting members**: All members (normal + -cx). Count = role count × 2.
+- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
+- **No advisory members**: All team members have voting rights.
+
+| Total Members | Majority Threshold |
+|---------------|-------------------|
 | 6 | 4 |
-| 7 | 4 |
 | 8 | 5 |
-| 9 | 5 |
 | 10 | 6 |
+| 12 | 7 |
 
 - **Max rounds**: 10 (configurable at investigation creation)
 - **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
@@ -582,7 +587,7 @@ Note: This is an investigation report, not an implementation plan. To create an 
 | 6 | `## Audit` section is leader-only (structural exception to per-member rule, same pattern as SYNTHESIS.md) | Single writer; audit results managed by leader |
 | 7 | Revisions are append-only in member's own subsection; original entries are never modified | Maintains append-only invariant from Core Principle #6 |
 | 8 | Debate Tally is leader-only in SYNTHESIS.md | Single writer; quantitative tally requires consistent state |
-| 9 | `### codex` subsection is leader-only (leader writes on Codex's behalf) | Same pattern as Audit rule |
+| 9 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 10 | Evidence gathering uses Read/Grep/Glob (read-only tools) — no file modifications during investigation | Read-only tools cannot conflict with write zones |
 
 ## Audit Notes
@@ -593,93 +598,6 @@ Note: This is an investigation report, not an implementation plan. To create an 
 - **Audit is incremental** — each round audits only new entries, not the full history
 - **Revisions are append-only** — never edit the original hypothesis, evidence, or critique text
 - **Layer 1 takes precedence** — if a code claim fails Layer 1 verification, it is flagged regardless of Layer 2 outcome
-
-## Codex Advisory Member
-
-### Prerequisites
-
-`codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, skip all Codex advisory steps with "(Codex advisory skipped: CLI not found)".
-
-### Workflow
-
-Leader waits for all voting members to complete their phase entries → reads WHITEBOARD.md → constructs prompt from template → runs `codex exec` → writes verbatim output to the `### codex` subsection in the relevant WHITEBOARD section.
-
-### Hypothesize Prompt Template
-
-```
-You are an advisory member in a structured bug investigation. The team is investigating the following bug:
-
-{bug description and reproduction context}
-
-The team's evidence and existing hypotheses are below. Generate 2-3 novel hypotheses that the team has NOT already proposed. Each hypothesis must be concrete, testable, and grounded in the evidence collected.
-
-Use this exact ID format: [H-X-001], [H-X-002], etc.
-
-Format each hypothesis as:
-- [H-X-NNN] **hypothesis**: {concrete claim about root cause}
-  > **Cause mechanism**: {causal chain}
-  > **Predicted evidence**: {what to look for in the codebase}
-  > **Falsification condition**: {what would disprove this}
-  > **Evidence chain**:
-  >   - Supporting [{strength}]: {evidence reference or description}
-  >   - Counter [{strength}]: {counter-evidence or "none found"}
-  >   - Unverified: {unverified assumptions}
-
-Existing content:
-{evidence + hypotheses from WHITEBOARD.md}
-```
-
-### Critique Prompt Template
-
-```
-You are an advisory member in a structured bug investigation. The team is investigating the following bug:
-
-{bug description and reproduction context}
-
-Review the hypotheses and existing critiques below. Write 2-4 critiques that fill gaps. Each critique must target a specific hypothesis using refs=[] and @codex.
-
-Use this exact ID format: [CR-X-R{round}-001], [CR-X-R{round}-002], etc.
-Label: **challenge**, **support**, **amend**, or **question**.
-Reference evidence entries [E-X-NNN] where possible.
-
-Existing content:
-{evidence + hypotheses + critiques from WHITEBOARD.md}
-```
-
-### Revise Prompt Template
-
-Same as discussion-board's revise prompt template.
-
-### Invocation Pattern
-
-Temp file + stdin:
-
-```bash
-TMPFILE=$(mktemp)
-cat <<'PROMPT_EOF' > "$TMPFILE"
-<constructed_prompt>
-PROMPT_EOF
-cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
-rm -f "$TMPFILE"
-```
-
-### Verbatim Copy Rule
-
-Leader MUST copy Codex output verbatim to the `### codex` subsection. Only ID prefix corrections are allowed (e.g., fixing `[H-1-001]` to `[H-X-001]`).
-
-### Error Handling
-
-| Situation | Action |
-|-----------|--------|
-| CLI not found | Skip Codex advisory with "(Codex advisory skipped: CLI not found)" |
-| Empty output | Note "(Codex returned empty output)" in `### codex` subsection |
-| Malformed IDs | Prepend correct ID format (e.g., `[H-X-NNN]`) before writing |
-| Non-zero exit | Skip with "(Codex advisory skipped: exit code {N})" |
-| Timeout (>2min) | Skip with "(Codex advisory skipped: timeout exceeded)" |
-
-### Budget
-
-Max 3 Codex CLI calls per round, 2-minute timeout per call. Set Bash tool `timeout: 180000` (3 minutes) for each Codex invocation.
 
 ## Timeout Policy
 
