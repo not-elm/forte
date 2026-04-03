@@ -24,13 +24,21 @@ Produce a concrete implementation plan through structured 2-phase team debate: P
 ## Core Principles
 
 1. **Design-centric** — All activity targets producing an actionable implementation plan.
-2. **2-phase model** — Phase 1 (Technical Investigation) narrows technology choices; Phase 2 (Design) produces the implementation plan. Each phase has its own WHITEBOARD.md + SYNTHESIS.md in separate subdirectories.
-3. **2-file model per phase** — WHITEBOARD.md (framing + hypotheses + critiques) + SYNTHESIS.md (leader-managed state), in `docs/discussions/{discussion-id}/phase-{N}/`.
-4. **Per-member write zones** — Each teammate writes only to their own `### {name}` subsection in WHITEBOARD.md.
-5. **Leader-only SYNTHESIS.md** — Teammates read but never write to SYNTHESIS.md.
-6. **Append-only** — Teammates add content, never delete or modify existing entries.
-7. **Leader as synthesizer, not participant** — Leader does NOT write hypotheses or critiques. Leader MAY write process artifacts (audit results, evidence maps, conclusions).
-8. **Structured phase handoff** — Phase 1 SYNTHESIS.md is the mandatory context injection source for Phase 2. Leader pushes Phase 1 conclusions via broadcast at Phase 2 framing start.
+2. **2-phase model** — Phase 1 (Technical Investigation) narrows technology choices; Phase 2 (Design) produces the implementation plan. Each phase has its own WHITEBOARD + SYNTHESIS files in separate subdirectories.
+3. **Structured phase handoff** — Phase 1 SYNTHESIS.md is the mandatory context injection source for Phase 2. Leader pushes Phase 1 conclusions via broadcast at Phase 2 framing start.
+4. All other principles (2-file model, per-member write zones, leader-only SYNTHESIS, append-only, leader as synthesizer) — see Shared Debate Engine.
+
+## Shared Debate Engine
+
+**At setup, leader MUST read the shared reference:**
+1. Use `Glob pattern="**/board-engine/REFERENCE.md"` to locate the file
+2. Read the found file path
+3. If Glob returns no results, use fallback path: `../board-engine/REFERENCE.md` relative to this skill's base directory
+
+**If Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
+`> Warning: board-engine/REFERENCE.md not found. Using inline rules only.`
+
+This provides: round-split WHITEBOARD model, standard debate cycle (hypothesize → critique → audit → revise → synthesize → ratify), entry formats, and shared rules (conflict prevention, ratification, communication, timeout). Board-specific overrides below take precedence.
 
 ## Phase Model
 
@@ -38,7 +46,7 @@ Produce a concrete implementation plan through structured 2-phase team debate: P
 setup → [Phase 1: framing → hypothesize → critique → synthesize] → user-review → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → concluded
 ```
 
-### Phase 1 — Technical Investigation (4 steps)
+### Phase 1 — Technical Investigation (4 steps, NO audit/revise/ratify)
 
 | Step | Who | What |
 |------|-----|------|
@@ -46,6 +54,8 @@ setup → [Phase 1: framing → hypothesize → critique → synthesize] → use
 | hypothesize | All members | Propose concrete technology choices, library candidates, architecture patterns |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
 | synthesize | Leader only | Read all content, write Evidence Map + Technology Conclusion in SYNTHESIS.md |
+
+Phase 1 uses a **single WHITEBOARD.md** (no round-split). There is only one cycle with no ratification loop, so round-split overhead is unnecessary.
 
 Phase 1 does NOT include audit, revise, or ratify. The user-review step after Phase 1 serves as the ratification gate.
 
@@ -57,25 +67,27 @@ Leader presents Phase 1 conclusions to the user via AskUserQuestion:
 - If user provides feedback: Leader records feedback in phase-1/SYNTHESIS.md `## User Review Outcome`, then incorporates it as additional constraints for Phase 2 framing. Phase 1 files are NOT re-executed — feedback adjusts Phase 2's starting constraints only.
 - No skip option — user confirmation is mandatory
 
-### Phase 2 — Design (6 steps + conditional revise)
+### Phase 2 — Design (standard debate cycle with round-split)
 
-| Step | Who | What |
-|------|-----|------|
-| framing | All members | Document design constraints, scope, acceptance criteria (informed by Phase 1 conclusions) |
-| hypothesize | All members | Propose concrete implementation designs: file structure, APIs, data models |
-| critique | All members | Challenge/support/amend/question designs with cross-references |
-| audit | Leader only | Run Codex CLI to fact-check claims from current round |
-| revise | All members (conditional) | Append corrections if audit found inaccuracies (skipped if all clean) |
-| synthesize | Leader only | Read all content, write Evidence Map + Draft Design in SYNTHESIS.md |
-| ratify | All voting members | Vote accept or push-back via SendMessage. Simple majority ratifies |
+Uses the standard debate cycle from REFERENCE.md: `[Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify]`
 
-## Entry Formats
+Phase 2 applies round-split WHITEBOARD:
+- **Base:** `phase-2/WHITEBOARD.md` — Topic + Framing (read-only after framing completes)
+- **Rounds:** `phase-2/WHITEBOARD-R{N}.md` — Hypotheses + Critique + Audit per round
 
-### Framing
+## Board-Specific Entry Formats
 
-Structured fields in each member's `### {name}` Framing subsection (no entry IDs):
+Entry IDs use phase prefix to ensure global uniqueness across phases:
 
-**Phase 1 framing:**
+- **Hypothesis:** `[H-{phase}-{initial}-{seq}]` — e.g., `[H-1-S-001]`, `[H-2-A-001]`
+- **Critique:** `[CR-{phase}-{initial}-R{round}-{seq}]` — e.g., `[CR-1-P-R1-001]`, `[CR-2-M-R2-003]`
+
+Common mistake: `[CR-2-P-1-001]` (missing R prefix) — Correct: `[CR-2-P-R1-001]`
+
+All other entry formats (Evidence Map, Completion Report, Audit Table, Revision, Ratification History, Minority Report) — see REFERENCE.md.
+
+### Phase 1 Framing Fields
+
 ```markdown
 - **Problem**: {interpretation of the design challenge}
 - **Technology Constraints**: {known platform/stack/compatibility requirements}
@@ -83,7 +95,8 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 - **Unknowns**: {open questions about technology landscape}
 ```
 
-**Phase 2 framing:**
+### Phase 2 Framing Fields
+
 ```markdown
 - **Scope**: {what this design covers}
 - **Constraints**: {from Phase 1 conclusions + user feedback}
@@ -91,44 +104,8 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 - **Unknowns**: {open questions about implementation}
 ```
 
-### Hypothesis
+### Technology Conclusion (Phase 1, Leader only)
 
-**ID format:** `[H-{phase}-{initial}-{seq}]` — `{phase}` = 1 or 2; `{initial}` = first letter of name (uppercase); `{seq}` = 001, 002, ...
-
-**Phase 1 example (technology choice):**
-```markdown
-- [H-1-S-001] **hypothesis**: Use SQLite with WAL mode for local persistence over IndexedDB.
-  > Rationale: SQLite offers ACID transactions and SQL query flexibility; WAL mode supports concurrent reads.
-```
-
-**Phase 2 example (implementation design):**
-```markdown
-- [H-2-A-001] **hypothesis**: Implement a repository pattern with SQLite adapter behind an interface for storage abstraction.
-  > Rationale: Allows swapping storage backends without touching business logic. Interface: `StorageRepository { get, put, list, delete }`.
-```
-
-### Critique
-
-**ID format:** `[CR-{phase}-{initial}-R{round}-{seq}]`
-
-Common mistake: `[CR-2-P-1-001]` (missing R prefix) → Correct: `[CR-2-P-R1-001]`
-
-Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**question**`), `refs=[...]`, `@{member}`
-
-```markdown
-#### Round 1
-- [CR-1-P-R1-001] **challenge** @storage-expert refs=[H-1-S-001]: SQLite binary size adds ~2MB to the bundle. For a browser extension use case, this exceeds the store limit.
-```
-
-### Evidence Map (Leader only)
-
-| # | Claim | Support | Counterpoint | Confidence |
-|---|-------|---------|--------------|------------|
-| 1 | {claim} | refs=[H-2-X-001, CR-2-Y-R1-002] | refs=[CR-2-Z-R1-001] | high/medium/low |
-
-### Draft Conclusion (Leader only)
-
-**Phase 1 — Technology Conclusion:**
 ```markdown
 ## Technology Conclusion
 **Selected:** {technology/pattern choices with rationale}
@@ -137,7 +114,8 @@ Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**
 **Open questions for Phase 2:** {items to resolve during design}
 ```
 
-**Phase 2 — Draft Design:**
+### Draft Design (Phase 2, Leader only)
+
 ```markdown
 ## Draft Design — Round {N}
 {Synthesized implementation design citing entry IDs. Mark areas of uncertainty.}
@@ -145,110 +123,9 @@ Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**
 **Unresolved:** {low-confidence or unaddressed claims}
 ```
 
-### Ratification History (Leader only, Phase 2 only)
-
-```markdown
-### Round {N}
-| Member | Vote | Reason |
-|--------|------|--------|
-| {name} | accept / push-back | {brief reason} |
-**Result:** {count}/{total} — {ratified | not ratified}
-```
-
-### Minority Report (Leader only)
-
-Written only when conclusion is ratified with dissent:
-
-```markdown
-**Dissenter(s):** {names}  **Position:** {view}  **Evidence:** refs=[...]
-**Leader note:** {why majority view was adopted}
-```
-
-### Completion Report
-
-Members send this via SendMessage after each sub-phase:
-
-```
-Entries added: {N}
-Key insight: {most important finding}
-Current position: {stance in one sentence}
-Remaining concerns: {description or "none"}
-```
-
-### Audit (Phase 2 only)
-
-Leader-only. Written per round after Codex CLI fact-check. Only factual claims are audited — opinions, value judgments, and forecasts are excluded.
-
-| Entry | Claim Summary | Verdict | Notes |
-|-------|--------------|---------|-------|
-| [H-2-S-001] | {claim} | ✅/⚠️/❌/❓ | {evidence or reason} |
-
-Verdict rubric:
-- ✅ **Verified**: Claim is factually accurate based on established knowledge
-- ⚠️ **Partially accurate**: Claim contains some truth but is misleading, incomplete, or outdated
-- ❌ **Inaccurate**: Claim is factually wrong
-- ❓ **Unverifiable**: Claim cannot be verified (insufficient context, or subjective/speculative)
-
-Granularity: one row per hypothesis or critique entry (by entry ID), not per sentence.
-
-### Revision (Phase 2 only)
-
-Members append corrections in their own subsection (append-only — original entry is never modified).
-
-- [H-2-S-001] **revised**: Updated claim based on audit [Round {N}]. {corrected statement}
-  > Original: {original claim}. Audit note: {audit note}.
-
-### ID Summary
-
-| Type | Format | Section | Phase |
-|------|--------|---------|-------|
-| Framing | (no ID — structured fields) | Framing | framing (both phases) |
-| Hypothesis | `[H-{phase}-{initial}-{seq}]` | Hypotheses | hypothesize (both phases) |
-| Critique | `[CR-{phase}-{initial}-R{round}-{seq}]` | Critique → Round N | critique (both phases) |
-| Audit | (no ID — table format) | Audit → Round N | audit (Phase 2 only) |
-| Revision | `[{original-ID}] **revised**` | Hypotheses or Critique | revise (Phase 2 only) |
-
-Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` members use their normal member's initial + `X`. Example: backend → `B`, backend-cx → `BX`. Entry IDs: `[H-1-BX-001]`.
-
 ---
 
 # Workflow Layer
-
-## Workflow Overview
-
-### Phase 1 — Technical Investigation
-
-| Step | Leader Action | Member Action | Output | Next Trigger |
-|------|---------------|---------------|--------|--------------|
-| setup | Invoke team-composer, create phase files, spawn members | — | phase-1/ + phase-2/ WHITEBOARD.md + SYNTHESIS.md | Team spawned |
-| framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
-| critique | Broadcast instructions | Write critiques with labels + refs | Critique entries | All members report complete |
-| synthesize | Read all WHITEBOARD, write Evidence Map + Technology Conclusion | — | phase-1/SYNTHESIS.md updated | Conclusion written |
-
-### User Review
-
-| Step | Leader Action | Output | Next Trigger |
-|------|---------------|--------|--------------|
-| user-review | Present Phase 1 Technology Conclusion via AskUserQuestion | User approval or feedback | User responds |
-
-### Phase 2 — Design
-
-| Step | Leader Action | Member Action | Output | Next Trigger |
-|------|---------------|---------------|--------|--------------|
-| framing | Broadcast Phase 1 conclusions + framing instructions | Document design constraints in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff | Write design hypotheses in own section | Hypothesis entries | All members report complete |
-| critique | Broadcast instructions | Write critiques with labels + refs | Critique entries | All members report complete |
-| audit | Run Codex CLI on current round's claims, write Audit table | — | phase-2/WHITEBOARD.md `## Audit → Round {N}` updated | Audit written |
-| revise | Broadcast audit findings to affected members | Append corrections (append-only) | Revised entries | All affected complete (or skipped if all clean) |
-| synthesize | Read all WHITEBOARD, write Evidence Map + Draft Design | — | phase-2/SYNTHESIS.md updated | Draft written |
-| ratify | Broadcast ratify request to voting members | Send vote via SendMessage | Ratification History | Majority reached or next round |
-
-### Concluded
-
-| Step | Leader Action | Output |
-|------|---------------|--------|
-| concluded | Generate Plan File, delete discussion directory | `docs/plans/YYYY-MM-DD-{topic}.md` |
 
 ## Phase Notes
 
@@ -277,7 +154,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
 
 - Members read all framings via full WHITEBOARD.md Read (~200 lines at this stage).
 - Each member aims for 2-5 hypotheses about technology choices, library candidates, or architecture patterns.
-- Report completion using the completion report format.
+- Report completion using the Completion Report format.
 
 ### Phase 1: critique
 
@@ -320,93 +197,26 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
 - If user provided feedback during user-review, include it as additional constraints.
 - Framing should focus on implementation scope, design constraints, and acceptance criteria.
 
-### Phase 2: hypothesize
+### Phase 2: debate cycle (hypothesize → critique → audit → revise → synthesize → ratify)
 
-- Members read all Phase 2 framings via full WHITEBOARD.md Read.
-- Hypotheses should propose concrete implementation designs: file structure, APIs, data models, component boundaries.
-- Report completion using the completion report format.
+Uses standard debate cycle from REFERENCE.md with these design-board specifics:
 
-### Phase 2: critique
-
-- Same rules as Phase 1 critique.
-
-### Phase 2: audit
-
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If not available, skip audit phase entirely, log warning in SYNTHESIS.md status, and proceed to synthesize.
-- **Scope:** Audit only entries from the current round. Do NOT re-audit entries from prior rounds.
-- **Exclusion:** Skip opinions, value judgments, and forecasts — only fact-check verifiable factual claims.
-- Leader collects hypotheses and critiques from current round in WHITEBOARD.md.
-- Leader builds a Codex prompt requesting fact-checking of each claim.
-- Prompt template:
-
-  ```
-  Fact-check the following claims from a team discussion about implementation design. For each claim:
-  1. Verify if it is factually accurate
-  2. Note any inaccuracies, outdated information, or unsupported assertions
-  3. Provide brief evidence or references for your assessment
-  4. Skip opinions, value judgments, and forecasts — mark them as Unverifiable
-
-  Rate each claim: Verified / Partially accurate / Inaccurate / Unverifiable
-
-  Claims:
-  {hypotheses and critique claims from current round}
-  ```
-
-- Execute via temp file + stdin:
-  ```bash
-  TMPFILE=$(mktemp)
-  cat <<'PROMPT_EOF' > "$TMPFILE"
-  <constructed_prompt>
-  PROMPT_EOF
-  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
-  rm -f "$TMPFILE"
-  ```
-
-- Write results to phase-2/WHITEBOARD.md `## Audit` → `### Round {N}` subsection.
-
-- **Error handling:**
-  - Codex exits non-zero or times out → record "Audit failed (Codex error)" in `### Round {N}`, skip revise, proceed to synthesize with warning
-  - Codex returns partial/malformed output → leader writes available results, marks incomplete entries as ❓
-
-- **Decision logic:**
-  - All ✅ or ❓ only → skip `revise`, proceed to `synthesize`
-  - Any ⚠️ or ❌ → proceed to `revise`
-
-### Phase 2: revise
-
-- Only runs when audit found ⚠️ or ❌ entries.
-- Leader broadcasts audit results and instructs affected members to review and correct their entries.
-- Members **append** corrections in their own `### {name}` subsection (append-only).
-- **Max 1 revise round per audit** — no recursive auditing of revisions.
-- **Unresolved ❌ after revise:** Leader notes unresolved inaccuracies in the Evidence Map with low confidence rating.
-
-### Phase 2: synthesize
-
-- Leader reads ALL phase-2/WHITEBOARD.md content.
-- Writes Evidence Map + Draft Design in phase-2/SYNTHESIS.md.
-- Round 2+: add entry ID → summary mapping table for members to reference efficiently.
-
-### Phase 2: ratify
-
-- Votes via SendMessage (NOT file writes): `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}`
-- Simple majority: ⌊N/2⌋ + 1 required to ratify.
-- If not ratified and rounds remain: incorporate push-back concerns into next round. Next round starts at `critique` (members write new critiques addressing push-back concerns, then audit → revise → synthesize → ratify).
-- If not ratified and max rounds exhausted: leader writes "best available design" in `## Final Design` with explicit uncertainty markers.
+- **hypothesize:** Members propose concrete implementation designs: file structure, APIs, data models, component boundaries.
+- **audit:** Writes to `phase-2/WHITEBOARD-R{N}.md` `## Audit` section.
+- **synthesize:** Uses incremental read protocol from REFERENCE.md. Writes Evidence Map + Draft Design in phase-2/SYNTHESIS.md. Round 2+: add entry ID → summary mapping table.
+- **ratify:** If not ratified and rounds remain, incorporate push-back concerns into next round. Next round starts at `hypothesize` (leader creates WHITEBOARD-R{N+1}.md). If not ratified and max rounds exhausted: leader writes "best available design" in `## Final Design` with explicit uncertainty markers.
 
 ### concluded
 
 - Leader writes `## Final Design` in phase-2/SYNTHESIS.md by promoting the ratified Draft Design (or best available design on exhaustion).
-- Leader generates the Plan File at `docs/plans/YYYY-MM-DD-{topic}.md` (see Plan File Template in Reference Layer).
+- Leader generates the Plan File at `docs/plans/YYYY-MM-DD-{topic}.md` (see Plan File Template below).
 - Content is derived from both phase-1/SYNTHESIS.md (technology background) and phase-2/SYNTHESIS.md (implementation design).
 - Verify the Plan File was created successfully.
 - Delete `docs/discussions/{discussion-id}/` directory after successful export.
 - If discussion was interrupted (no Final Design): skip Plan File export, delete discussion directory manually.
 
-## Communication Rules
+### Board-Specific Communication Note
 
-- All leader → member instructions via **broadcast** (NOT individual SendMessage).
-- Use structured short format: Phase / Step / Action / Format-ref (~80-120 tokens).
-- Combine phase transitions: completion confirmation + next phase instruction in 1 broadcast.
 - Phase 2 framing broadcast MUST include Phase 1 Technology Conclusion summary (Push-based context injection).
 
 ---
@@ -415,7 +225,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
 
 ## WHITEBOARD.md Templates
 
-### Phase 1 WHITEBOARD
+### Phase 1 WHITEBOARD (single file, no round-split)
 
 Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
 
@@ -450,7 +260,9 @@ Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
 ...
 ```
 
-### Phase 2 WHITEBOARD
+No Audit section in Phase 1 (audit is Phase 2 only). No round-split — all content in a single file.
+
+### Phase 2 Base WHITEBOARD (Topic + Framing only)
 
 Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
 
@@ -471,29 +283,16 @@ Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
 ### {member-A}
 ### {member-B}
 ...
-
-## Hypotheses
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-
-## Critique
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-
-## Audit
 ```
 
-No Status/Round header in WHITEBOARD — managed in SYNTHESIS.md. Sections start empty. Phase 1 has no `## Audit` section (audit is Phase 2 only).
+This base file becomes **read-only** after framing completes. Per-round content goes into WHITEBOARD-R{N}.md files (see REFERENCE.md for per-round template).
 
-## SYNTHESIS.md Template
+## SYNTHESIS.md Templates
 
-Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
+### Phase 1 SYNTHESIS
 
-**Phase 1:**
+Path: `docs/discussions/{discussion-id}/phase-1/SYNTHESIS.md`
+
 ```markdown
 # SYNTHESIS — {discussion-id} / Phase 1: Technical Investigation
 > Status: setup
@@ -503,7 +302,10 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 ## User Review Outcome
 ```
 
-**Phase 2:**
+### Phase 2 SYNTHESIS
+
+Path: `docs/discussions/{discussion-id}/phase-2/SYNTHESIS.md`
+
 ```markdown
 # SYNTHESIS — {discussion-id} / Phase 2: Design
 > Status: setup
@@ -512,12 +314,13 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 
 ## Evidence Map
 ## Draft Design
+## Round Context Packet
 ## Ratification History
 ## Minority Report
 ## Final Design
 ```
 
-Leader-only files. See Entry Formats above for section content structure.
+Leader-only files. See Entry Formats above and REFERENCE.md for section content structure.
 
 ## Plan File Template
 
@@ -571,50 +374,10 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 - Ratification: Round {N}, {accept_count}/{total} (voting members only)
 ```
 
-## Ratification Rules (Phase 2 only)
-
-- **Voting members**: All members (normal + -cx). Count = role count × 2.
-- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
-- **No advisory members**: All team members have voting rights.
-
-| Total Members | Majority Threshold |
-|---------------|-------------------|
-| 6 | 4 |
-| 8 | 5 |
-| 10 | 6 |
-| 12 | 7 |
-
-- **Max rounds**: 10 (configurable at board creation)
-- **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
-- **Exhaustion**: If max rounds reached with no majority, leader writes "best available design" with explicit uncertainty markers
-- **Abstention**: Not permitted. Every voting member must vote each round.
-- **Vote supersession**: A member's vote in round N supersedes prior rounds.
-
-## Conflict Prevention Rules
+## Board-Specific Conflict Rule
 
 | # | Rule | Rationale |
 |---|------|-----------|
-| 1 | Each teammate edits only their own `### {name}` subsection in WHITEBOARD.md | Prevents Edit tool match failures from concurrent writes |
-| 2 | SYNTHESIS.md is leader-only (teammates read, never write) | Single writer eliminates conflicts |
-| 3 | Append-only writes (no deletion/modification of existing entries) | Prevents overwrites from stale reads |
-| 4 | Ratification votes via SendMessage, not file writes | Eliminates race conditions on vote tallying |
-| 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
-| 6 | `## Audit` section is leader-only | Single writer; Codex results managed by leader |
-| 7 | Revisions are append-only in member's own subsection | Maintains append-only invariant |
-| 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
-| 9 | Phase 1 files are read-only during Phase 2 | Prevents retroactive modification of settled technology decisions |
+| 11 | Phase 1 files are read-only during Phase 2 | Prevents retroactive modification of settled technology decisions |
 
-## Audit Notes (Phase 2 only)
-
-- **Prerequisite:** `codex` CLI must be installed. If unavailable, skip audit, record warning in SYNTHESIS.md status line, and proceed to synthesize.
-- **Do NOT audit opinions or forecasts** — only verifiable factual claims
-- **Audit is incremental** — each round audits only new entries, not the full history
-- **Revisions are append-only** — never edit the original hypothesis or critique text
-
-## Timeout Policy
-
-| Situation | Action |
-|-----------|--------|
-| Member has not reported completion | Leader sends one reminder via SendMessage |
-| After reminder, still no response | Leader proceeds with available results (partial round) |
-| Missing ratification vote | Recorded as "not submitted"; threshold recalculated as ⌊voting_count/2⌋ + 1 |
+This extends the base conflict prevention rules (1-10) in REFERENCE.md.

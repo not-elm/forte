@@ -14,6 +14,7 @@ This is "forte" — notelm's personal collection of Claude Code skills, packaged
   marketplace.json     # Marketplace definition for git URL installation
 skills/
   batch-fix/           # Batch-fix code review findings with clear solutions
+  board-engine/        # Shared debate engine reference for all board skills (round-split WB, debate cycle, rules)
   code-review-board/   # Multi-perspective parallel code review (8 reviewer agents)
   codex-investigate/   # Bug root-cause investigation via Codex CLI
   codex-review/        # Design/code/hypothesis review via Codex CLI
@@ -32,7 +33,7 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 ### Key Patterns Across Skills
 
 - **Codex-based skills** (codex-investigate, codex-review): Use `codex exec` CLI in read-only mode. Prompts are always written to a temp file and piped via stdin to avoid shell argument length limits.
-- **Agent Team skills** (code-review-board, design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a 2-file model (WHITEBOARD.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention.
+- **Agent Team skills** (code-review-board, design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a round-split WHITEBOARD model (base WHITEBOARD.md + per-round WHITEBOARD-R{N}.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention. Shared debate rules are in `board-engine/REFERENCE.md`; each board SKILL.md contains only board-specific logic.
 
 ## Adding a New Skill
 

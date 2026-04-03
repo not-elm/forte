@@ -28,60 +28,63 @@ Produce a concrete Design Spec through structured 2-phase team debate with visua
 
 The following are explicitly outside this skill's scope:
 
-- **Component API design / Props design** → Use `frontend-design` skill after obtaining the Design Spec
-- **State transition tables / copy CSV** → Responsibility of implementation skills
-- **i18n / RTL locale support as mandatory gate** → May be mentioned in Phase 1 framing as context, but is NOT a required gate
-- **Non-AI handoff pack** → Out of scope; the Design Spec is the sole output artifact
+- **Component API design / Props design** — Use `frontend-design` skill after obtaining the Design Spec
+- **State transition tables / copy CSV** — Responsibility of implementation skills
+- **i18n / RTL locale support as mandatory gate** — May be mentioned in Phase 1 framing as context, but is NOT a required gate
+- **Non-AI handoff pack** — Out of scope; the Design Spec is the sole output artifact
 
 ## Core Principles
 
 1. **Design-direction-centric** — All activity targets producing an actionable Design Spec for frontend implementation.
-2. **2-phase model** — Phase 1 (Design Direction) builds aesthetic consensus; Phase 2 (Design Specification) produces concrete tokens and strategies. Each phase has its own WHITEBOARD.md + SYNTHESIS.md in separate subdirectories.
-3. **2-file model per phase** — WHITEBOARD.md (framing + hypotheses + critiques) + SYNTHESIS.md (leader-managed state), in `docs/discussions/{discussion-id}/phase-{N}/`.
-4. **Per-member write zones** — Each teammate writes only to their own `### {name}` subsection in WHITEBOARD.md.
-5. **Leader-only SYNTHESIS.md** — Teammates read but never write to SYNTHESIS.md.
-6. **Append-only** — Teammates add content, never delete or modify existing entries.
-7. **Leader as synthesizer, not participant** — Leader does NOT write hypotheses or critiques. Leader MAY write process artifacts (audit results, evidence maps, conclusions).
-8. **Structured phase handoff** — Phase 1 SYNTHESIS.md is the mandatory context injection source for Phase 2. Leader pushes Phase 1 conclusions via broadcast at Phase 2 framing start.
-9. **Principle-based critique** — Critiques must reference design principles (contrast, repetition, alignment, proximity, visual hierarchy, Gestalt), not subjective preferences. "I don't like it" is never valid; "this violates the alignment principle because..." is required.
-10. **Staged concreteness** — Phase 1 uses linguistic descriptions (mood, direction, references); Phase 2 requires CSS Custom Properties token definitions. This prevents premature specificity from suppressing creative exploration.
+2. **2-phase model** — Phase 1 (Design Direction) builds aesthetic consensus; Phase 2 (Design Specification) produces concrete tokens and strategies. Each phase has its own working directory with round-split WHITEBOARD files + SYNTHESIS.md in `docs/discussions/{discussion-id}/phase-{N}/`.
+3. **Round-split WHITEBOARD model** — Base WHITEBOARD.md (topic + framing, read-only after framing) + per-round WHITEBOARD-R{N}.md + SYNTHESIS.md per phase. See board-engine REFERENCE.md for file model details.
+4. **Principle-based critique** — Critiques must reference design principles (contrast, repetition, alignment, proximity, visual hierarchy, Gestalt), not subjective preferences. "I don't like it" is never valid; "this violates the alignment principle because..." is required.
+5. **Staged concreteness** — Phase 1 uses linguistic descriptions (mood, direction, references); Phase 2 requires CSS Custom Properties token definitions. This prevents premature specificity from suppressing creative exploration.
+6. **Axis tagging** — Every hypothesis and critique must include at least one `axis=` tag from: typography, color, layout, motion, accessibility, spatial-composition, spacing, elevation.
+
+## Shared Debate Engine
+
+**At setup, leader MUST read the shared reference:**
+1. Use `Glob pattern="**/board-engine/REFERENCE.md"` to locate the file
+2. Read the found file path
+3. If Glob returns no results, use fallback path: `../board-engine/REFERENCE.md` relative to this skill's base directory
+
+**If Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
+`> Warning: board-engine/REFERENCE.md not found. Using inline rules only.`
+
+This provides: round-split WHITEBOARD model, standard debate cycle (hypothesize → critique → audit → revise → synthesize → ratify), entry formats, and shared rules (conflict prevention, ratification, communication, timeout). Board-specific overrides below take precedence.
 
 ## Phase Model
 
 ```
-setup → [Phase 1: framing → hypothesize → critique → synthesize → ratify] → user-review-1 (moodboard mockup ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
+setup → [Phase 1: framing → [Round N: hypothesize → critique → synthesize → ratify]] → user-review-1 (moodboard ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify]] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
 ```
 
-### Phase 1 — Design Direction (5 steps)
+**Round numbering:** Round numbers are **monotonically increasing** across the entire discussion, never reset. Phase 1 feedback cycle 1 = R1, feedback cycle 2 = R2, Phase 2 starts at R3, etc. This prevents file naming collisions across feedback cycles.
+
+**Max Rounds scope:** The 10-round max applies per-phase, not globally. Since round numbers are monotonically increasing, track the count of rounds within each phase separately. Example: Phase 1 uses R1-R3 (3 rounds), Phase 2 can use R4-R13 (up to 10 rounds).
+
+### Phase 1 — Design Direction (4 steps per round)
 
 | Step | Who | What |
 |------|-----|------|
 | framing | All members | Document design context: purpose, aesthetic instincts, target user, constraints, unknowns |
 | hypothesize | All members | Propose design directions: tone, mood, aesthetic stance, reference points |
 | critique | All members | Challenge/support/amend/question directions using design principles |
-| synthesize | Leader only | Read all content, write Evidence Map + Direction Conclusion in SYNTHESIS.md |
+| synthesize | Leader only | Read current round WHITEBOARD-R{N}.md + prior SYNTHESIS.md, write Evidence Map + Direction Conclusion |
 | ratify | All voting members | Vote accept or push-back on design direction. Simple majority ratifies |
 
-Phase 1 does NOT include audit or revise. Hypotheses are linguistic descriptions; code snippets are optional.
+**Phase 1 has NO audit or revise.** Aesthetic hypotheses are not fact-checkable. The debate cycle for Phase 1 is: hypothesize → critique → synthesize → ratify.
 
 ### User Review 1 — Visual Moodboard (after Phase 1)
 
 Leader presents Phase 1 direction as a visual moodboard via the visual companion server:
 - Include: color palette, typography samples, tone/mood CSS visualization, comparison cards if multiple directions remain
 - User choices: "Proceed to Phase 2" or "Provide feedback" (via AskUserQuestion in terminal)
-- If user provides feedback: Leader records feedback in phase-1/SYNTHESIS.md `## User Feedback History`, resets ratification round counter, re-enters Phase 1 hypothesize with feedback as new constraint. Loop until approved.
+- If user provides feedback: Leader records feedback in phase-1/SYNTHESIS.md `## User Feedback History`, increments Feedback Cycle, re-enters Phase 1 hypothesize with feedback as new constraint. Loop until approved.
 - No skip option — user confirmation is mandatory
 
-### User Review 2 — Visual UI Mockup (after Phase 2)
-
-Leader presents Phase 2 specification as a UI mockup via the visual companion server:
-- Include: design tokens applied to components, responsive demo, theme switching (light/dark/high-contrast), motion preview
-- User choices: "Approve specification" or "Provide feedback" (via AskUserQuestion in terminal)
-- If user provides feedback (Phase 2 scope): Leader records feedback in phase-2/SYNTHESIS.md `## User Feedback History`, resets ratification round counter, re-enters Phase 2 hypothesize. Loop until approved.
-- If user feedback requires Phase 1 direction change: Leader presents escalation confirmation to user, and if confirmed, suspends conflict rule #9, discards Phase 2 files, re-enters Phase 1 hypothesize with feedback as constraint.
-- No skip option — user confirmation is mandatory
-
-### Phase 2 — Design Specification (6 steps + conditional revise)
+### Phase 2 — Design Specification (6 steps + conditional revise per round)
 
 | Step | Who | What |
 |------|-----|------|
@@ -90,10 +93,19 @@ Leader presents Phase 2 specification as a UI mockup via the visual companion se
 | critique | All members | Challenge/support/amend/question specifications with design principle references and axis tags |
 | audit | Leader only | Run Codex CLI to fact-check: a11y (WCAG 2.1/2.2 AA), browser compat, performance (CLS/LCP). Aesthetic judgments excluded |
 | revise | All members (conditional) | Append corrections if audit found inaccuracies (skipped if all clean) |
-| synthesize | Leader only | Read all content, write Evidence Map + Draft Design Spec in SYNTHESIS.md |
+| synthesize | Leader only | Read current round WHITEBOARD-R{N}.md + prior SYNTHESIS.md, write Evidence Map + Draft Design Spec |
 | ratify | All voting members | Vote accept or push-back via SendMessage. Simple majority ratifies |
 
-## Entry Formats
+### User Review 2 — Visual UI Mockup (after Phase 2)
+
+Leader presents Phase 2 specification as a UI mockup via the visual companion server:
+- Include: design tokens applied to components, responsive demo, theme switching (light/dark/high-contrast), motion preview
+- User choices: "Approve specification" or "Provide feedback" (via AskUserQuestion in terminal)
+- If user provides feedback (Phase 2 scope): Leader records feedback in phase-2/SYNTHESIS.md `## User Feedback History`, increments Feedback Cycle, re-enters Phase 2 hypothesize. Loop until approved.
+- If user feedback requires Phase 1 direction change: Leader presents escalation confirmation to user, and if confirmed, suspends conflict rule #11, discards Phase 2 files, re-enters Phase 1 hypothesize with feedback as constraint.
+- No skip option — user confirmation is mandatory
+
+## Board-Specific Entry Formats
 
 ### Framing
 
@@ -119,6 +131,8 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 ### Hypothesis
 
 **ID format:** `[H-{phase}-{initial}-{seq}]` — `{phase}` = 1 or 2; `{initial}` = first letter of name (uppercase); `{seq}` = 001, 002, ...
+
+`-cx` members use their normal member's initial + `X`. Example: backend → `B`, backend-cx → `BX`. Entry IDs: `[H-1-BX-001]`.
 
 **Phase 1 example (design direction — linguistic, code snippet optional):**
 ```markdown
@@ -156,7 +170,7 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 
 **ID format:** `[CR-{phase}-{initial}-R{round}-{seq}]`
 
-Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**question**`), `refs=[...]`, `@{member}`, and `axis={tag}` (one or more from: typography, color, layout, motion, accessibility, spatial-composition, spacing, elevation).
+Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**question**`), `refs=[...]`, `@{member}`, and `axis={tag}`.
 
 **Recommended critique body structure** (Feldman model — recommended, not required):
 ```markdown
@@ -168,17 +182,10 @@ Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**
   判断: ディスプレイ用途に限定し、ボディにはx-heightの高いセリフ体（Literata, Charter等）を提案
 ```
 
-The Feldman structure (記述→分析→解釈→判断) is a **recommended template** to improve critique quality. It is NOT required — members may write free-form critiques with the standard label + refs + axis format. The 4-label system (challenge/support/amend/question) from discussion-board is the only **required** structure.
+The Feldman structure (記述→分析→解釈→判断) is a **recommended template** to improve critique quality. It is NOT required — members may write free-form critiques with the standard label + refs + axis format. The 4-label system (challenge/support/amend/question) is the only **required** structure.
 
-### Evidence Map (Leader only)
+### Phase 1 Direction Conclusion (Leader only)
 
-| # | Claim | Support | Counterpoint | Confidence |
-|---|-------|---------|--------------|------------|
-| 1 | {claim} | refs=[H-1-X-001, CR-1-Y-R1-002] | refs=[CR-1-Z-R1-001] | high/medium/low |
-
-### Draft Conclusion (Leader only)
-
-**Phase 1 — Direction Conclusion:**
 ```markdown
 ## Direction Conclusion
 **Design Direction:** {selected tone/mood/aesthetic with rationale}
@@ -189,7 +196,8 @@ The Feldman structure (記述→分析→解釈→判断) is a **recommended tem
 **Open questions for Phase 2:** {items to resolve during specification}
 ```
 
-**Phase 2 — Draft Design Spec:**
+### Phase 2 Draft Design Spec (Leader only)
+
 ```markdown
 ## Draft Design Spec — Round {N}
 {Synthesized specification citing entry IDs. Mark areas of uncertainty.}
@@ -197,128 +205,31 @@ The Feldman structure (記述→分析→解釈→判断) is a **recommended tem
 **Unresolved:** {low-confidence or unaddressed claims}
 ```
 
-### Ratification History (Leader only)
+### Phase 2 Audit (Leader only)
 
-```markdown
-### Round {N}
-| Member | Vote | Reason |
-|--------|------|--------|
-| {name} | accept / push-back | {brief reason} |
-**Result:** {count}/{total} — {ratified | not ratified}
-```
-
-### Minority Report (Leader only)
-
-Written only when conclusion is ratified with dissent:
-
-```markdown
-**Dissenter(s):** {names}  **Position:** {view}  **Evidence:** refs=[...]
-**Leader note:** {why majority view was adopted}
-```
-
-### Completion Report
-
-Members send this via SendMessage after each sub-phase:
-
-```
-Entries added: {N}
-Key insight: {most important finding}
-Current position: {stance in one sentence}
-Remaining concerns: {description or "none"}
-```
-
-### Audit (Phase 2 only)
-
-Leader-only. Written per round after Codex CLI fact-check. **Scope is limited to 3 axes — aesthetic judgments are explicitly excluded:**
+**Scope is strictly limited to 3 axes — aesthetic judgments are explicitly excluded:**
 
 1. **Accessibility** — WCAG 2.1/2.2 AA compliance (contrast ratio 4.5:1, target size 24x24px minimum per SC 2.5.8)
 2. **Browser compatibility** — CSS feature support status across major browsers
 3. **Performance** — CLS ≤ 0.1, LCP ≤ 2.5s impact assessment
 
-| Entry | Claim Summary | Verdict | Notes |
-|-------|--------------|---------|-------|
-| [H-2-T-001] | {claim} | ✅/⚠️/❌/❓ | {evidence or reason} |
+**Explicit exclusion instruction in Codex prompt:** "Do NOT evaluate aesthetic quality, visual appeal, or design taste. Only verify factual claims about accessibility standards, browser support, and performance metrics."
 
-Verdict rubric:
-- ✅ **Verified**: Claim is factually accurate
-- ⚠️ **Partially accurate**: Contains some truth but misleading, incomplete, or outdated
-- ❌ **Inaccurate**: Factually wrong
-- ❓ **Unverifiable**: Cannot be verified (subjective, speculative, or insufficient context)
-
-Granularity: one row per hypothesis or critique entry (by entry ID), not per sentence.
-
-### Revision (Phase 2 only)
-
-Members append corrections in their own subsection (append-only — original entry is never modified).
-
-```markdown
-- [H-2-T-001] **revised**: Updated claim based on audit [Round {N}]. {corrected statement}
-  > Original: {original claim}. Audit note: {audit note}.
-```
+All other entry formats (Evidence Map, Round Context Packet, Ratification History, Minority Report, Completion Report, Audit Table + Verdict Rubric, Revision) — see board-engine REFERENCE.md.
 
 ### ID Summary
 
-| Type | Format | Section | Phase |
-|------|--------|---------|-------|
-| Framing | (no ID — structured fields) | Framing | framing (both phases) |
-| Hypothesis | `[H-{phase}-{initial}-{seq}]` | Hypotheses | hypothesize (both phases) |
-| Critique | `[CR-{phase}-{initial}-R{round}-{seq}]` | Critique → Round N | critique (both phases) |
-| Audit | (no ID — table format) | Audit → Round N | audit (Phase 2 only) |
-| Revision | `[{original-ID}] **revised**` | Hypotheses or Critique | revise (Phase 2 only) |
+| Type | Format | Phase |
+|------|--------|-------|
+| Framing | (no ID — structured fields) | both phases |
+| Hypothesis | `[H-{phase}-{initial}-{seq}]` | both phases |
+| Critique | `[CR-{phase}-{initial}-R{round}-{seq}]` | both phases |
+| Audit | (no ID — table format) | Phase 2 only |
+| Revision | `[{original-ID}] **revised**` | Phase 2 only |
 
-Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` members use their normal member's initial + `X`. Example: backend → `B`, backend-cx → `BX`. Entry IDs: `[H-1-BX-001]`.
+## Board-Specific Phase Notes
 
----
-
-# Workflow Layer
-
-## Workflow Overview
-
-### Phase 1 — Design Direction
-
-| Step | Leader Action | Member Action | Output | Next Trigger |
-|------|---------------|---------------|--------|--------------|
-| setup | Analyze design topic, ask questions, invoke team-composer, create phase files, spawn members | — | phase-1/ + phase-2/ created, team spawned | Team ready |
-| framing | Broadcast framing instructions | Document design context in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff | Write direction hypotheses (linguistic, code optional) | Hypothesis entries | All complete |
-| critique | Broadcast instructions | Write critiques with labels + axis tags + refs | Critique entries | All complete |
-| synthesize | Read all WHITEBOARD, write Evidence Map + Direction Conclusion | — | phase-1/SYNTHESIS.md updated | Conclusion written |
-| ratify | Broadcast ratify request to voting members | Send vote via SendMessage | Ratification History | Majority reached or next round |
-
-### User Review 1 — Visual Moodboard
-
-| Step | Leader Action | Output | Next Trigger |
-|------|---------------|--------|--------------|
-| user-review-1 | Start visual companion server; generate moodboard HTML from Direction Conclusion; present via AskUserQuestion with browser URL | User approval or feedback | User responds |
-| (feedback loop) | Record feedback in User Feedback History; reset Round to 0; increment Feedback Cycle; broadcast feedback as constraint; re-enter Phase 1 hypothesize | Updated hypotheses → critique → synthesize → ratify → new moodboard | Ratify succeeds → present user-review-1 again |
-
-### Phase 2 — Design Specification
-
-| Step | Leader Action | Member Action | Output | Next Trigger |
-|------|---------------|---------------|--------|--------------|
-| framing | Broadcast Phase 1 conclusions + framing instructions | Document specification constraints in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast kickoff | Write specification hypotheses (token definitions required) | Hypothesis entries | All complete |
-| critique | Broadcast instructions | Write critiques with labels + axis tags + refs | Critique entries | All complete |
-| audit | Run Codex CLI on current round (a11y/compat/perf only, NO aesthetic judgment) | — | phase-2/WHITEBOARD.md `## Audit → Round {N}` updated | Audit written |
-| revise | Broadcast audit findings to affected members | Append corrections (append-only) | Revised entries | All affected complete (or skipped if all clean) |
-| synthesize | Read all WHITEBOARD, write Evidence Map + Draft Design Spec | — | phase-2/SYNTHESIS.md updated | Draft written |
-| ratify | Broadcast ratify request to voting members | Send vote via SendMessage | Ratification History | Majority reached or next round |
-
-### User Review 2 — Visual UI Mockup
-
-| Step | Leader Action | Output | Next Trigger |
-|------|---------------|--------|--------------|
-| user-review-2 | Generate UI mockup HTML from Draft Design Spec; present via AskUserQuestion with browser URL | User approval or feedback | User responds |
-| (feedback loop — Phase 2 scope) | Record feedback in User Feedback History; reset Round to 0; increment Feedback Cycle; broadcast feedback as constraint; re-enter Phase 2 hypothesize | Updated hypotheses → critique → audit → revise → synthesize → ratify → new UI mockup | Ratify succeeds → present user-review-2 again |
-| (feedback loop — Phase 1 escalation) | Present escalation confirmation to user; if confirmed: suspend rule #9, discard Phase 2 files, re-enter Phase 1 hypothesize with feedback | Phase 1 re-discussion → user-review-1 → new Phase 2 | Phase 1 approved → create new Phase 2 |
-
-### Concluded
-
-| Step | Leader Action | Output |
-|------|---------------|--------|
-| concluded | Generate Design Spec file, delete discussion directory | `docs/plans/YYYY-MM-DD-{topic}-design-spec.md` |
-
-## Phase Notes
+For the standard debate cycle phases (hypothesize, critique, audit, revise, synthesize, ratify), see board-engine REFERENCE.md. Board-specific additions only below.
 
 ### setup
 
@@ -335,7 +246,9 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
   - `constraints`: `["a11y non-negotiable axis"]`
   - `domain_hints`: extracted from user answers + design-domain seed axes (美的方向性, ユーザビリティ vs 表現性, パフォーマンス vs リッチネス, ブランド一貫性 vs 革新性)
 - After team-composer completes (Handoff Contract received):
-  - Create `docs/discussions/{discussion-id}/phase-1/` and `phase-2/` with WHITEBOARD.md + SYNTHESIS.md.
+  - Create `docs/discussions/{discussion-id}/phase-1/` and `phase-2/` directories.
+  - In each phase directory, create base WHITEBOARD.md + SYNTHESIS.md using templates below.
+  - Do NOT create per-round WHITEBOARD files yet — created at each round's hypothesize phase.
   - Ensure `docs/discussions/` is in `.gitignore`.
   - Spawn all members with frontend-design-board-specific prompts:
     - Normal members: 3-layer role description (discipline + epistemic stance + epistemic constraint) as briefing.
@@ -344,45 +257,39 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
 
 ### Phase 1: framing
 
-- Members use full WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- Members use full base WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- After framing completes, base WHITEBOARD.md becomes **read-only** for the remainder of Phase 1.
 - Leader combines completion confirmation + hypothesize kickoff in 1 broadcast.
 - Framing should focus on design context: purpose, aesthetic instincts, target user, constraints.
 
 ### Phase 1: hypothesize
 
-- **Independent generation (Round 1 only):** Members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the topic and their own role briefing (3-layer description). This eliminates first-mover anchoring.
-- **Per-round role re-anchoring:** Every broadcast must restate each member's core epistemic commitments.
+- Leader creates WHITEBOARD-R{N}.md in phase-1/ at the start of each round.
+- **Independent generation (Round 1, Feedback Cycle 1 only):** Members generate hypotheses WITHOUT reading other members' entries. Each member receives only the topic and their own role briefing (3-layer description). This eliminates first-mover anchoring. Subsequent feedback cycles allow reading existing entries.
 - Each member aims for 2-5 hypotheses about design direction. Hypotheses are primarily linguistic (mood, tone, references). Code snippets (CSS variables, font-family declarations) are permitted but NOT required.
 - Each hypothesis MUST include at least one `axis=` tag.
-- Report completion using the completion report format.
-- **Feedback re-entry:** When re-entering hypothesize from user-review-1 feedback, the broadcast includes user feedback as a new constraint. Members add new hypotheses addressing the feedback. Previous WHITEBOARD.md entries remain (append-only). The `Independent generation` rule applies only to Feedback Cycle 1, Round 1 — subsequent cycles allow reading existing entries.
+- **Feedback re-entry:** When re-entering hypothesize from user-review-1 feedback, the broadcast includes user feedback as a new constraint. Members write new hypotheses in a new WHITEBOARD-R{N}.md file (round number continues monotonically). Previous round files remain read-only.
 
 ### Phase 1: critique
 
-- **Per-round role re-anchoring:** Every broadcast must restate each member's core epistemic commitments.
-- **IMPORTANT**: Use 2-step Grep extraction when WHITEBOARD exceeds ~350 lines.
-- Members must label each critique: challenge/support/amend/question.
-- Cite refs=[], @member, and axis= for every entry.
+- Members read the current round's WHITEBOARD-R{N}.md `## Hypotheses` section.
 - **Feldman template encouraged** (記述→分析→解釈→判断) but not enforced.
 
 ### Phase 1: synthesize
 
-- Leader reads ALL phase-1/WHITEBOARD.md content.
-- Writes Evidence Map + Direction Conclusion in phase-1/SYNTHESIS.md.
+- Leader reads WHITEBOARD-R{N}.md in full (current round) + previous Evidence Map and Direction Conclusion from SYNTHESIS.md.
+- Writes updated Evidence Map + Direction Conclusion in phase-1/SYNTHESIS.md.
 - Direction Conclusion must clearly state: design direction (tone/mood/aesthetic), purpose, target user, rejected alternatives, key trade-offs, and open questions for Phase 2.
 
 ### Phase 1: ratify
 
-- Votes via SendMessage: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}`
-- Simple majority: ⌊N/2⌋ + 1 required.
-- If not ratified: incorporate push-back, start next critique round (within Phase 1).
-- Max 10 rounds. On exhaustion: leader writes "best available direction" with uncertainty markers.
+- If not ratified: incorporate push-back, leader creates WHITEBOARD-R{N+1}.md, start next hypothesize round (within Phase 1).
 
 ### user-review-1
 
-- Leader starts visual companion server (if not already running): `scripts/start-server.sh --project-dir {project-root}` from superpowers plugin scripts directory. If server fails, fall back to text-based review (see Visual Companion → Fallback).
+- Leader starts visual companion server (if not already running): `scripts/start-server.sh --project-dir {project-root}` from superpowers plugin scripts directory. If server fails, fall back to text-based review (see Visual Companion section).
 - Leader reads phase-1/SYNTHESIS.md Direction Conclusion.
-- Leader generates moodboard HTML content fragment and writes to `screen_dir` (see Visual Companion → Phase 1 Mockup Content).
+- Leader generates moodboard HTML content fragment and writes to `screen_dir` (see Visual Companion section).
 - Presents to user via AskUserQuestion:
   ```
   Phase 1 (Design Direction) の結果をモックアップにしました。
@@ -412,20 +319,56 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
      - **Feedback:** {user's feedback content}
      - **Action:** Re-entered hypothesize with feedback as constraint
      ```
-  2. Reset `> Round:` to 0 in SYNTHESIS.md header; increment `> Feedback Cycle:`.
+  2. Increment `> Feedback Cycle:` in SYNTHESIS.md header.
   3. Broadcast to members: restate 3-layer roles + "ユーザーからのフィードバック: {content}。これを新たな制約として hypothesize を再開してください"
-  4. Re-enter Phase 1 hypothesize.
+  4. Re-enter Phase 1 hypothesize (new WHITEBOARD-R{N}.md, round number continues).
   5. After ratify succeeds: generate updated moodboard, present user-review-1 again.
-  6. After ratify succeeds and new moodboard presented, append outcome:
+  6. After approval, append outcome:
      ```markdown
      ### Feedback Cycle {N} Outcome
      - **Result:** {summary of how feedback was addressed}
      ```
 
+### Phase 2: framing
+
+- **Context injection (Push-based):** Leader reads phase-1/SYNTHESIS.md, extracts Direction Conclusion, and includes it in the framing broadcast. Members do NOT read phase-1/ files directly.
+- If user provided feedback during user-review-1, include the final approved direction and any feedback that shaped it as additional context.
+- Framing should focus on specification scope, acceptance criteria, and which token categories to define.
+- After framing completes, base WHITEBOARD.md becomes **read-only** for the remainder of Phase 2.
+
+### Phase 2: hypothesize
+
+- Leader creates WHITEBOARD-R{N}.md in phase-2/ at the start of each round (round number continues from Phase 1).
+- **Token definition block is REQUIRED** in Phase 2 hypotheses. Each hypothesis must include at least one CSS Custom Properties code block defining design tokens. Hypotheses without token definitions are returned for revision.
+- **Theme matrix:** Token hypotheses that define color tokens MUST include light/dark/high-contrast variants. Motion token hypotheses MUST address `prefers-reduced-motion` handling policy (disable, shorten, or provide alternatives — WCAG does not mandate 0ms specifically).
+- **Feedback re-entry:** When re-entering hypothesize from user-review-2 feedback, the broadcast includes user feedback as a new constraint. Members write new hypotheses in a new WHITEBOARD-R{N}.md file.
+
+### Phase 2: critique
+
+- Same rules as Phase 1 critique, plus: critiques of token definitions SHOULD include quantitative checks (contrast ratio, spacing ratio, type scale ratio) when applicable.
+
+### Phase 2: audit
+
+- **Scope is strictly limited to 3 axes. Aesthetic judgments are EXCLUDED:**
+  1. **Accessibility**: WCAG 2.1/2.2 AA (contrast ratio >= 4.5:1 for normal text per SC 1.4.3, target size >= 24x24px per SC 2.5.8)
+  2. **Browser compatibility**: CSS feature support (e.g., oklch() color space, container queries)
+  3. **Performance**: CLS <= 0.1, LCP <= 2.5s impact
+- Audit results written to WHITEBOARD-R{N}.md `## Audit` section.
+
+### Phase 2: synthesize
+
+- Leader reads WHITEBOARD-R{N}.md in full (current round) + previous Evidence Map and Draft Design Spec from SYNTHESIS.md.
+- Writes updated Evidence Map + Draft Design Spec in phase-2/SYNTHESIS.md.
+- Draft Design Spec must include the Design Thinking Mapping (5-axis) and token definition tables.
+
+### Phase 2: ratify
+
+- If not ratified: next round starts at hypothesize (leader creates WHITEBOARD-R{N+1}.md, full cycle including audit).
+
 ### user-review-2
 
 - Leader reads phase-2/SYNTHESIS.md Draft Design Spec.
-- Leader generates UI mockup HTML content fragment and writes to `screen_dir` (see Visual Companion → Phase 2 Mockup Content).
+- Leader generates UI mockup HTML content fragment and writes to `screen_dir` (see Visual Companion section).
 - Presents to user via AskUserQuestion:
   ```
   Phase 2 (Design Specification) の結果をモックアップにしました。
@@ -440,7 +383,7 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
 - On approval: stop visual companion server (`scripts/stop-server.sh $SESSION_DIR`), proceed to concluded.
 - On feedback:
   1. Leader assesses scope: is this Phase 2 internal or does it require Phase 1 direction change?
-  2. **If Phase 2 scope:** Same feedback recording and re-entry flow as user-review-1 but for Phase 2 (record in phase-2/SYNTHESIS.md, reset Round, re-enter Phase 2 hypothesize, loop).
+  2. **If Phase 2 scope:** Same feedback recording and re-entry flow as user-review-1 but for Phase 2 (record in phase-2/SYNTHESIS.md, increment Feedback Cycle, re-enter Phase 2 hypothesize with new WHITEBOARD-R{N}.md, loop).
   3. **If Phase 1 escalation needed:** Present escalation confirmation via AskUserQuestion:
      ```
      このフィードバックは Phase 1 のデザイン方向性の変更を必要とします。
@@ -449,79 +392,24 @@ Note: `{phase}` = 1 or 2 to ensure IDs are globally unique across phases. `-cx` 
      1. はい、Phase 1 から再議論する
      2. いいえ、Phase 2 の範囲内で対応する
      ```
-     - If user confirms Phase 1 escalation: suspend conflict rule #9, delete phase-2/ directory (new Phase 2 will be created after Phase 1 re-approval), record escalation in phase-1/SYNTHESIS.md User Feedback History, re-enter Phase 1 hypothesize with feedback as constraint.
+     - If user confirms Phase 1 escalation: suspend conflict rule #11, delete phase-2/ directory (new Phase 2 will be created after Phase 1 re-approval), record escalation in phase-1/SYNTHESIS.md User Feedback History, re-enter Phase 1 hypothesize with feedback as constraint.
      - If user chooses Phase 2 scope: proceed with Phase 2 internal feedback flow.
-
-### Phase 2: framing
-
-- **Context injection (Push-based):** Leader reads phase-1/SYNTHESIS.md, extracts Direction Conclusion, and includes it in the framing broadcast. Members do NOT read phase-1/ files directly.
-- If user provided feedback during user-review-1 (recorded in User Feedback History), include the final approved direction and any feedback that shaped it as additional context.
-- Framing should focus on specification scope, acceptance criteria, and which token categories to define.
-
-### Phase 2: hypothesize
-
-- Members read all Phase 2 framings via full WHITEBOARD.md Read.
-- **Token definition block is REQUIRED** in Phase 2 hypotheses. Each hypothesis must include at least one CSS Custom Properties code block defining design tokens. Hypotheses without token definitions are returned for revision.
-- **Theme matrix:** Token hypotheses that define color tokens MUST include light/dark/high-contrast variants. Motion token hypotheses MUST address `prefers-reduced-motion` handling policy (disable, shorten, or provide alternatives — WCAG does not mandate 0ms specifically).
-- Each hypothesis MUST include at least one `axis=` tag.
-- Report completion using the completion report format.
-- **Feedback re-entry:** When re-entering hypothesize from user-review-2 feedback, same rules as Phase 1 feedback re-entry. The broadcast includes user feedback as a new constraint. Members add new hypotheses with required token definition blocks. Previous entries remain (append-only).
-
-### Phase 2: critique
-
-- Same rules as Phase 1 critique, plus: critiques of token definitions SHOULD include quantitative checks (contrast ratio, spacing ratio, type scale ratio) when applicable.
-
-### Phase 2: audit
-
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If not available, skip audit, log warning in SYNTHESIS.md status, proceed to synthesize.
-- **Scope is strictly limited to 3 axes. Aesthetic judgments are EXCLUDED:**
-  1. **Accessibility**: WCAG 2.1/2.2 AA (contrast ratio ≥ 4.5:1 for normal text per SC 1.4.3, target size ≥ 24x24px per SC 2.5.8)
-  2. **Browser compatibility**: CSS feature support (e.g., oklch() color space, container queries)
-  3. **Performance**: CLS ≤ 0.1, LCP ≤ 2.5s impact
-- **Explicit exclusion instruction in Codex prompt:** "Do NOT evaluate aesthetic quality, visual appeal, or design taste. Only verify factual claims about accessibility standards, browser support, and performance metrics."
-- Audit only entries from the current round (incremental).
-- Execute via temp file + stdin:
-  ```bash
-  TMPFILE=$(mktemp)
-  cat <<'PROMPT_EOF' > "$TMPFILE"
-  <constructed_prompt>
-  PROMPT_EOF
-  cat "$TMPFILE" | codex exec
-  rm -f "$TMPFILE"
-  ```
-- Write results to phase-2/WHITEBOARD.md `## Audit` → `### Round {N}`.
-- **Decision logic:** All ✅ or ❓ → skip revise; Any ⚠️ or ❌ → proceed to revise.
-
-### Phase 2: revise
-
-- Only runs when audit found ⚠️ or ❌.
-- Members append corrections (append-only). Max 1 revise round per audit.
-
-### Phase 2: synthesize
-
-- Leader reads ALL phase-2/WHITEBOARD.md content.
-- Writes Evidence Map + Draft Design Spec in phase-2/SYNTHESIS.md.
-- Draft Design Spec must include the Design Thinking Mapping (5-axis) and token definition tables.
-
-### Phase 2: ratify
-
-- Same rules as Phase 1 ratify.
-- If not ratified: next round starts at `critique` (members write new critiques, then audit → revise → synthesize → ratify).
 
 ### concluded
 
 - Leader writes `## Final Design Spec` in phase-2/SYNTHESIS.md.
-- Leader generates the Design Spec file at `docs/plans/YYYY-MM-DD-{topic}-design-spec.md` (see Design Spec Template in Reference Layer).
+- Leader generates the Design Spec file at `docs/plans/YYYY-MM-DD-{topic}-design-spec.md` (see Design Spec Template below).
 - Content is derived from both phase-1/SYNTHESIS.md (design direction) and phase-2/SYNTHESIS.md (specifications).
 - Verify the file was created successfully.
 - Delete `docs/discussions/{discussion-id}/` directory after successful export.
 
-## Communication Rules
+## Board-Specific Conflict Rules
 
-- All leader → member instructions via **broadcast** (NOT individual SendMessage).
-- Use structured short format: Phase / Step / Action / Format-ref (~80-120 tokens).
-- Combine phase transitions: completion confirmation + next phase instruction in 1 broadcast.
-- Phase 2 framing broadcast MUST include Phase 1 Direction Conclusion summary (Push-based context injection).
+Rules 1-10 from board-engine REFERENCE.md apply. Additional board-specific rules:
+
+| # | Rule | Rationale |
+|---|------|-----------|
+| 11 | Phase 1 files are read-only during Phase 2 (suspended during Phase 2 → Phase 1 escalation) | Prevents retroactive modification of settled design direction. Suspension requires explicit user confirmation via escalation flow in user-review-2. When suspended: Phase 2 files are discarded, Phase 1 re-enters hypothesize, rule reinstates when new Phase 2 begins. |
 
 ## Visual Companion
 
@@ -582,11 +470,13 @@ If the visual companion server fails to start (superpowers plugin not installed,
 
 # Reference Layer
 
-## WHITEBOARD.md Templates
+## WHITEBOARD.md Templates (Base Files)
 
-### Phase 1 WHITEBOARD
+### Phase 1 Base WHITEBOARD
 
 Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
+
+Created during setup. Becomes **read-only after framing phase** completes.
 
 ```markdown
 # WHITEBOARD — {discussion-id} / Phase 1: Design Direction
@@ -605,23 +495,13 @@ Path: `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md`
 ### {member-A}
 ### {member-B}
 ...
-
-## Hypotheses
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-
-## Critique
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
 ```
 
-### Phase 2 WHITEBOARD
+### Phase 2 Base WHITEBOARD
 
 Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
+
+Created during setup. Becomes **read-only after framing phase** completes.
 
 ```markdown
 # WHITEBOARD — {discussion-id} / Phase 2: Design Specification
@@ -640,23 +520,9 @@ Path: `docs/discussions/{discussion-id}/phase-2/WHITEBOARD.md`
 ### {member-A}
 ### {member-B}
 ...
-
-## Hypotheses
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-
-## Critique
-<!-- Repeat ### {member-name} subsections for each team member -->
-### {member-A}
-### {member-B}
-...
-
-## Audit
 ```
 
-No Status/Round header in WHITEBOARD — managed in SYNTHESIS.md. Sections start empty. Phase 1 has no `## Audit` section (audit is Phase 2 only).
+Per-round WHITEBOARD-R{N}.md files use the template from board-engine REFERENCE.md. Phase 1 round files omit `## Audit` (no audit in Phase 1).
 
 ## SYNTHESIS.md Templates
 
@@ -672,8 +538,8 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 
 ## Evidence Map
 ## Direction Conclusion
+## Round Context Packet
 ## Ratification History
-## Minority Report
 ## User Feedback History
 ```
 
@@ -687,13 +553,14 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 
 ## Evidence Map
 ## Draft Design Spec
+## Round Context Packet
 ## Ratification History
 ## Minority Report
 ## User Feedback History
 ## Final Design Spec
 ```
 
-Leader-only files. See Entry Formats above for section content structure.
+Leader-only files. See board-engine REFERENCE.md for section content structure.
 
 ## Design Spec Template
 
@@ -797,53 +664,3 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 ```
 
 Note: This is a design specification, not an implementation plan. To create executable code, use the `frontend-design` skill with this Design Spec as input context.
-
-## Ratification Rules
-
-- **Voting members**: All members (normal + -cx). Count = role count × 2.
-- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
-- **No advisory members**: All team members have voting rights.
-
-| Total Members | Majority Threshold |
-|---------------|-------------------|
-| 6 | 4 |
-| 8 | 5 |
-| 10 | 6 |
-| 12 | 7 |
-
-- **Max rounds**: 10 (configurable at board creation)
-- **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
-- **Exhaustion**: If max rounds reached with no majority, leader writes "best available conclusion" with explicit uncertainty markers
-- **Abstention**: Not permitted. Every voting member must vote each round.
-- **Vote supersession**: A member's vote in round N supersedes prior rounds.
-- **Both phases use ratification.** Phase 1 ratifies the design direction; Phase 2 ratifies the design specification.
-
-## Conflict Prevention Rules
-
-| # | Rule | Rationale |
-|---|------|-----------|
-| 1 | Each teammate edits only their own `### {name}` subsection in WHITEBOARD.md | Prevents Edit tool match failures from concurrent writes |
-| 2 | SYNTHESIS.md is leader-only (teammates read, never write) | Single writer eliminates conflicts |
-| 3 | Append-only writes (no deletion/modification of existing entries) | Prevents overwrites from stale reads |
-| 4 | Ratification votes via SendMessage, not file writes | Eliminates race conditions on vote tallying |
-| 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
-| 6 | `## Audit` section is leader-only | Single writer; Codex results managed by leader |
-| 7 | Revisions are append-only in member's own subsection | Maintains append-only invariant |
-| 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
-| 9 | Phase 1 files are read-only during Phase 2 (suspended during Phase 2 → Phase 1 escalation) | Prevents retroactive modification of settled design direction. Suspension requires explicit user confirmation via escalation flow in user-review-2. When suspended: Phase 2 files are discarded, Phase 1 re-enters hypothesize, rule reinstates when new Phase 2 begins. |
-| 10 | Ratification round counter resets on user feedback re-entry; feedback cycle counter is separate and unbounded | Distinguishes internal loops (ratify failure → critique) from external loops (user feedback → hypothesize). Max Rounds (10) applies per feedback cycle. |
-
-## Audit Notes (Phase 2 only)
-
-- **Prerequisite:** `codex` CLI must be installed. If unavailable, skip audit, record warning in SYNTHESIS.md status line, and proceed to synthesize.
-- **Do NOT audit aesthetic quality** — only verify factual claims about accessibility standards, browser support, and performance metrics
-- **Audit is incremental** — each round audits only new entries, not the full history
-- **Revisions are append-only** — never edit the original hypothesis or critique text
-
-## Timeout Policy
-
-| Situation | Action |
-|-----------|--------|
-| Member has not reported completion | Leader sends one reminder via SendMessage |
-| After reminder, still no response | Leader proceeds with available results (partial round) |
-| Missing ratification vote | Recorded as "not submitted"; threshold recalculated as ⌊voting_count/2⌋ + 1 |

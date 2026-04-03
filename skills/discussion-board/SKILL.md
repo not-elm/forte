@@ -24,12 +24,22 @@ Explore an open-ended proposition through structured team debate, iterative synt
 ## Core Principles
 
 1. **Proposition-centric** — All activity addresses an open-ended proposition.
-2. **2-file model** — WHITEBOARD.md (framing + hypotheses + critiques) + SYNTHESIS.md (leader-managed state), both in `docs/discussions/{discussion-id}/`. Concluded → Design Doc exported to `docs/plans/`, discussion directory deleted.
-3. **Per-member write zones** — Each teammate writes only to their own `### {name}` subsection in WHITEBOARD.md.
-4. **Leader-only SYNTHESIS.md** — Teammates read but never write to SYNTHESIS.md.
-5. **Append-only** — Teammates add content, never delete or modify existing entries.
-6. **Iterative synthesis** — Leader drafts conclusions; members ratify or push back across rounds.
-7. **Leader as synthesizer, not participant** — Leader does NOT write hypotheses or critiques. Leader MAY write process artifacts (audit results, evidence maps, conclusions) to facilitate discussion quality.
+2. **Round-split WHITEBOARD model** — Base WHITEBOARD.md (proposition + framing, read-only after framing) + per-round WHITEBOARD-R{N}.md + SYNTHESIS.md, all in `docs/discussions/{discussion-id}/`. Concluded → Design Doc exported to `docs/plans/`, discussion directory deleted. See board-engine REFERENCE.md for file model details.
+3. **Append-only** — Teammates add content, never delete or modify existing entries.
+4. **Iterative synthesis** — Leader drafts conclusions; members ratify or push back across rounds.
+5. **Leader as synthesizer, not participant** — Leader does NOT write hypotheses or critiques. Leader MAY write process artifacts (audit results, evidence maps, conclusions) to facilitate discussion quality.
+
+## Shared Debate Engine
+
+**At setup, leader MUST read the shared reference:**
+1. Use `Glob pattern="**/board-engine/REFERENCE.md"` to locate the file
+2. Read the found file path
+3. If Glob returns no results, use fallback path: `../board-engine/REFERENCE.md` relative to this skill's base directory
+
+**If Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
+`> Warning: board-engine/REFERENCE.md not found. Using inline rules only.`
+
+This provides: round-split WHITEBOARD model, standard debate cycle (hypothesize → critique → audit → revise → synthesize → ratify), entry formats, and shared rules (conflict prevention, ratification, communication, timeout). Board-specific overrides below take precedence.
 
 ## Phase Model
 
@@ -43,13 +53,13 @@ setup → framing → [Round N: hypothesize → critique → audit → revise (i
 | framing | All members | Document problem interpretation, constraints, criteria, unknowns |
 | hypothesize | All members | Write concrete, testable candidate answers as hypotheses |
 | critique | All members | Challenge/support/amend/question hypotheses with cross-references |
-| audit | Leader only | Run Codex CLI to fact-check hypotheses and critiques from current round; write results to WHITEBOARD `## Audit` |
-| revise | All members | Review audit findings and append corrections to own entries (skipped if no ⚠️/❌ found) |
-| synthesize | Leader only | Read all content, write Evidence Map + Draft Conclusion + Round Context Packet in SYNTHESIS.md |
+| audit | Leader only | Codex CLI fact-check of current round; results to WHITEBOARD-R{N}.md `## Audit` |
+| revise | All members | Review audit findings, append corrections (skipped if no warnings/errors) |
+| synthesize | Leader only | Update Evidence Map + Draft Conclusion + Round Context Packet in SYNTHESIS.md |
 | ratify | All members | Vote accept or push-back via SendMessage. Simple majority ratifies |
 | concluded | Leader only | Record final conclusion (and Minority Report if dissent exists) |
 
-## Entry Formats
+## Board-Specific Entry Formats
 
 ### Framing
 
@@ -62,154 +72,23 @@ Structured fields in each member's `### {name}` Framing subsection (no entry IDs
 - **Unknowns**: {open questions}
 ```
 
-### Hypothesis
+### Grounding Requirement
 
-**ID format:** `[H-{initial}-{seq}]` — `{initial}` = first letter of name (uppercase); `{seq}` = 001, 002, ...
+Every hypothesis should include a `Grounding:` line citing evidence basis. Labels:
 
-**-cx member initials:** `-cx` members use their normal member's initial + `X`. Example: `[H-BX-001]` = backend-cx member's hypothesis. See team-composer skill for full initial rules.
-
-```markdown
-- [H-S-001] **hypothesis**: Use WebSocket-based real-time sync with CRDTs for offline mode.
-  > Rationale: CRDTs allow concurrent edits without coordination.
-  > Grounding: [general-knowledge] CRDTs are a well-established approach for distributed state (Shapiro et al., 2011). [code-verified] Current sync logic at src/sync/engine.ts:45 assumes single-writer.
-```
-
-Grounding labels:
 - `[code-verified]` — Confirmed at a specific file:line in the codebase
 - `[data-backed]` — Based on concrete data, measurements, or benchmarks
 - `[general-knowledge]` — Based on widely recognized technical knowledge (always valid as escape valve)
 
-### Critique
+`[general-knowledge]` is always valid — the goal is transparency about evidence strength, not blocking non-code claims. Hypotheses without grounding will be flagged during audit.
 
-**ID format:** `[CR-{initial}-R{round}-{seq}]`
+Critiques making factual claims (`**challenge**`/`**amend**`) should also include grounding. Questions and support labels may omit grounding.
 
-Common mistake: `[CR-P-1-001]` (missing R prefix) → Correct: `[CR-P-R1-001]`
+All other entry formats (Hypothesis ID, Critique ID, Evidence Map, Draft Conclusion, Round Context Packet, Ratification History, Minority Report, Completion Report, Audit Table, Revision) — see board-engine REFERENCE.md.
 
-Each critique must include: label (`**challenge**`/`**support**`/`**amend**`/`**question**`), `refs=[...]`, `@{member}`
+## Board-Specific Phase Notes
 
-Critiques making factual claims (challenge/amend) should include grounding for those claims. Questions and support labels may omit grounding. Example: `**challenge** ... [code-verified] The current implementation at file:line does X, contradicting this hypothesis.`
-
-```markdown
-#### Round 1
-- [CR-P-R1-001] **challenge** @security-expert refs=[H-S-001]: CRDTs introduce unbounded state growth. How do we handle tombstone GC?
-```
-
-### Evidence Map (Leader only)
-
-| # | Claim | Support | Counterpoint | Grounding | Confidence |
-|---|-------|---------|--------------|-----------|------------|
-| 1 | {claim} | refs=[H-X-001, CR-Y-R1-002] | refs=[CR-Z-R1-001] | code-verified/data-backed/general-knowledge/ungrounded | high/medium/low |
-
-### Draft Conclusion (Leader only)
-
-```markdown
-## Draft Conclusion — Round {N}
-{Synthesized conclusion citing entry IDs. Mark areas of uncertainty.}
-**Key claims:** 1, 2, 3 (from Evidence Map)
-**Unresolved:** {low-confidence or unaddressed claims}
-```
-
-### Round Context Packet (Leader only)
-
-Compact handoff context for the next round. This is the default read target for members in Round 2+.
-
-```markdown
-## Round Context Packet
-### Round {N}
-- Key points (with entry IDs): {5-10 bullets}
-- Open disputes: refs=[...]
-- Next-round focus: {what members should challenge or extend}
-```
-
-Rules:
-- Keep concise: target 150-250 tokens, hard cap 350 tokens
-- Reference entry IDs instead of pasting long excerpts
-- Members read this first in Round 2+, then pull original text via Grep only when needed
-
-### Ratification History (Leader only)
-
-```markdown
-### Round {N}
-| Member | Vote | Reason |
-|--------|------|--------|
-| {name} | accept / push-back | {brief reason} |
-**Result:** {count}/{total} — {ratified | not ratified}
-```
-
-### Minority Report (Leader only)
-
-Written only when conclusion is ratified with dissent:
-
-```markdown
-**Dissenter(s):** {names}  **Position:** {view}  **Evidence:** refs=[...]
-**Leader note:** {why majority view was adopted}
-```
-
-### Completion Report
-
-Members send this via SendMessage after each sub-phase:
-
-```
-Entries added: {N}
-Key insight: {most important finding}
-Current position: {view in one sentence}
-Evidence basis: {code-verified: N, data-backed: N, general-knowledge: N}
-Remaining concerns: {description or "none"}
-```
-
-### Audit
-
-Leader-only. Written per round after Codex CLI fact-check. Only factual claims are audited — opinions, value judgments, and forecasts are excluded.
-
-| Entry | Claim Summary | Verdict | Notes |
-|-------|--------------|---------|-------|
-| [H-S-001] | {claim} | ✅/⚠️/❌/❓ | {evidence or reason} |
-
-Verdict rubric:
-- ✅ **Verified**: Claim is factually accurate based on established knowledge
-- ⚠️ **Partially accurate**: Claim contains some truth but is misleading, incomplete, or outdated
-- ❌ **Inaccurate**: Claim is factually wrong
-- ❓ **Unverifiable**: Claim cannot be verified (insufficient context, or subjective/speculative)
-
-Granularity: one row per hypothesis or critique entry (by entry ID), not per sentence.
-
-### Revision
-
-Members append corrections in their own subsection (append-only — original entry is never modified).
-
-- [H-S-001] **revised**: Updated claim based on audit [Round {N}]. {corrected statement}
-  > Original: {original claim}. Audit note: {audit note}.
-
-### ID Summary
-
-| Type | Format | Section | Phase |
-|------|--------|---------|-------|
-| Framing | (no ID — structured fields) | Framing | framing |
-| Hypothesis | `[H-{initial}-{seq}]` | Hypotheses | hypothesize |
-| Critique | `[CR-{initial}-R{round}-{seq}]` | Critique → Round N | critique |
-| Audit | (no ID — table format) | Audit → Round N | audit |
-| Revision | `[{original-ID}] **revised**` | Hypotheses or Critique | revise |
-| Context Packet | (no ID — compact summary with refs) | Round Context Packet → Round N | synthesize |
-
----
-
-# Workflow Layer
-
-## Workflow Overview
-
-| Phase | Leader Action | Member Action | Output | Next Trigger |
-|-------|---------------|---------------|--------|--------------|
-| setup | Invoke team-composer, create discussion files, spawn members | — | WHITEBOARD.md + SYNTHESIS.md created, team spawned | Team ready |
-| framing | Broadcast framing instructions | Document understanding in own section | Framing entries | All members report complete |
-| hypothesize | Broadcast hypothesize kickoff | Write hypotheses in own section | Hypothesis entries | All members report complete |
-| critique | Broadcast critique instructions | Write critiques with labels + refs | Critique entries | All members report complete |
-| audit | Run Codex CLI on current round's claims, write Audit table | — | WHITEBOARD.md `## Audit → Round {N}` updated | Audit written |
-| revise | Broadcast audit findings to affected members | Append corrections in own section (append-only) | Revised entries | All affected members report complete (or skipped if all ✅/❓) |
-| synthesize | Read all WHITEBOARD, write Evidence Map + Draft + Round Context Packet | — | SYNTHESIS.md updated | Draft + Context Packet written |
-| ratify | Broadcast ratify request | Send vote via SendMessage | Ratification History | Majority reached or next round |
-| concluded | Write Final Conclusion (+ Minority Report) | — | Final SYNTHESIS.md | — |
-
-## Phase Notes
+For the standard debate cycle phases (hypothesize, critique, audit, revise, synthesize, ratify), see board-engine REFERENCE.md. Board-specific additions only below.
 
 ### setup
 
@@ -219,7 +98,8 @@ Members append corrections in their own subsection (append-only — original ent
   - `role_count`: `"3-6"`
   - `domain_hints`: extracted from any pre-context given by user
 - After team-composer completes (Handoff Contract received):
-  - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates (see Reference Layer).
+  - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` (base file) + `SYNTHESIS.md` using templates below.
+  - Do NOT create per-round WHITEBOARD files yet — created at each round's hypothesize phase.
   - Ensure `docs/discussions/` is in `.gitignore` (add if missing).
   - SYNTHESIS.md initializes with `> Status: setup`.
   - Spawn all members with discussion-board-specific prompts:
@@ -229,137 +109,31 @@ Members append corrections in their own subsection (append-only — original ent
 
 ### framing
 
-- Members read only `## Proposition`, `## How Our Work Connects`, and their own `## Framing` subsection (`### {name}`).
-- Full WHITEBOARD.md Read is fallback-only (use only if targeted extraction fails).
+- Members read only `## Proposition`, `## How Our Work Connects`, and their own `## Framing` subsection from base WHITEBOARD.md.
+- Base WHITEBOARD.md is small at this stage (~100 lines); full Read is acceptable.
+- After framing completes, base WHITEBOARD.md becomes **read-only** for the remainder of the discussion.
 - Leader combines completion confirmation + hypothesize kickoff in 1 broadcast to reduce round-trips.
 
-### hypothesize
+### hypothesize (board-specific addition)
 
-- **Independent generation (Round 1 only):** In the first round, members generate hypotheses WITHOUT reading other members' framing entries. Each member receives only the proposition and their own role briefing (discipline + expected contribution from setup). This eliminates first-mover anchoring where the first agent's conceptual vocabulary constrains all subsequent agents. All hypotheses are written to WHITEBOARD.md simultaneously.
-- **Round 2+ context protocol (mandatory):**
-  1. Read latest `## Round Context Packet` in SYNTHESIS.md first.
-  2. Extract `## Hypotheses` via Grep.
-  3. Narrow with `Grep pattern="### {member-name}"`, then pull only referenced entry IDs as needed.
-- Do NOT use full WHITEBOARD.md Read in Round 2+ unless Grep-based extraction fails.
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup). This combats role collapse — the tendency of agents to drift toward consensus as the WHITEBOARD accumulates content.
-- Each member aims for 2-5 hypotheses, each concrete and testable.
-- Each hypothesis should include a `Grounding:` line citing evidence basis. `[general-knowledge]` is always valid — the goal is transparency about evidence strength, not blocking non-code claims. Hypotheses without grounding will be flagged during audit.
-- Report completion using the completion report format.
-
-### critique
-
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution (from setup).
-- **IMPORTANT**: Use section extraction instead of full WHITEBOARD.md Read (mandatory in Round 2+):
-  1. `Grep pattern="## Hypotheses"` to extract the H2 section
-  2. `Grep pattern="### {member-name}"` to narrow to a specific member
-  3. If needed, Grep by specific entry ID from `refs=[...]`
-- Members must label each critique: challenge/support/amend/question.
-- Cite refs=[] and @member for every entry.
-- Round 2+: read both `Draft Conclusion` and latest `Round Context Packet` in SYNTHESIS.md before writing.
-
-### audit
-
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If not available, skip audit phase entirely, log warning in SYNTHESIS.md status, and proceed to synthesize.
-- **Scope:** Audit only entries from the current round (new hypotheses + new critiques). Do NOT re-audit entries from prior rounds.
-- **Exclusion:** Skip opinions, value judgments, and forecasts — only fact-check verifiable factual claims.
-- Leader collects hypotheses and critiques from current round in WHITEBOARD.md.
-- Leader builds a Codex prompt requesting fact-checking of each claim.
-- Prompt template:
-
-  ```
-  Fact-check the following claims from a team discussion. For each claim:
-  1. Verify if it is factually accurate
-  2. Note any inaccuracies, outdated information, or unsupported assertions
-  3. Provide brief evidence or references for your assessment
-  4. Skip opinions, value judgments, and forecasts — mark them as ❓ Unverifiable
-  5. If a hypothesis cites a specific file:line reference, verify that the cited code actually supports the claim
-
-  Rate each claim: ✅ Verified / ⚠️ Partially accurate / ❌ Inaccurate / ❓ Unverifiable
-
-  Claims:
-  {hypotheses and critique claims from current round}
-  ```
-
-- Execute via temp file + stdin (same as codex-review skill):
-  ```bash
-  TMPFILE=$(mktemp)
-  cat <<'PROMPT_EOF' > "$TMPFILE"
-  <constructed_prompt>
-  PROMPT_EOF
-  cat "$TMPFILE" | codex exec --ephemeral
-  rm -f "$TMPFILE"
-  ```
-
-- Write results to WHITEBOARD.md `## Audit` → `### Round {N}` subsection (append-only, each round gets its own subsection).
-
-- **Error handling:**
-  - Codex exits non-zero or times out → record "Audit failed (Codex error)" in `### Round {N}`, skip revise, proceed to synthesize with warning
-  - Codex returns partial/malformed output → leader writes available results, marks incomplete entries as ❓
-
-- Set Bash tool `timeout: 180000` (3 minutes) for the Codex invocation to prevent the default 120s timeout from killing longer runs.
-
-- **Decision logic:**
-  - All ✅ or ❓ only → skip `revise`, proceed to `synthesize`
-  - Any ⚠️ or ❌ → proceed to `revise`
-
-### revise
-
-- Only runs when audit found ⚠️ Partially accurate or ❌ Inaccurate entries.
-- **Per-round role re-anchoring:** The broadcast that kicks off this phase must restate each affected member's discipline and expected contribution alongside the audit findings.
-- Leader broadcasts audit results and instructs affected members to review and correct their entries.
-- Affected members read only:
-  1. `## Audit` → `### Round {N}`
-  2. Referenced entries (by ID) in Hypotheses/Critique
-  3. Latest `## Round Context Packet`
-- Do NOT use full WHITEBOARD.md Read in revise unless targeted extraction fails.
-- Members **append** corrections in their own `### {name}` subsection under the relevant section (Hypotheses or Critique). Original entries are NEVER modified (append-only).
-- Revision format:
-
-  ```markdown
-  - [H-S-001] **revised**: Updated claim based on audit [Round {N}]. {corrected statement}
-    > Original: {original claim}. Audit note: {audit note}.
-  ```
-
-- Members report completion via SendMessage using the standard completion report format.
-- After all affected members report: proceed to `synthesize`.
-- **Max 1 revise round per audit** — no recursive auditing of revisions.
-- **Unresolved ❌ after revise:** Leader notes unresolved inaccuracies in the Evidence Map (synthesize phase) with low confidence rating. These are visible during ratification for members to consider.
-
-### synthesize
-
-- Leader reads ALL WHITEBOARD.md content (framing, hypotheses, all critiques).
-- Writes Evidence Map + Draft Conclusion in SYNTHESIS.md.
-- Writes `## Round Context Packet` → `### Round {N}` as a compact handoff for next-round members.
-- Round 2+: add entry ID → summary mapping table in SYNTHESIS.md for members to reference efficiently.
-- Guideline: "When in doubt about summary accuracy, members should Grep original text."
-
-### ratify
-
-- Votes via SendMessage (NOT file writes): `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}`
-- Simple majority: ⌊N/2⌋ + 1 required to ratify.
-- If not ratified and rounds remain: incorporate push-back, start next critique round.
+- Each hypothesis should include a `Grounding:` line per the Grounding Requirement above.
 
 ### concluded
 
-- Leader exports Final Conclusion as a Design Doc to `docs/plans/YYYY-MM-DD-{topic}-design.md` (see Design Doc Template in Reference Layer).
+- Leader exports Final Conclusion as a Design Doc to `docs/plans/YYYY-MM-DD-{topic}-design.md` (see Design Doc Template below).
 - Verify the Design Doc file was created successfully.
 - Delete `docs/discussions/{discussion-id}/` directory after successful export.
 - If discussion was interrupted (no Final Conclusion): skip Design Doc export, delete discussion directory manually.
-
-## Communication Rules
-
-- All leader → member instructions via **broadcast** (NOT individual SendMessage).
-- Use structured short format: Phase / Round / Action / Format-ref (~80-120 tokens).
-- Combine phase transitions: completion confirmation + next phase instruction in 1 broadcast.
-- Round 2+ broadcasts should reference `Round Context Packet` and entry IDs instead of pasting long excerpts.
 
 ---
 
 # Reference Layer
 
-## WHITEBOARD.md Template
+## WHITEBOARD.md Template (Base File)
 
 Path: `docs/discussions/{discussion-id}/WHITEBOARD.md`
+
+Created during setup. Becomes **read-only after framing phase** completes.
 
 ```markdown
 # WHITEBOARD — {discussion-id}
@@ -380,25 +154,7 @@ Path: `docs/discussions/{discussion-id}/WHITEBOARD.md`
 ### {member-C}
 ### {member-D}
 <!-- ... up to {member-J} depending on team size -->
-
-## Hypotheses
-### {member-A}
-### {member-B}
-### {member-C}
-### {member-D}
-<!-- ... up to {member-J} depending on team size -->
-
-## Critique
-### {member-A}
-### {member-B}
-### {member-C}
-### {member-D}
-<!-- ... up to {member-J} depending on team size -->
-
-## Audit
 ```
-
-No Status/Round header in WHITEBOARD — managed in SYNTHESIS.md. Sections start empty. See Entry Formats above for content structure.
 
 ## SYNTHESIS.md Template
 
@@ -418,7 +174,7 @@ Path: `docs/discussions/{discussion-id}/SYNTHESIS.md`
 ## Final Conclusion
 ```
 
-Leader-only file. See Entry Formats above for section content structure.
+Leader-only file. See board-engine REFERENCE.md for section content structure.
 
 ## Design Doc Template
 
@@ -453,49 +209,12 @@ Exported by leader during `concluded` phase. This is the permanent record of the
 
 Note: This is a design document, not an implementation plan. To create an executable plan, use `superpowers:writing-plans` with this design doc as input.
 
-## Ratification Rules
+### Completion Report Override
 
-- **Voting members**: All members (normal + -cx). Count = role count × 2.
-- **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
-- **No advisory members**: All team members have voting rights.
+Discussion-board adds one field to the standard Completion Report (see board-engine REFERENCE.md):
 
-| Total Members | Majority Threshold |
-|---------------|-------------------|
-| 6 | 4 |
-| 8 | 5 |
-| 10 | 6 |
-| 12 | 7 |
+```
+Evidence basis: {code-verified: N, data-backed: N, general-knowledge: N}
+```
 
-- **Max rounds**: 10 (configurable at board creation)
-- **Vote format**: `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}` via SendMessage
-- **Exhaustion**: If max rounds reached with no majority, leader writes "best available conclusion" with explicit uncertainty markers
-- **Abstention**: Not permitted. Every member must vote each round.
-- **Vote supersession**: A member's vote in round N supersedes prior rounds.
-
-## Conflict Prevention Rules
-
-| # | Rule | Rationale |
-|---|------|-----------|
-| 1 | Each teammate edits only their own `### {name}` subsection in WHITEBOARD.md | Prevents Edit tool match failures from concurrent writes |
-| 2 | SYNTHESIS.md is leader-only (teammates read, never write) | Single writer eliminates conflicts |
-| 3 | Append-only writes (no deletion/modification of existing entries) | Prevents overwrites from stale reads |
-| 4 | Ratification votes via SendMessage, not file writes | Eliminates race conditions on vote tallying |
-| 5 | Phase transitions are leader-controlled via broadcast | Clear boundaries prevent out-of-order writes |
-| 6 | `## Audit` section is leader-only (structural exception to per-member rule, same pattern as SYNTHESIS.md) | Single writer; Codex results managed by leader |
-| 7 | Revisions are append-only in member's own subsection; original entries are never modified | Maintains append-only invariant from Core Principle #5 |
-| 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
-
-## Audit Notes
-
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, skip audit, record warning in SYNTHESIS.md status line, and proceed to synthesize.
-- **Do NOT audit opinions or forecasts** — only verifiable factual claims
-- **Audit is incremental** — each round audits only new entries, not the full history
-- **Revisions are append-only** — never edit the original hypothesis or critique text
-
-## Timeout Policy
-
-| Situation | Action |
-|-----------|--------|
-| Member has not reported completion | Leader sends one reminder via SendMessage |
-| After reminder, still no response | Leader proceeds with available results (partial round) |
-| Missing ratification vote | Recorded as "not submitted"; threshold recalculated as ⌊voting_count/2⌋ + 1 |
+This tracks the grounding quality of each member's contributions.
