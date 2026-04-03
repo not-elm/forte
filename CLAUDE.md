@@ -22,6 +22,7 @@ skills/
   discussion-board/    # Structured team debate with iterative synthesis
   frontend-design-board/ # Frontend design discussion via 2-phase team debate
   investigation-board/ # Evidence-based bug investigation via structured team debate
+  team-composer/       # Shared team composition for board skills (expertise map + always-doubling)
 ```
 
 ## Plugin Architecture
