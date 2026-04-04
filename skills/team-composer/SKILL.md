@@ -141,7 +141,7 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
 
 ## -cx Member: Codex-Mediated Protocol
 
--cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep discussion files (WHITEBOARD-R{N}.md, SYNTHESIS.md) during debate rounds. Exceptions: framing phase (base WHITEBOARD.md is small), hypothesize Round 1 (independent generation, no reads needed). If codex CLI is unavailable, fall back to normal member Grep protocol.
+-cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable, fall back to normal member protocol (full Read for framing, Grep for critique/revise).
 
 ### Setup exploration (initial codebase scan)
 
@@ -168,6 +168,18 @@ Before participating in the discussion, run a Codex exploration:
 If codex CLI is not installed or fails, participate without Codex findings.
 Note this in your first entry: (Codex exploration skipped: CLI not available)
 ````
+
+### Framing
+
+-cx members use codex exec to read base WHITEBOARD.md and generate framing entries. The framing prompt template is provided by the calling board skill, since framing fields vary by board and phase. Generic structure:
+
+1. Read base WHITEBOARD.md (topic, team composition, context)
+2. Analyze codebase from {role-description} perspective
+3. Output structured framing fields (board-specific)
+4. Cite file:line where relevant
+5. Max 250 tokens output
+
+Board skills provide the specific prompt with their framing field definitions (e.g., frontend-design-board provides Phase 1 and Phase 2 framing templates).
 
 ### Hypothesize (Round 2+)
 
@@ -208,6 +220,10 @@ rm -f /tmp/cx-critique-prompt.txt
 ### Fallback
 
 If codex CLI is not installed or fails at any phase, -cx members fall back to the normal member Grep protocol for that phase. Note in the entry: `(Codex unavailable: using Grep fallback)`
+
+### Model recommendation
+
+-cx members SHOULD be spawned with `model: "sonnet"` for cost efficiency. Their work is primarily Codex mediation (prompt construction → execution → transcription → ID assignment). Board skills specify the model when spawning -cx members via the Agent tool.
 
 Set Bash tool `timeout: 180000` (3 minutes) for all codex exec invocations.
 
