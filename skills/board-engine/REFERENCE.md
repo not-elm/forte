@@ -177,10 +177,40 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 
 ### synthesize
 
-- **Incremental read protocol (replaces full WHITEBOARD read):**
-  1. Read WHITEBOARD-R{N}.md in full (current round's entries only — bounded size).
-  2. Read previous `## Evidence Map` and `## Draft Conclusion` from SYNTHESIS.md (cumulative summary of all prior rounds).
-  3. For any `refs=[]` in current round entries that reference older rounds, Grep by entry ID on the specific WHITEBOARD-R{X}.md. Do NOT read older round files in full.
+- **2-pass protocol (reduces leader token consumption):**
+  - **Pass 1 — Structured extraction (Sonnet subagent):** Leader spawns a subagent with `model: "sonnet"` to read WHITEBOARD-R{N}.md and extract structured data:
+    ```
+    Agent(model: "sonnet", prompt: "
+      Read {path}/WHITEBOARD-R{N}.md and extract:
+
+      ## Hypotheses
+      For each hypothesis entry:
+      - id: [H-X-001]
+      - author: {member-name}
+      - axis: {tags}
+      - claim: {1-sentence summary}
+      - key_detail: {most important specific detail}
+
+      ## Critiques
+      For each critique entry:
+      - id: [CR-X-R{N}-001]
+      - author: {member-name}
+      - label: challenge|support|amend|question
+      - target: refs=[...]
+      - claim: {1-sentence summary}
+
+      ## Audit (if present)
+      For each audited entry:
+      - id: {entry-id}
+      - verdict: ✅|⚠️|❌|❓
+      - note: {brief}
+
+      Output as structured text. Include ALL entries — do not skip any.
+      Verify: count of hypotheses = {expected}, count of critiques = {expected}
+    ")
+    ```
+  - **Pass 2 — Integration (Leader, Opus):** Leader reads the Pass 1 structured output (~500 tokens) + previous `## Evidence Map` and `## Draft Conclusion` from SYNTHESIS.md (cumulative summary of all prior rounds). For any `refs=[]` that reference older rounds, Grep by entry ID on the specific WHITEBOARD-R{X}.md.
+  - **Fallback:** If Pass 1 extraction is incomplete (entry count mismatch, missing IDs), leader falls back to reading WHITEBOARD-R{N}.md directly (original protocol).
 - Writes updated Evidence Map + Draft Conclusion in SYNTHESIS.md (cumulative — incorporates both prior synthesis and current round findings).
 - Writes `## Round Context Packet` → `### Round {N}` as a compact handoff for next-round members.
 - Round 2+: add entry ID → summary mapping table in SYNTHESIS.md for members to reference efficiently.
