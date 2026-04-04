@@ -246,7 +246,7 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 - Invoke `forte:team-composer` with:
   - `topic`: the design topic
   - `team_name`: generate a kebab-case `{discussion-id}`
-  - `role_count`: `"3-6"`
+  - `role_count`: `"3-4"`
   - `constraints`: `["a11y non-negotiable axis"]`
   - `domain_hints`: extracted from user answers + design-domain seed axes (美的方向性, ユーザビリティ vs 表現性, パフォーマンス vs リッチネス, ブランド一貫性 vs 革新性)
 - After team-composer completes (Handoff Contract received):

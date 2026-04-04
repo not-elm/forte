@@ -137,7 +137,7 @@ All other entry formats (Evidence Map, Completion Report, Audit Table, Revision,
 - Invoke `forte:team-composer` with:
   - `topic`: the design topic
   - `team_name`: generate a kebab-case `{discussion-id}` from the design topic (e.g., `auth-system-design`)
-  - `role_count`: `"3-6"`
+  - `role_count`: `"3-4"`
 - Roles should cover both technology evaluation AND implementation design perspectives (same team serves both phases).
 - After team-composer completes (Handoff Contract received):
   - Create `docs/discussions/{discussion-id}/phase-1/WHITEBOARD.md` + `SYNTHESIS.md` using templates.

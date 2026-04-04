@@ -164,7 +164,7 @@ Standard debate cycle (hypothesize, critique, audit, revise, synthesize, ratify)
 ### setup
 
 - Load board-engine REFERENCE.md.
-- Invoke `forte:team-composer`: `topic` = bug description, `team_name` = kebab-case `{investigation-id}`, `role_count` = `"3-6"`.
+- Invoke `forte:team-composer`: `topic` = bug description, `team_name` = kebab-case `{investigation-id}`, `role_count` = `"3-4"`.
 - After team-composer completes:
   - Create `docs/investigations/{investigation-id}/WHITEBOARD.md` + `SYNTHESIS.md` using templates.
   - Do NOT create per-round files yet.
