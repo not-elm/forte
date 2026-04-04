@@ -102,7 +102,7 @@ Leader presents Phase 2 specification as a UI mockup via the visual companion se
 - Include: design tokens applied to components, responsive demo, theme switching (light/dark/high-contrast), motion preview
 - User choices: "Approve specification" or "Provide feedback" (via AskUserQuestion in terminal)
 - If user provides feedback (Phase 2 scope): Leader records feedback in phase-2/SYNTHESIS.md `## User Feedback History`, increments Feedback Cycle, re-enters Phase 2 hypothesize. Loop until approved.
-- If user feedback requires Phase 1 direction change: Leader presents escalation confirmation to user, and if confirmed, suspends conflict rule #11, discards Phase 2 files, re-enters Phase 1 hypothesize with feedback as constraint.
+- If user feedback requires Phase 1 direction change: Leader presents escalation confirmation to user, and if confirmed, suspends conflict rule #12, discards Phase 2 files, re-enters Phase 1 hypothesize with feedback as constraint.
 - No skip option — user confirmation is mandatory
 
 ## Board-Specific Entry Formats
@@ -253,12 +253,26 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
   - Ensure `docs/discussions/` is in `.gitignore`.
   - Spawn all members with frontend-design-board-specific prompts:
     - Normal members: discipline + expected contribution as briefing.
-    - `-cx` members: same briefing + codex exec exploration template (see team-composer skill for template).
+    - `-cx` members: same briefing + codex exec exploration template (see team-composer skill for template) + `model: "sonnet"`.
   - **Lean role briefing policy:** For recurring broadcasts (hypothesize/critique/revise/re-entry), restate only discipline + expected contribution. This minimizes token overhead while preserving role separation.
 
 ### Phase 1: framing
 
-- Members use full base WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- Normal members use full base WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- -cx members use Codex framing template:
+  ```
+  Read the base WHITEBOARD at {absolute-path}/phase-1/WHITEBOARD.md.
+
+  From a {role-description} perspective, provide Phase 1 framing:
+  - Purpose: what problem this interface solves and who uses it
+  - Aesthetic Instinct: initial direction about tone/mood
+  - Target User: who the design serves
+  - Constraints: technical requirements relevant to your expertise
+  - Unknowns: open questions from your discipline
+
+  Analyze the codebase for relevant constraints. Cite file:line.
+  Output: structured framing fields only, max 250 tokens.
+  ```
 - After framing completes, base WHITEBOARD.md becomes **read-only** for the remainder of Phase 1.
 - Leader combines completion confirmation + hypothesize kickoff in 1 broadcast.
 - Framing should focus on design context: purpose, aesthetic instincts, target user, constraints.
@@ -335,6 +349,20 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 
 - **Context injection (Push-based):** Leader reads phase-1/SYNTHESIS.md, extracts Direction Conclusion, and includes it in the framing broadcast. Members do NOT read phase-1/ files directly.
 - If user provided feedback during user-review-1, include the final approved direction and any feedback that shaped it as additional context.
+- Normal members use full base WHITEBOARD.md Read.
+- -cx members use Codex framing template:
+  ```
+  Read the base WHITEBOARD at {absolute-path}/phase-2/WHITEBOARD.md.
+
+  From a {role-description} perspective, provide Phase 2 framing:
+  - Scope: what this specification covers
+  - Direction Constraints: from Phase 1 conclusions (included in WHITEBOARD)
+  - Acceptance Criteria: what makes a good specification
+  - Unknowns: open questions about specification details
+
+  Analyze the codebase for relevant constraints. Cite file:line.
+  Output: structured framing fields only, max 250 tokens.
+  ```
 - Framing should focus on specification scope, acceptance criteria, and which token categories to define.
 - After framing completes, base WHITEBOARD.md becomes **read-only** for the remainder of Phase 2.
 
@@ -396,7 +424,7 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
      1. はい、Phase 1 から再議論する
      2. いいえ、Phase 2 の範囲内で対応する
      ```
-     - If user confirms Phase 1 escalation: suspend conflict rule #11, delete phase-2/ directory (new Phase 2 will be created after Phase 1 re-approval), record escalation in phase-1/SYNTHESIS.md User Feedback History, re-enter Phase 1 hypothesize with feedback as constraint.
+     - If user confirms Phase 1 escalation: suspend conflict rule #12, delete phase-2/ directory (new Phase 2 will be created after Phase 1 re-approval), record escalation in phase-1/SYNTHESIS.md User Feedback History, re-enter Phase 1 hypothesize with feedback as constraint.
      - If user chooses Phase 2 scope: proceed with Phase 2 internal feedback flow.
 
 ### concluded
