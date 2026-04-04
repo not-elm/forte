@@ -267,14 +267,14 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 
 - Leader creates WHITEBOARD-R{N}.md in phase-1/ at the start of each round.
 - **Independent generation (Round 1, Feedback Cycle 1 only):** Members generate hypotheses WITHOUT reading other members' entries. Each member receives only the topic and their own role briefing (discipline + expected contribution). This eliminates first-mover anchoring. Subsequent feedback cycles allow reading existing entries.
-- Each member aims for 1-3 hypotheses about design direction. Hypotheses are linguistic (mood, tone, references). No code snippets in Phase 1.
+- Each member aims for **1-2 hypotheses** about design direction. Hypotheses are linguistic (mood, tone, references). No code snippets in Phase 1.
 - Each hypothesis MUST include at least one `axis=` tag.
 - **Feedback re-entry:** When re-entering hypothesize from user-review-1 feedback, the broadcast includes user feedback as a new constraint. Members write new hypotheses in a new WHITEBOARD-R{N}.md file (round number continues monotonically). Previous round files remain read-only.
 
 ### Phase 1: critique
 
-- Members read the current round's WHITEBOARD-R{N}.md `## Hypotheses` section.
-- Each member writes at most 2 critiques per round, prioritizing highest-risk disagreements.
+- ID-index protocol from board-engine REFERENCE.md applies. Leader builds ID-index and assigns hypotheses.
+- Each member writes at most **1 critique per round**, prioritizing highest-risk disagreements.
 - **Feldman template encouraged** (記述→分析→解釈→判断) but not enforced.
 
 ### Phase 1: synthesize
@@ -414,7 +414,7 @@ Rules 1-10 from board-engine REFERENCE.md apply. Additional board-specific rules
 
 | # | Rule | Rationale |
 |---|------|-----------|
-| 11 | Phase 1 files are read-only during Phase 2 (suspended during Phase 2 → Phase 1 escalation) | Prevents retroactive modification of settled design direction. Suspension requires explicit user confirmation via escalation flow in user-review-2. When suspended: Phase 2 files are discarded, Phase 1 re-enters hypothesize, rule reinstates when new Phase 2 begins. |
+| 12 | Phase 1 files are read-only during Phase 2 (suspended during Phase 2 → Phase 1 escalation) | Prevents retroactive modification of settled design direction. Suspension requires explicit user confirmation via escalation flow in user-review-2. When suspended: Phase 2 files are discarded, Phase 1 re-enters hypothesize, rule reinstates when new Phase 2 begins. |
 
 ## Visual Companion
 
