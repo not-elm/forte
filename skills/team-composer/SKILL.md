@@ -25,6 +25,8 @@ Compose a team for structured board discussions. Analyzes the topic, generates a
 | `role_count` | No | `"3-6"` | Role count range |
 | `domain_hints` | No | — | Domains to include (e.g., `"security, performance"`) |
 | `constraints` | No | — | Board-specific constraint list. Natural language; interpreted as domain inclusion/exclusion rules (e.g., `["a11y non-negotiable axis"]` → must include a11y domain) |
+| `lean` | No | `"no"` | `"yes"` for lean mode: fewer roles (3-4), single-pass approval, compact output. Reduces setup token consumption |
+| `cx` | No | `"yes"` | `"yes"` for always-doubling (normal + -cx per role). `"no"` for normal members only (halves team size, no codex exec) |
 
 ## Output (Handoff Contract)
 
@@ -49,19 +51,21 @@ The calling board skill uses this to spawn members with board-specific prompts.
 
 ## Member Composition Rules
 
-### Always-Doubling
+### Doubling (controlled by `cx` parameter)
 
-Each role gets exactly 2 members:
+When `cx: "yes"` (default), each role gets 2 members:
 
 - **Normal member** (`{role-name}`): Participates in discussion directly
 - **-cx member** (`{role-name}-cx`): Runs `codex exec` to explore the topic from their role's perspective before participating, bringing Codex-informed insights
 
-| Role Count | Total Members |
-|------------|--------------|
-| 3 | 6 |
-| 4 | 8 |
-| 5 | 10 |
-| 6 | 12 |
+When `cx: "no"`, each role gets 1 member (normal only). No -cx members are created.
+
+| Role Count | cx: "yes" | cx: "no" |
+|------------|-----------|----------|
+| 3 | 6 | 3 |
+| 4 | 8 | 4 |
+| 5 | 10 | 5 |
+| 6 | 12 | 6 |
 
 ### Entry ID Initial Rule
 
@@ -84,6 +88,17 @@ Each role gets exactly 2 members:
 Do not include an "Audit" or "Auditor" role. Audit is handled by the board leader during round flow.
 
 ## Workflow
+
+### Lean Mode
+
+When `lean: "yes"`, the workflow is simplified for reduced token consumption:
+
+1. **Role count** defaults to 3-4 (ignoring `role_count` if wider range specified).
+2. **Single-pass proposal**: Phase 1 (Expertise Map) and Phase 2 (Role Generation) are merged into one step. Leader generates roles directly without separate domain analysis.
+3. **Single approval**: Present roles once. No re-presentation loop. If user wants changes, accept free-text modifications and apply directly.
+4. **Compact Handoff Contract**: Omit Expertise Map from output (roles + member table only).
+
+When `lean: "no"` (default), use the standard multi-phase workflow below.
 
 ### Phase 1: Expertise Map Generation
 
@@ -108,9 +123,9 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
    - **Expected contribution**: Concrete contribution to the discussion.
 2. Ensure normal member initials are unique within the team.
    - If collision is unavoidable with meaningful names, use first 2 letters as fallback.
-3. Generate the member list (doubling applied):
+3. Generate the member list:
    - `{role-name}` (normal, initial = first letter or 2-letter fallback)
-   - `{role-name}-cx` (cx, initial = normal initial + `X`)
+   - If `cx: "yes"`: also `{role-name}-cx` (cx, initial = normal initial + `X`)
 
 ### Phase 3: User Approval
 
@@ -135,7 +150,7 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
 
 ### Phase 4: TeamCreate
 
-1. Execute TeamCreate with `team_name` and all member names (normal + -cx).
+1. Execute TeamCreate with `team_name` and all member names (normal, and -cx if `cx: "yes"`).
 2. Output the Handoff Contract (see Output section above).
 3. team-composer skill completes. Control returns to the calling board skill.
 
