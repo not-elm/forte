@@ -153,12 +153,12 @@ All other entry formats (Evidence Map, Completion Report, Audit Table, Revision,
 ### Phase 1: hypothesize
 
 - Members read all framings via full WHITEBOARD.md Read (~200 lines at this stage).
-- Each member aims for 2-5 hypotheses about technology choices, library candidates, or architecture patterns.
+- Each member aims for **1-3 hypotheses** about technology choices, library candidates, or architecture patterns.
 - Report completion using the Completion Report format.
 
 ### Phase 1: critique
 
-- **IMPORTANT**: Use 2-step Grep extraction when WHITEBOARD exceeds ~350 lines.
+- ID-index protocol from board-engine REFERENCE.md applies. Leader builds ID-index and assigns hypotheses.
 - Members must label each critique: challenge/support/amend/question.
 - Cite refs=[] and @member for every entry.
 
