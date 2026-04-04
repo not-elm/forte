@@ -1,6 +1,6 @@
 # Board Engine — Shared Debate Reference
 
-Common rules for all board-type skills (discussion-board, design-board, investigation-board, frontend-design-board). Each board skill reads this file at setup and may override specific sections.
+Common rules for all board-type skills (discussion-board, design-board, investigation-board, frontend-design-board). **Read at framing kickoff** (not at setup — use `SETUP.md` for setup phase). Board skills may override specific sections.
 
 ---
 
