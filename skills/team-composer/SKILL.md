@@ -139,11 +139,15 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
 2. Output the Handoff Contract (see Output section above).
 3. team-composer skill completes. Control returns to the calling board skill.
 
-## -cx Member: codex exec Prompt Template
+## -cx Member: Codex-Mediated Protocol
+
+-cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep discussion files (WHITEBOARD-R{N}.md, SYNTHESIS.md) during debate rounds. Exceptions: framing phase (base WHITEBOARD.md is small), hypothesize Round 1 (independent generation, no reads needed). If codex CLI is unavailable, fall back to normal member Grep protocol.
+
+### Setup exploration (initial codebase scan)
 
 Board skills include this template in the spawn prompt for `-cx` members:
 
-```
+````
 Before participating in the discussion, run a Codex exploration:
 
 1. Write the following prompt to a temp file:
@@ -163,9 +167,49 @@ Before participating in the discussion, run a Codex exploration:
 
 If codex CLI is not installed or fails, participate without Codex findings.
 Note this in your first entry: (Codex exploration skipped: CLI not available)
+````
+
+### Hypothesize (Round 2+)
+
+```bash
+cat <<'PROMPT_EOF' > /tmp/cx-hypothesize-prompt.txt
+Read the following file and extract the Round Context Packet:
+- {absolute-path}/phase-{N}/SYNTHESIS.md (read ## Round Context Packet → ### Round {N-1})
+
+From a {role-description} perspective regarding: {topic}
+Generate 1-2 hypotheses based on the discussion context + codebase analysis.
+Include axis= tags. Cite file:line references where relevant.
+Output: hypothesis entries only, max 300 tokens.
+PROMPT_EOF
+cat /tmp/cx-hypothesize-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+rm -f /tmp/cx-hypothesize-prompt.txt
 ```
 
-Set Bash tool `timeout: 180000` (3 minutes) for the codex exec invocation.
+### Critique
+
+```bash
+cat <<'PROMPT_EOF' > /tmp/cx-critique-prompt.txt
+Read the following entries from {absolute-path}/phase-{N}/WHITEBOARD-R{round}.md:
+- Grep for: {assigned-ID-1}, {assigned-ID-2}
+
+From a {role-description} perspective, critique these hypotheses.
+Each critique must include: label (challenge/support/amend/question), refs=[...], @{member}, axis={tag}.
+Verify claims against the codebase where possible. Cite file:line as evidence.
+Output: critique entries only, max 250 tokens.
+PROMPT_EOF
+cat /tmp/cx-critique-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+rm -f /tmp/cx-critique-prompt.txt
+```
+
+### Transcription rule
+
+-cx members transcribe Codex output directly into their `### {name}` subsection. Only ID assignment (e.g., `[H-{P}-{I}X-{seq}]`, `[CR-{P}-{I}X-R{N}-{seq}]`) is performed by the -cx member. Content is not re-interpreted or summarized by Claude.
+
+### Fallback
+
+If codex CLI is not installed or fails at any phase, -cx members fall back to the normal member Grep protocol for that phase. Note in the entry: `(Codex unavailable: using Grep fallback)`
+
+Set Bash tool `timeout: 180000` (3 minutes) for all codex exec invocations.
 
 ## Error Handling
 
