@@ -44,15 +44,19 @@ The following are explicitly outside this skill's scope:
 
 ## Shared Debate Engine
 
-**At setup, leader MUST read the shared reference:**
+**At setup, leader reads the lightweight setup reference:**
+1. Use `Glob pattern="**/board-engine/SETUP.md"` to locate the file
+2. Read the found file path (file model, round numbering, setup checklist)
+
+**At framing kickoff, leader reads the full debate reference:**
 1. Use `Glob pattern="**/board-engine/REFERENCE.md"` to locate the file
 2. Read the found file path
 3. If Glob returns no results, use fallback path: `../board-engine/REFERENCE.md` relative to this skill's base directory
 
-**If Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
-`> Warning: board-engine/REFERENCE.md not found. Using inline rules only.`
+**If either Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
+`> Warning: board-engine reference not found. Using inline rules only.`
 
-This provides: round-split WHITEBOARD model, standard debate cycle (hypothesize → critique → audit → revise → synthesize → ratify), entry formats, and shared rules (conflict prevention, ratification, communication, timeout). Board-specific overrides below take precedence.
+SETUP.md provides: file model and round numbering. REFERENCE.md provides: full debate cycle, entry formats, and shared rules. Board-specific overrides below take precedence.
 
 ## Phase Model
 
@@ -258,6 +262,7 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 
 ### Phase 1: framing
 
+- **Leader reads board-engine REFERENCE.md** at framing kickoff (if not already read).
 - Normal members use full base WHITEBOARD.md Read (file is small, ~100 lines at this stage).
 - -cx members use Codex framing template:
   ```

@@ -30,15 +30,18 @@ Produce a concrete implementation plan through structured 2-phase team debate: P
 
 ## Shared Debate Engine
 
-**At setup, leader MUST read the shared reference:**
+**At setup, leader reads the lightweight setup reference:**
+1. Use `Glob pattern="**/board-engine/SETUP.md"` to locate the file
+2. Read the found file path (file model, round numbering, setup checklist)
+
+**At framing kickoff, leader reads the full debate reference:**
 1. Use `Glob pattern="**/board-engine/REFERENCE.md"` to locate the file
 2. Read the found file path
-3. If Glob returns no results, use fallback path: `../board-engine/REFERENCE.md` relative to this skill's base directory
 
-**If Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
-`> Warning: board-engine/REFERENCE.md not found. Using inline rules only.`
+**If either Read fails:** Proceed without the reference, but log warning in SYNTHESIS.md status line:
+`> Warning: board-engine reference not found. Using inline rules only.`
 
-This provides: round-split WHITEBOARD model, standard debate cycle (hypothesize → critique → audit → revise → synthesize → ratify), entry formats, and shared rules (conflict prevention, ratification, communication, timeout). Board-specific overrides below take precedence.
+SETUP.md provides: file model and round numbering. REFERENCE.md provides: full debate cycle, entry formats, and shared rules. Board-specific overrides below take precedence.
 
 ## Phase Model
 
@@ -146,7 +149,9 @@ All other entry formats (Evidence Map, Completion Report, Audit Table, Revision,
 
 ### Phase 1: framing
 
-- Members use full WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- **Leader reads board-engine REFERENCE.md** at framing kickoff (if not already read).
+- Normal members use full WHITEBOARD.md Read (file is small, ~100 lines at this stage).
+- -cx members use Codex framing template (see team-composer Codex-Mediated Protocol).
 - Leader combines completion confirmation + hypothesize kickoff in 1 broadcast to reduce round-trips.
 - Framing should focus on technology landscape, constraints, and evaluation criteria.
 
