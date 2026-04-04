@@ -189,6 +189,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 ### ratify
 
 - Votes via SendMessage (NOT file writes): `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}`
+- **Ratify broadcast MUST include conclusion summary** (~100-150 tokens): the current Draft Conclusion or equivalent from SYNTHESIS.md, so -cx members (who cannot read SYNTHESIS.md directly) can vote meaningfully.
 - Simple majority: ⌊N/2⌋ + 1 required to ratify.
 - If not ratified and rounds remain: incorporate push-back, leader creates WHITEBOARD-R{N+1}.md, start next hypothesize phase.
 
@@ -308,7 +309,7 @@ Granularity: one row per hypothesis or critique entry (by entry ID), not per sen
 | 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 9 | Base WHITEBOARD.md is read-only after its initial phases complete | Prevents retroactive modification; keeps base file small |
 | 10 | Older round files (WHITEBOARD-R{X}.md where X < current) are read-only; only current round file is writable | Prevents cross-round write conflicts; enforces incremental synthesis |
-| 11 | `-cx` members MUST NOT directly Read or Grep discussion files (WHITEBOARD-R{N}.md, SYNTHESIS.md) during debate rounds (hypothesize R2+, critique, revise). They interact with these files exclusively through codex exec. Exceptions: framing phase (base WHITEBOARD.md), hypothesize Round 1 (independent generation). Fallback: if codex CLI is unavailable, -cx members use normal member Grep protocol. | Shifts token consumption from Claude to Codex (separate billing) |
+| 11 | `-cx` members MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. They interact with these files exclusively through codex exec. Exception: hypothesize Round 1 (independent generation, no files to read). Fallback: if codex CLI is unavailable, -cx members use normal member protocol (full Read for framing, Grep for critique/revise). | Shifts token consumption from Claude to Codex (separate billing) |
 
 Board skills may add additional rules (e.g., phase-specific read-only rules, escalation rules).
 
