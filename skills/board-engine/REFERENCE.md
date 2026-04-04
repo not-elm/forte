@@ -70,17 +70,42 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
   3. If referencing specific entries from prior rounds, Grep by entry ID on WHITEBOARD-R{X}.md where X < N.
 - Do NOT read older round WHITEBOARD files in full — use targeted Grep by entry ID only.
 - **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution. This combats role collapse — the tendency of agents to drift toward consensus as rounds accumulate.
-- Each member aims for 2-5 hypotheses, each concrete and testable.
+- Each member aims for 1-3 hypotheses, each concrete and testable.
 - Report completion using the Completion Report format.
 
 ### critique
 
 - **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution.
-- Members read the current round's WHITEBOARD-R{N}.md `## Hypotheses` section.
-  - Since each round file contains only that round's entries, a full Read of WHITEBOARD-R{N}.md is acceptable (bounded size).
-  - To reference entries from prior rounds, Grep by entry ID on WHITEBOARD-R{X}.md where X < N. Do NOT read older round files in full.
+- **ID-index protocol (replaces full WHITEBOARD read):**
+  1. Leader reads WHITEBOARD-R{N}.md `## Hypotheses`, builds an ID-index, and assigns 2-3 hypothesis IDs per member in the critique broadcast.
+  2. ID-index format (per entry): `[H-X-001] axis={tags} — {1-line summary, max 20 words}`
+  3. Normal members Grep only their assigned IDs on WHITEBOARD-R{N}.md to get original text. Members MUST NOT Read the full file.
+  4. -cx members do NOT Grep. Instead, pass file path + assigned IDs to codex exec (see -cx Codex protocol in team-composer).
+- **Assignment rules:**
+  - Each member receives 2-3 IDs, prioritizing **cross-discipline** hypotheses (axis different from member's own).
+  - Members choose which assigned IDs to critique (up to their critique cap per round).
+  - All hypotheses covered by at least 1 member.
+  - Members are never assigned their own hypotheses.
+- **Critique broadcast format:**
+  ```
+  Phase {P} / Round {N} / Critique / WHITEBOARD-R{N}.md
+
+  ID-index:
+    [H-{P}-{I}-001] axis={tags} — {summary}
+    ...
+
+  Assignments:
+    {member-name}: critique {ID-1}, {ID-2}
+    {member-name}-cx: codex critique {ID-1}, {ID-2}
+    ...
+
+  Discipline: {discipline}. Expected contribution: {contribution}.
+  Max {critique-cap} critiques this round. Choose which assigned IDs to critique.
+  ```
+- To reference entries from prior rounds, Grep by entry ID on WHITEBOARD-R{X}.md where X < N. Do NOT read older round files in full.
 - Members must label each critique: `**challenge**` / `**support**` / `**amend**` / `**question**`.
 - Cite `refs=[...]` and `@{member}` for every entry.
+- Each member writes at most **2 critiques per round** (default; board skills may override).
 - Round 2+: read both `## Draft Conclusion` and latest `## Round Context Packet` in SYNTHESIS.md before writing.
 - Report completion using the Completion Report format.
 
@@ -283,6 +308,7 @@ Granularity: one row per hypothesis or critique entry (by entry ID), not per sen
 | 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 9 | Base WHITEBOARD.md is read-only after its initial phases complete | Prevents retroactive modification; keeps base file small |
 | 10 | Older round files (WHITEBOARD-R{X}.md where X < current) are read-only; only current round file is writable | Prevents cross-round write conflicts; enforces incremental synthesis |
+| 11 | `-cx` members MUST NOT directly Read or Grep discussion files (WHITEBOARD-R{N}.md, SYNTHESIS.md) during debate rounds (hypothesize R2+, critique, revise). They interact with these files exclusively through codex exec. Exceptions: framing phase (base WHITEBOARD.md), hypothesize Round 1 (independent generation). Fallback: if codex CLI is unavailable, -cx members use normal member Grep protocol. | Shifts token consumption from Claude to Codex (separate billing) |
 
 Board skills may add additional rules (e.g., phase-specific read-only rules, escalation rules).
 
