@@ -98,8 +98,6 @@ For the standard debate cycle phases (hypothesize, critique, audit, revise, synt
 - Invoke `forte:team-composer` with:
   - `topic`: the proposition
   - `team_name`: generate a kebab-case `{discussion-id}` from the proposition (e.g., `context-optimization`)
-  - `role_count`: `"3-4"`
-  - `domain_hints`: extracted from any pre-context given by user
 - After team-composer completes (Handoff Contract received):
   - Create `docs/discussions/{discussion-id}/WHITEBOARD.md` (base file) + `SYNTHESIS.md` using templates below.
   - Do NOT create per-round WHITEBOARD files yet — created at each round's hypothesize phase.

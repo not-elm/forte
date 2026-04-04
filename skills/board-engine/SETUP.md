@@ -41,7 +41,7 @@ Sections start empty. Board skills may add additional sections.
 
 ## Setup Checklist
 
-1. Invoke `forte:team-composer` with topic, team_name, role_count, domain_hints, constraints
+1. Invoke `forte:team-composer` with topic, team_name, and constraints (if any)
 2. After Handoff Contract received: create working directory with base WHITEBOARD.md + SYNTHESIS.md
 3. Spawn members (normal + -cx) with board-specific prompts
 4. At framing kickoff: read `REFERENCE.md` for full debate rules

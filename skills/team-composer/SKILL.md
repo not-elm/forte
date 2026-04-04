@@ -22,8 +22,6 @@ Compose a team for structured board discussions. Analyzes the topic, generates a
 |-----------|----------|---------|-------------|
 | `topic` | Yes | — | Discussion theme / design challenge / bug description |
 | `team_name` | Yes | — | kebab-case ID for TeamCreate |
-| `role_count` | No | `"3-4"` | Role count range |
-| `domain_hints` | No | — | Domains to include (e.g., `"security, performance"`) |
 | `constraints` | No | — | Board-specific constraint list. Natural language; interpreted as domain inclusion/exclusion rules (e.g., `["a11y non-negotiable axis"]` → must include a11y domain) |
 
 ## Output (Handoff Contract)
@@ -85,9 +83,9 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
 
 ### Phase 1: Role Generation
 
-1. Analyze `topic`, `domain_hints`, and `constraints` to identify relevant domains and generate roles directly.
+1. Analyze `topic` and `constraints` to identify relevant domains and generate 3-4 roles directly.
    - If `constraints` are provided: inclusion constraints MUST appear, exclusion constraints MUST NOT appear.
-   - Generate `role_count` roles (within the specified range). Each must be **directly relevant** to the topic.
+   - Generate 3-4 roles. Each must be **directly relevant** to the topic.
 2. Each role has:
    - **Role name**: kebab-case, 1-2 words (English). Must work as `### {name}` subsection header.
    - **Discipline**: The specific expertise this member brings.
@@ -108,7 +106,7 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
       > Expected contribution: {contribution}
       > Members: {role-name} ({initial}), {role-name}-cx ({initial}X)
 
-   Total: {role_count} roles, {role_count * 2} members
+   Total: {N} roles, {N * 2} members
 
    Add, remove, or modify roles as needed.
    ```
@@ -210,6 +208,5 @@ Set Bash tool `timeout: 180000` (3 minutes) for all codex exec invocations.
 
 ## Error Handling
 
-- If `constraints` reference a domain that conflicts with `domain_hints`, `constraints` take precedence.
-- If user requests more roles than `role_count` max allows, inform user and suggest increasing the range or consolidating.
-- If user requests fewer roles than `role_count` min, allow it (minimum 2 roles = 4 members).
+- If user requests more than 4 roles, inform user and suggest consolidating.
+- If user requests fewer roles, allow it (minimum 2 roles = 4 members).

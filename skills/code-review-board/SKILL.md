@@ -24,17 +24,11 @@ Perform comprehensive code review from 7 perspectives using parallel reviewer ag
 
 - `target` (required): File paths or directory paths to review (space-separated)
 - `--spec <path>` (optional): Specification document file path for spec compliance checks
-- `--perspectives <list>` (optional): Comma-separated list of perspectives to include or exclude. Prefix with `-` to exclude. Default: all applicable perspectives.
-- `--rounds <N>` (optional): Number of debate rounds. Default: 2. Set to 0 to skip debate phase entirely.
 
 **Examples:**
 ```
 /code-review src/api/
 /code-review src/api/ --spec docs/plans/api-design.md
-/code-review src/api/ --perspectives security,correctness,performance
-/code-review src/api/ --perspectives -codex-reviewer
-/code-review src/api/ --rounds 3
-/code-review src/api/ --rounds 0
 ```
 
 ## Core Principles
@@ -57,9 +51,9 @@ setup → reviewing → debating (N rounds) → resolving → synthesizing → r
 
 | Phase | Who Acts | What Happens |
 |-------|----------|--------------|
-| `setup` | Leader | Parse arguments (including `--rounds`), identify target files, create `docs/reviews/{review-id}/` directory with SYNTHESIS.md, WHITEBOARD.md, and `findings/` subdirectory, create team, spawn reviewers |
+| `setup` | Leader | Parse arguments, identify target files, create `docs/reviews/{review-id}/` directory with SYNTHESIS.md, WHITEBOARD.md, and `findings/` subdirectory, create team, spawn reviewers |
 | `reviewing` | All reviewers | Each reviewer analyzes code from their perspective, writes findings to `findings/{perspective}.md`, sends structured completion report to leader. Leader displays progress to user after each report. |
-| `debating` | All reviewers | Reviewers write reactions to other perspectives' findings in WHITEBOARD.md per-member write zones. Multiple rounds (default 2, configurable via `--rounds`). Leader manages round transitions. |
+| `debating` | All reviewers | Reviewers write reactions to other perspectives' findings in WHITEBOARD.md per-member write zones. 2 rounds. Leader manages round transitions. |
 | `resolving` | All reviewers | Each reviewer proposes solutions for confirmed findings in WHITEBOARD.md `## Solutions` section. Single pass. |
 | `synthesizing` | Leader only | Leader reads all `findings/*.md` and WHITEBOARD.md, applies debate tally, calibrates severity, deduplicates, consolidates solutions, computes scores, writes to SYNTHESIS.md |
 | `reporting` | Leader only | Leader generates Markdown report to `docs/reviews/YYYY-MM-DD-{target}-review.md` (with Solution lines and Debate Summary), displays terminal summary, deletes intermediate files |
@@ -136,12 +130,11 @@ Reviewers append findings using the Finding Format (see Entry ID System). No oth
 
 ### WHITEBOARD.md Template
 
-WHITEBOARD.md uses per-member write zones. Each reviewer writes only within their own `### {perspective}` subsection under `## Debate` and `## Solutions` sections. Reviewers add `#### Round 1`, `#### Round 2` headers within their own `### {perspective}` subsection. The leader creates this file during setup with sections for all active perspectives (after `--perspectives` filtering).
+WHITEBOARD.md uses per-member write zones. Each reviewer writes only within their own `### {perspective}` subsection under `## Debate` and `## Solutions` sections. Reviewers add `#### Round 1`, `#### Round 2` headers within their own `### {perspective}` subsection. The leader creates this file during setup with sections for all perspectives.
 
 ```markdown
 # WHITEBOARD — {review-id}
 > Target: {target paths}
-> Rounds: {N}
 
 ## Findings Summary
 
@@ -370,12 +363,9 @@ Each solution entry must reference one or more finding IDs it addresses.
  1. PARSE ARGS    → Parse the skill arguments:
                     - Extract target file/directory paths
                     - Extract --spec path (if provided)
-                    - Extract --perspectives list (if provided)
                     - Resolve all paths to absolute paths
                     - Validate that target paths exist
                     - List all files in target directories (recursively)
-                    - Apply --perspectives filter to Team Composition table
-                    - Extract --rounds N (default: 2)
                     - Generate review-id: YYYY-MM-DD-{target-name}
 
  2. CREATE FILES  → Create docs/reviews/{review-id}/ directory.
@@ -387,7 +377,7 @@ Each solution entry must reference one or more finding IDs it addresses.
  3. CREATE TEAM   → TeamCreate with team_name "code-review".
 
  4. SPAWN         → Spawn reviewer agents using the Agent tool with team_name "code-review".
-                    For each active reviewer (after --perspectives filtering), provide:
+                    For each reviewer, provide:
                     - Their perspective name and checklist (from Reviewer Responsibilities below)
                     - Their individual finding file path: docs/reviews/{review-id}/findings/{perspective}.md
                     - The list of target files to review
@@ -398,8 +388,6 @@ Each solution entry must reference one or more finding IDs it addresses.
                       Write findings to your individual file at {finding-file-path}
                       using [R-XX-NNN] format. When done, send a structured completion
                       report to review-lead."
-
-                    Skip any perspectives excluded by --perspectives.
 
                     For codex-reviewer, additionally instruct:
                     - "Use the codex-review skill approach: build a Code Review prompt
@@ -426,25 +414,25 @@ Each solution entry must reference one or more finding IDs it addresses.
                        brief description — grouped by file).
                     c. Write findings summary to WHITEBOARD.md ## Findings Summary.
                     d. Broadcast to all reviewers:
-                       "DEBATE ROUND 1/{max_rounds}: Review the Findings Summary in
+                       "DEBATE ROUND 1/2: Review the Findings Summary in
                         WHITEBOARD.md. For each finding from other perspectives,
                         write your reaction in your ### {perspective} section under
                         ## Debate. Use format: [D-{XX}-R1-{NNN}] **agree|disagree|revise**
                         refs=[R-XX-NNN] | reason. Send completion report when done."
                     e. Wait for completion reports (reminder at 2 min, timeout at 3 min).
-                    f. Update SYNTHESIS.md Status: "debating (round 1/{max_rounds})"
+                    f. Update SYNTHESIS.md Status: "debating (round 1/2)"
 
                     For round 2+:
                     g. Read all ## Debate sections from WHITEBOARD.md.
                     h. Compose debate summary for the previous round (per-finding
                        tally of agree/disagree/revise with key arguments).
                     i. Broadcast to all reviewers:
-                       "DEBATE ROUND {N}/{max_rounds}: Previous round summary:
+                       "DEBATE ROUND {N}/2: Previous round summary:
                         {debate_summary}. Continue debating in your ### {perspective}
                         section. Add #### Round {N} header, then your entries.
                         Send completion report when done."
                     j. Wait for completion reports (reminder at 2 min, timeout at 3 min).
-                    k. Update SYNTHESIS.md Status: "debating (round {N}/{max_rounds})"
+                    k. Update SYNTHESIS.md Status: "debating (round {N}/2)"
 
                     After all rounds (or early termination):
                     l. Tally debate results per finding using Debate Tally Rules.
@@ -766,15 +754,12 @@ Full report: docs/reviews/{review-id}-review.md
 ```
 Target: src/api/
 Spec: docs/plans/api-design.md
-Rounds: 2 (default)
 
 === SETUP PHASE ===
 
 1. Leader parses arguments:
    - Target files: routes.ts, middleware.ts, types.ts
    - Spec: docs/plans/api-design.md
-   - --perspectives: not specified (all active)
-   - --rounds: 2 (default)
    - Review ID: 2026-03-01-api
 
 2. Leader creates docs/reviews/2026-03-01-api/ directory:
@@ -912,9 +897,7 @@ The old rule #5 ('Cross-review responses via SendMessage, not file writes') is r
 | Debate reviewer not responding after 2 min | Leader sends reminder |
 | Debate reviewer not responding after 3 min | Leader proceeds with available responses |
 | Resolving reviewer not responding after 3 min | Leader proceeds — solutions are optional |
-| `--rounds 0` specified | Skip debating phase entirely. All findings pass through at original severity (no debate-based calibration). In the resolving phase (step 7), skip step 7a (no tally to apply) and use the original findings list as the confirmed findings list for step 7b-c. |
 | All reviewers agree on all findings in round 1 | Leader ends debate early (skip remaining rounds) |
-| --perspectives specifies non-existent perspective | Warning to user, ignored. Valid perspectives proceed. |
 
 ---
 
