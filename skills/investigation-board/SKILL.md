@@ -200,7 +200,7 @@ Standard debate cycle (hypothesize, critique, audit, revise, synthesize, ratify)
 
 - **Layer 1** runs first: Read tool at +/-10 lines for every file:line citation. Record in Layer 1 table. May invalidate before Layer 2.
 - **Layer 2**: Shared audit from REFERENCE.md with investigation-specific Codex prompt.
-- Error: L1 file not found → ❓; L2 Codex error → skip L2, proceed with L1 only.
+- Error: L1 file not found → ❓; L2 Codex error → leader terminates the skill immediately. Clean up working directory and temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
 - All ✅/❓ both layers → skip revise; any ⚠️/❌ → revise.
 
 ### synthesize (override)

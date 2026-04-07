@@ -111,7 +111,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 
 ### audit
 
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If not available, skip audit phase entirely, log warning in SYNTHESIS.md status, and proceed to synthesize.
+- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If not available, leader terminates the skill immediately with error: "Codex CLI not installed. Run `npm i -g @openai/codex` and retry." Clean up working directory and temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
 - **Scope:** Audit only entries from the current round (new hypotheses + new critiques). Do NOT re-audit entries from prior rounds.
 - **Exclusion:** Skip opinions, value judgments, and forecasts — only fact-check verifiable factual claims.
 - Leader collects hypotheses and critiques from current round in WHITEBOARD-R{N}.md.
@@ -146,7 +146,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 - Set Bash tool `timeout: 180000` (3 minutes) for the Codex invocation.
 
 - **Error handling:**
-  - Codex exits non-zero or times out → record "Audit failed (Codex error)" in WHITEBOARD-R{N}.md `## Audit`, skip revise, proceed to synthesize with warning
+  - Codex exits non-zero or times out → leader terminates the skill immediately with error: "Codex execution failed (exit code {N} / timeout). Skill aborted." Clean up working directory and temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
   - Codex returns partial/malformed output → leader writes available results, marks incomplete entries as ❓
 
 - **Decision logic:**
@@ -339,7 +339,7 @@ Granularity: one row per hypothesis or critique entry (by entry ID), not per sen
 | 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 9 | Base WHITEBOARD.md is read-only after its initial phases complete | Prevents retroactive modification; keeps base file small |
 | 10 | Older round files (WHITEBOARD-R{X}.md where X < current) are read-only; only current round file is writable | Prevents cross-round write conflicts; enforces incremental synthesis |
-| 11 | `-cx` members MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. They interact with these files exclusively through codex exec. Exception: hypothesize Round 1 (independent generation, no files to read). Fallback: if codex CLI is unavailable, -cx members use normal member protocol (full Read for framing, Grep for critique/revise). | Shifts token consumption from Claude to Codex (separate billing) |
+| 11 | `-cx` members MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. They interact with these files exclusively through codex exec. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable or fails, -cx member reports failure to leader via SendMessage: "Codex failed at {phase}." Leader terminates the skill immediately. | Shifts token consumption from Claude to Codex (separate billing); fail-fast prevents context waste |
 
 Board skills may add additional rules (e.g., phase-specific read-only rules, escalation rules).
 
@@ -376,10 +376,11 @@ Board skills may add additional rules (e.g., phase-specific read-only rules, esc
 | Member has not reported completion | Leader sends one reminder via SendMessage |
 | After reminder, still no response | Leader proceeds with available results (partial round) |
 | Missing ratification vote | Recorded as "not submitted"; threshold recalculated as ⌊voting_count/2⌋ + 1 |
+| -cx member reports Codex failure | Leader terminates skill immediately (no fallback). Clean up working directory and temp files |
 
 ### Audit Notes
 
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, skip audit, record warning in SYNTHESIS.md status line, and proceed to synthesize.
+- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, terminate skill immediately (same as audit phase prerequisite above).
 - **Do NOT audit opinions or forecasts** — only verifiable factual claims
 - **Audit is incremental** — each round audits only new entries, not the full history
 - **Revisions are append-only** — never edit the original hypothesis or critique text

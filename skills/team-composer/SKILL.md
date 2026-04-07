@@ -120,7 +120,7 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
 
 ## -cx Member: Codex-Mediated Protocol
 
--cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable, fall back to normal member protocol (full Read for framing, Grep for critique/revise).
+-cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable or fails, report failure to leader via SendMessage. Leader terminates the skill immediately.
 
 ### Setup exploration (initial codebase scan)
 
@@ -144,8 +144,8 @@ Before participating in the discussion, run a Codex exploration:
 3. Use the findings as your unique perspective when writing hypotheses and critiques.
    Reference Codex findings with [codex-explored] label.
 
-If codex CLI is not installed or fails, participate without Codex findings.
-Note this in your first entry: (Codex exploration skipped: CLI not available)
+If codex CLI is not installed or fails, report failure to leader via SendMessage: "Codex CLI unavailable."
+Leader terminates the skill with error message to user.
 ````
 
 ### Framing
@@ -196,9 +196,10 @@ rm -f /tmp/cx-critique-prompt.txt
 
 -cx members transcribe Codex output directly into their `### {name}` subsection. Only ID assignment (e.g., `[H-{P}-{I}X-{seq}]`, `[CR-{P}-{I}X-R{N}-{seq}]`) is performed by the -cx member. Content is not re-interpreted or summarized by Claude.
 
-### Fallback
+### Codex Failure
 
-If codex CLI is not installed or fails at any phase, -cx members fall back to the normal member Grep protocol for that phase. Note in the entry: `(Codex unavailable: using Grep fallback)`
+If codex CLI is not installed or fails at any phase, -cx member reports failure to leader via SendMessage: "Codex failed at {phase}. Skill must terminate."
+Leader terminates the skill immediately. Clean up: delete working directory if it exists, remove temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
 
 ### Model recommendation
 
