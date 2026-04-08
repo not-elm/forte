@@ -112,7 +112,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 - **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If not available, leader terminates the skill immediately with error: "Codex CLI not installed. Run `npm i -g @openai/codex` and retry." Clean up working directory and temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
 - **Scope:** Audit only entries from the current round (new hypotheses + new critiques). Do NOT re-audit entries from prior rounds.
 - **Exclusion:** Skip opinions, value judgments, and forecasts — only fact-check verifiable factual claims.
-- Leader collects hypotheses and critiques from current round in WHITEBOARD-R{N}.md.
+- Leader collects hypotheses and critiques from current round via section-bounded Grep on WHITEBOARD-R{N}.md: `Grep pattern="^### " path=WHITEBOARD-R{N}.md` to get member subsection boundaries, then Read with `offset` and `limit` for `## Hypotheses` and `## Critique` sections only. Do NOT Read the full file — bounded extraction reduces leader context consumption by skipping the file header and `## Audit` section.
 - Leader builds a Codex prompt requesting fact-checking of each claim.
 - Prompt template:
 
