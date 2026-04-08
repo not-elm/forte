@@ -76,30 +76,28 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 ### critique
 
 - **Per-round role re-anchoring (compressed):** Critique broadcasts use a compact role tag per member: `[role:{discipline} | focus:{cue}]`. Minimum 8 tokens enforced. Full re-anchoring was already provided at hypothesize kickoff earlier in the same round.
-- **ID-index protocol (replaces full WHITEBOARD read):**
-  1. Leader reads WHITEBOARD-R{N}.md `## Hypotheses`, builds an ID-index, and assigns 2-3 hypothesis IDs per member in the critique broadcast.
+- **ID-index protocol (per-member targeted dispatch):**
+  1. Leader reads WHITEBOARD-R{N}.md `## Hypotheses`, builds an ID-index, and assigns 2-3 hypothesis IDs per member.
   2. ID-index format (per entry): `[H-X-001] axis={tags} — {1-line summary, max 20 words}`
-  3. Normal members Grep only their assigned IDs on WHITEBOARD-R{N}.md to get original text. Members MUST NOT Read the full file.
-  4. -cx members do NOT Grep. Instead, pass file path + assigned IDs to codex exec (see -cx Codex protocol in team-composer).
+  3. **Assertion guard (mandatory before dispatch):** Leader validates: (a) every hypothesis ID is assigned to at least 1 member (full coverage), (b) no member is assigned their own hypotheses. Duplicate assignments across members are permitted when `total hypotheses > N_members × 2` (necessary to achieve full coverage). If validation fails, leader fixes assignments before sending.
+  4. **Per-member targeted SendMessage (exception to broadcast rule):** For critique assignments only, leader sends one SendMessage per member containing ONLY that member's assignment. No member sees other members' assignments. All other phase transitions remain broadcast. (This is an explicit exception to Communication Rule "All leader → member instructions via broadcast".)
+  5. Normal members Grep only their assigned IDs on WHITEBOARD-R{N}.md to get original text. Members MUST NOT Read the full file.
+  6. -cx members do NOT Grep. Instead, pass file path + assigned IDs to codex exec (see -cx Codex protocol in team-composer).
 - **Assignment rules:**
   - Each member receives 2-3 IDs, prioritizing **cross-discipline** hypotheses (axis different from member's own).
   - Members choose which assigned IDs to critique (up to their critique cap per round).
   - All hypotheses covered by at least 1 member.
   - Members are never assigned their own hypotheses.
-- **Critique broadcast format:**
+- **Per-member critique message format:**
   ```
   Phase {P} / Round {N} / Critique / WHITEBOARD-R{N}.md
+  Total hypotheses: {total_count}
 
-  ID-index:
-    [H-{P}-{I}-001] axis={tags} — {summary}
-    ...
+  Your assignments: {ID-1}, {ID-2} [, {ID-3}]
+    {ID-1} axis={tags} — {summary}
+    {ID-2} axis={tags} — {summary}
 
-  Assignments:
-    {member-name}: critique {ID-1}, {ID-2}
-    {member-name}-cx: codex critique {ID-1}, {ID-2}
-    ...
-
-  Discipline: {discipline}. Expected contribution: {contribution}.
+  [role:{discipline} | focus:{cue}]
   Max {critique-cap} critiques this round. Choose which assigned IDs to critique.
   ```
 - To reference entries from prior rounds, Grep by entry ID on WHITEBOARD-R{X}.md where X < N. Do NOT read older round files in full.
@@ -364,7 +362,7 @@ Board skills may add additional rules (e.g., phase-specific read-only rules, esc
 
 ### Communication Rules
 
-- All leader → member instructions via **broadcast** (NOT individual SendMessage).
+- All leader → member instructions via **broadcast** (NOT individual SendMessage). **Exception:** Critique assignments use per-member targeted SendMessage to avoid cross-member payload duplication (see ID-index protocol).
 - Use structured short format: Phase / Round / Action / Format-ref (~80-120 tokens).
 - Combine phase transitions: completion confirmation + next phase instruction in 1 broadcast.
 - Round 2+ broadcasts should reference `Round Context Packet` and entry IDs instead of pasting long excerpts. Include the current round file name (WHITEBOARD-R{N}.md) so members know which file to write to.
