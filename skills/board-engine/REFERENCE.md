@@ -298,14 +298,15 @@ Written only when conclusion is ratified with dissent:
 
 ### Completion Report
 
-Members send this via SendMessage after each sub-phase:
+Members send this via SendMessage after each sub-phase (3 fields — optimized for minimal leader context consumption):
 
 ```
 Entries added: {N}
-Key insight: {most important finding}
-Current position: {view in one sentence}
-Remaining concerns: {description or "none"}
+Key insight: {most important finding, max 1 sentence}
+Blocking concern: {issue requiring leader action, or "none"}
 ```
+
+Note: Board skills may add extra fields (e.g., discussion-board adds `Evidence basis`). The 3-field base format is the minimum; additional fields are appended, not substituted.
 
 ### Audit Table + Verdict Rubric
 
