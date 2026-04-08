@@ -66,7 +66,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 - **Independent generation (Round 1 only):** Members generate hypotheses WITHOUT reading other members' entries. Each member receives only the topic and their own role briefing. This eliminates first-mover anchoring. All hypotheses are written to WHITEBOARD-R1.md simultaneously.
 - **Round 2+ context protocol (mandatory):**
   1. Read latest `## Round Context Packet` in SYNTHESIS.md first.
-  2. Read current round's WHITEBOARD-R{N}.md (empty or near-empty at this point).
+  2. **Leader-gated file read:** Before broadcast, leader runs `Grep pattern="^- \[H-" path=WHITEBOARD-R{N}.md` to check if any hypothesis entries exist. If no entries found (file has only template headings), step 2 is omitted from member instructions. If entries exist, members Read current round's WHITEBOARD-R{N}.md.
   3. If referencing specific entries from prior rounds, Grep by entry ID on WHITEBOARD-R{X}.md where X < N.
 - Do NOT read older round WHITEBOARD files in full — use targeted Grep by entry ID only.
 - **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution. This combats role collapse — the tendency of agents to drift toward consensus as rounds accumulate.
