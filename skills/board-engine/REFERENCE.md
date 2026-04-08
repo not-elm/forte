@@ -69,13 +69,13 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
   2. **Leader-gated file read:** Before broadcast, leader runs `Grep pattern="^- \[H-" path=WHITEBOARD-R{N}.md` to check if any hypothesis entries exist. If no entries found (file has only template headings), step 2 is omitted from member instructions. If entries exist, members Read current round's WHITEBOARD-R{N}.md.
   3. If referencing specific entries from prior rounds, Grep by entry ID on WHITEBOARD-R{X}.md where X < N.
 - Do NOT read older round WHITEBOARD files in full — use targeted Grep by entry ID only.
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution. This combats role collapse — the tendency of agents to drift toward consensus as rounds accumulate.
+- **Per-round role re-anchoring:** The hypothesize broadcast restates each member's role in compressed form: `Discipline: {discipline}. Focus: {2-3 word contribution cue}.` (~15 tokens per member). This is the most detailed re-anchoring per round; critique and revise phases use shorter tags (see below). Minimum 8 tokens per member enforced — if shorter, leader must expand before sending.
 - Each member aims for 1-3 hypotheses, each concrete and testable.
 - Report completion using the Completion Report format.
 
 ### critique
 
-- **Per-round role re-anchoring:** Every broadcast that kicks off this phase must restate each member's discipline and expected contribution.
+- **Per-round role re-anchoring (compressed):** Critique broadcasts use a compact role tag per member: `[role:{discipline} | focus:{cue}]`. Minimum 8 tokens enforced. Full re-anchoring was already provided at hypothesize kickoff earlier in the same round.
 - **ID-index protocol (replaces full WHITEBOARD read):**
   1. Leader reads WHITEBOARD-R{N}.md `## Hypotheses`, builds an ID-index, and assigns 2-3 hypothesis IDs per member in the critique broadcast.
   2. ID-index format (per entry): `[H-X-001] axis={tags} — {1-line summary, max 20 words}`
@@ -156,7 +156,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 ### revise
 
 - Only runs when audit found ⚠️ Partially accurate or ❌ Inaccurate entries.
-- **Per-round role re-anchoring:** The broadcast must restate each affected member's discipline and expected contribution alongside the audit findings.
+- **Per-round role re-anchoring (compressed):** The revise broadcast uses a compact role tag per affected member: `[role:{discipline} | focus:{cue}]`. Minimum 8 tokens enforced. Full re-anchoring was already provided at hypothesize kickoff earlier in the same round.
 - Leader broadcasts audit results and instructs affected members to review and correct their entries.
 - Affected members read only from WHITEBOARD-R{N}.md:
   1. `## Audit` section
