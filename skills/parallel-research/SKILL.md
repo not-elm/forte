@@ -127,11 +127,12 @@ Display a status message, then launch both investigations in a **single message*
 **Tool call 1 — Bash (Codex):**
 ```bash
 TMPFILE=$(mktemp /tmp/parallel-research-codex-XXXXXX.txt)
+trap 'rm -f "$TMPFILE"' EXIT
 cat <<'PROMPT_EOF' > "$TMPFILE"
 {codex_prompt}
 PROMPT_EOF
+# --ephemeral: skip session persistence (skills never resume sessions)
 cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
-rm -f "$TMPFILE"
 ```
 - Set Bash tool `timeout: 180000` (3 minutes)
 
