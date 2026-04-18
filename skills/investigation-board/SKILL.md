@@ -56,7 +56,7 @@ SETUP.md provides: file model and round numbering. REFERENCE.md provides: full d
 ## Phase Model
 
 ```
-setup → framing → evidence-gathering → [Round N: hypothesize → critique → audit (dual-layer) → revise → synthesize → ratify] → concluded
+setup → framing → evidence-gathering → [Round N: hypothesize → critique → audit (dual-layer) → revise → synthesize → user-checkpoint (if needed) → ratify] → concluded
 ```
 
 ## Board-Specific Entry Formats
@@ -284,6 +284,7 @@ Shared template from REFERENCE.md + `## Evidence Addendum`:
 ## Draft Conclusion
 ## Round Context Packet
 ## Ratification History
+## User Checkpoint
 ## Minority Report
 ## Final Conclusion
 ```
