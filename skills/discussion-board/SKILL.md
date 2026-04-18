@@ -47,7 +47,7 @@ SETUP.md provides: file model and round numbering. REFERENCE.md provides: full d
 ## Phase Model
 
 ```
-setup → framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] → concluded
+setup → framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → user-checkpoint (if needed) → ratify] → concluded
 ```
 
 | Phase | Who | What |
@@ -59,6 +59,7 @@ setup → framing → [Round N: hypothesize → critique → audit → revise (i
 | audit | Leader only | Codex CLI fact-check of current round; results to WHITEBOARD-R{N}.md `## Audit` |
 | revise | All members | Review audit findings, append corrections (skipped if no warnings/errors) |
 | synthesize | Leader only | Update Evidence Map + Draft Conclusion + Round Context Packet in SYNTHESIS.md |
+| user-checkpoint | Leader only | AskUserQuestion if trigger conditions match; record response (skipped if no triggers) |
 | ratify | All members | Vote accept or push-back via SendMessage. Simple majority ratifies |
 | concluded | Leader only | Record final conclusion (and Minority Report if dissent exists) |
 
@@ -173,6 +174,7 @@ Path: `docs/discussions/{discussion-id}/SYNTHESIS.md`
 ## Draft Conclusion
 ## Round Context Packet
 ## Ratification History
+## User Checkpoint
 ## Minority Report
 ## Final Conclusion
 ```
