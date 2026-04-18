@@ -15,6 +15,7 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 ## Direction Conclusion
 ## Round Context Packet
 ## Ratification History
+## User Checkpoint
 ## User Feedback History
 ```
 
@@ -31,6 +32,7 @@ Path: `docs/discussions/{discussion-id}/phase-{N}/SYNTHESIS.md`
 ## Draft Design Spec
 ## Round Context Packet
 ## Ratification History
+## User Checkpoint
 ## Minority Report
 ## User Feedback History
 ## Final Design Spec
