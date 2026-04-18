@@ -46,7 +46,7 @@ SETUP.md provides: file model and round numbering. REFERENCE.md provides: full d
 ## Phase Model
 
 ```
-setup → [Phase 1: framing → hypothesize → critique → synthesize] → user-review → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify] ] → concluded
+setup → [Phase 1: framing → hypothesize → critique → synthesize] → user-review → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → user-checkpoint (if needed) → ratify] ] → concluded
 ```
 
 ### Phase 1 — Technical Investigation (4 steps, NO audit/revise/ratify)
@@ -72,7 +72,7 @@ Leader presents Phase 1 conclusions to the user via AskUserQuestion:
 
 ### Phase 2 — Design (standard debate cycle with round-split)
 
-Uses the standard debate cycle from REFERENCE.md: `[Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify]`
+Uses the standard debate cycle from REFERENCE.md: `[Round N: hypothesize → critique → audit → revise (if needed) → synthesize → user-checkpoint (if needed) → ratify]`
 
 Phase 2 applies round-split WHITEBOARD:
 - **Base:** `phase-2/WHITEBOARD.md` — Topic + Framing (read-only after framing completes)
@@ -201,7 +201,7 @@ All other entry formats (Evidence Map, Completion Report, Audit Table, Revision,
 - If user provided feedback during user-review, include it as additional constraints.
 - Framing should focus on implementation scope, design constraints, and acceptance criteria.
 
-### Phase 2: debate cycle (hypothesize → critique → audit → revise → synthesize → ratify)
+### Phase 2: debate cycle (hypothesize → critique → audit → revise → synthesize → user-checkpoint → ratify)
 
 Uses standard debate cycle from REFERENCE.md with these design-board specifics:
 
@@ -209,6 +209,7 @@ Uses standard debate cycle from REFERENCE.md with these design-board specifics:
 - **audit:** Writes to `phase-2/WHITEBOARD-R{N}.md` `## Audit` section.
 - **synthesize:** Uses incremental read protocol from REFERENCE.md. Writes Evidence Map + Draft Design in phase-2/SYNTHESIS.md. Round 2+: add entry ID → summary mapping table.
 - **ratify:** If not ratified and rounds remain, incorporate push-back concerns into next round. Next round starts at `hypothesize` (leader creates WHITEBOARD-R{N+1}.md). If not ratified and max rounds exhausted: leader writes "best available design" in `## Final Design` with explicit uncertainty markers.
+- **user-checkpoint:** Phase 1 is excluded (no ratify loop; user-review serves as gate). Phase 2 applies all 6 trigger conditions from REFERENCE.md.
 
 ### concluded
 
@@ -320,6 +321,7 @@ Path: `docs/discussions/{discussion-id}/phase-2/SYNTHESIS.md`
 ## Draft Design
 ## Round Context Packet
 ## Ratification History
+## User Checkpoint
 ## Minority Report
 ## Final Design
 ```
