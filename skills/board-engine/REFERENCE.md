@@ -55,7 +55,7 @@ Sections start empty. Board skills may add additional sections (e.g., `## Eviden
 The core round loop shared by all boards:
 
 ```
-[Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify]
+[Round N: hypothesize → critique → audit → revise (if needed) → synthesize → user-checkpoint (if needed) → ratify]
 ```
 
 Board skills define what happens before (setup, framing, evidence-gathering) and after (concluded, export) this cycle.
@@ -215,6 +215,48 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
 - Round 2+: add entry ID → summary mapping table in SYNTHESIS.md for members to reference efficiently.
 - Guideline: "When in doubt about summary accuracy, members should Grep original text in the relevant WHITEBOARD-R{X}.md."
 
+### user-checkpoint
+
+- **Optional phase** — only runs when trigger conditions match. Skipped otherwise.
+- Leader evaluates the trigger condition checklist against SYNTHESIS.md artifacts (Draft Conclusion, Evidence Map, Round Context Packet) and WHITEBOARD-R{N}.md audit results immediately after synthesize completes.
+
+- **Trigger Condition Checklist** — execute user-checkpoint if one or more match:
+
+| # | Condition | Criteria | Example |
+|---|-----------|----------|---------|
+| 1 | **Domain requirement uncertainty** | The conclusion depends on user's business requirements or domain knowledge that the team cannot determine internally | "Is performance or UX the priority for this feature?" |
+| 2 | **Business trade-off judgment** | Multiple technically valid options exist and a business judgment is needed | "Accept increased cost for high availability?" |
+| 3 | **Unverified premise** | Facts underlying hypotheses cannot be verified by the team or audit, and only the user knows | "What is the actual concurrent connection count in production?" |
+| 4 | **Scope boundary ambiguity** | The scope of the conclusion is unclear and user intent confirmation is needed | "Can this change break backward compatibility of the existing API?" |
+| 5 | **Unresolvable member disagreement** | The same dispute persists in Round Context Packet's Open disputes for **2+ rounds** | "RDB vs NoSQL remains undecided for 2 consecutive rounds" |
+| 6 | **Process confidence degradation** | Audit failed, unresolved inaccuracies (❌/⚠️) remain after revise, or Draft Conclusion confidence is **low** | "Codex timed out, audit was skipped" |
+
+- Board skills may add board-specific conditions or disable specific conditions via override.
+
+- **Execution flow:**
+  1. Leader constructs questions from matched triggers and presents via AskUserQuestion (single call, all questions in numbered list).
+  2. AskUserQuestion format:
+     ```
+     Round {N} の統合結果について、以下の点を確認させてください。
+
+     1. {question}
+        背景: {why this needs user input, citing entry IDs}
+
+     2. {question}
+        背景: {why this needs user input, citing entry IDs}
+
+     回答後、チームの投票（ratify）に進みます。
+     方向転換が必要な場合はその旨お伝えください。
+     ```
+  3. Record response in SYNTHESIS.md `## User Checkpoint` → `### Round {N}` (see User Checkpoint Record format in Shared Entry Formats).
+  4. Branch on response:
+     - **Confirmation only** (no direction change needed) → include user response in ratify broadcast, proceed to `ratify`
+     - **Direction change needed** → skip `ratify`, create WHITEBOARD-R{N+1}.md, re-enter `hypothesize` with user response as new constraint in broadcast
+     - **Direction change criteria:** The user explicitly states a direction change is needed, OR the user's answer invalidates a key claim in the Draft Conclusion (leader judgment). When ambiguous, leader asks a follow-up: "この回答を踏まえて、現在の結論の方向で投票に進んでよいですか？"
+
+- **No timeout** — user is human, not an agent. Leader waits for response.
+- **No new conflict rules** — user-checkpoint is leader-only (AskUserQuestion + SYNTHESIS.md write), consistent with rule #2.
+
 ### ratify
 
 - Votes via SendMessage (NOT file writes): `RATIFY: accept — {reason}` or `RATIFY: push-back — {concerns}`
@@ -307,6 +349,19 @@ Blocking concern: {issue requiring leader action, or "none"}
 ```
 
 Note: Board skills may add extra fields (e.g., discussion-board adds `Evidence basis`). The 3-field base format is the minimum; additional fields are appended, not substituted.
+
+### User Checkpoint Record (Leader only)
+
+Written per-round when user-checkpoint fires. Stored in SYNTHESIS.md `## User Checkpoint`.
+
+```markdown
+## User Checkpoint
+### Round {N}
+- **Trigger:** {matched condition number(s) and name(s)}
+- **Questions:** {questions asked}
+- **Response:** {user's response verbatim}
+- **Action:** ratify / re-enter hypothesize with constraint: {constraint summary}
+```
 
 ### Audit Table + Verdict Rubric
 
