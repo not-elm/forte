@@ -61,7 +61,7 @@ SETUP.md provides: file model and round numbering. REFERENCE.md provides: full d
 ## Phase Model
 
 ```
-setup → [Phase 1: framing → [Round N: hypothesize → critique → synthesize → ratify]] → user-review-1 (moodboard ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → ratify]] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
+setup → [Phase 1: framing → [Round N: hypothesize → critique → synthesize → user-checkpoint (if needed) → ratify]] → user-review-1 (moodboard ⇄ Phase 1 hypothesize) → [Phase 2: framing → [Round N: hypothesize → critique → audit → revise (if needed) → synthesize → user-checkpoint (if needed) → ratify]] → user-review-2 (UI mockup ⇄ Phase 2 hypothesize) → concluded
 ```
 
 **Round numbering:** Round numbers are **monotonically increasing** across the entire discussion, never reset. Phase 1 feedback cycle 1 = R1, feedback cycle 2 = R2, Phase 2 starts at R3, etc. This prevents file naming collisions across feedback cycles.
@@ -76,9 +76,10 @@ setup → [Phase 1: framing → [Round N: hypothesize → critique → synthesiz
 | hypothesize | All members | Propose design directions: tone, mood, aesthetic stance, reference points |
 | critique | All members | Challenge/support/amend/question directions using design principles |
 | synthesize | Leader only | Read current round WHITEBOARD-R{N}.md + prior SYNTHESIS.md, write Evidence Map + Direction Conclusion |
+| user-checkpoint | Leader only | AskUserQuestion if trigger conditions match (condition 6 disabled — no audit in Phase 1); skipped if no triggers |
 | ratify | All voting members | Vote accept or push-back on design direction. Simple majority ratifies |
 
-**Phase 1 has NO audit or revise.** Aesthetic hypotheses are not fact-checkable. The debate cycle for Phase 1 is: hypothesize → critique → synthesize → ratify.
+**Phase 1 has NO audit or revise.** Aesthetic hypotheses are not fact-checkable. The debate cycle for Phase 1 is: hypothesize → critique → synthesize → user-checkpoint (if needed) → ratify. **user-checkpoint override:** Condition 6 (Process confidence degradation) is disabled in Phase 1 — no audit means no audit failure to detect.
 
 ### User Review 1 — Visual Moodboard (after Phase 1)
 
@@ -98,6 +99,7 @@ Leader presents Phase 1 direction as a visual moodboard via the visual companion
 | audit | Leader only | Run Codex CLI to fact-check: a11y (WCAG 2.1/2.2 AA), browser compat, performance (CLS/LCP). Aesthetic judgments excluded |
 | revise | All members (conditional) | Append corrections if audit found inaccuracies (skipped if all clean) |
 | synthesize | Leader only | Read current round WHITEBOARD-R{N}.md + prior SYNTHESIS.md, write Evidence Map + Draft Design Spec |
+| user-checkpoint | Leader only | AskUserQuestion if trigger conditions match; all 6 conditions apply (skipped if no triggers) |
 | ratify | All voting members | Vote accept or push-back via SendMessage. Simple majority ratifies |
 
 ### User Review 2 — Visual UI Mockup (after Phase 2)
