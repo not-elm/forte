@@ -203,7 +203,7 @@ cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
 
 **Both tool calls MUST be in the same message.**
 
-**Codex unavailable fallback:** If `codex` returns exit 127 or stderr contains "command not found", proceed with Claude Code Agent results only. Note this at the top of the final report.
+**Codex unavailable fallback:** If `codex` returns exit 127, stderr contains "command not found", or the Bash call times out, proceed with Claude Code Agent results only. Note this at the top of the final report. (See Error Handling table for the full failure matrix.)
 
 ### Phase 5: Synthesize Report
 
