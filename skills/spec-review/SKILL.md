@@ -9,7 +9,7 @@ description: >
 
 ## Overview
 
-Dispatch parallel reviews of a spec / design document to Codex CLI (codebase-grounded) and a Claude Code Agent (codebase + web), then synthesize a 4-axis report in the terminal. Two AI perspectives on the same spec, combined into one coherent review.
+Dispatch parallel reviews of a spec / design document to Codex CLI (codebase-grounded) and a Claude Code Agent (codebase + web), synthesize a 4-axis report in the terminal, then optionally apply user-approved updates back to the spec file. Two AI perspectives on the same spec, combined into one coherent review with a single review-to-revision loop.
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
@@ -22,7 +22,6 @@ Dispatch parallel reviews of a spec / design document to Codex CLI (codebase-gro
 **When NOT to use:**
 - For implementation code review — use `code-review-board` or `codex-review` instead
 - For deep multi-round debate — use `design-board` or `discussion-board` instead
-- To modify the spec — this skill is read-only; the user updates the spec manually based on findings
 
 ## The 4 Fixed Axes
 
@@ -51,13 +50,28 @@ digraph spec_review {
     "Phase 3: Display status" [shape=box];
     "Phase 4: Launch parallel\n(Bash + Agent in one message)" [shape=box];
     "Phase 5: Synthesize report" [shape=box];
-    "Phase 6: Display to user" [shape=doublecircle];
+    "Phase 6: Display to user" [shape=box];
+    "Phase 7: Propose & apply\nspec update" [shape=box];
+    "Has spec file?" [shape=diamond];
+    "Has actionable suggestions?" [shape=diamond];
+    "User approves diff?" [shape=diamond];
+    "Apply edits with Edit tool" [shape=box];
+    "End" [shape=doublecircle];
 
     "Phase 1: Collect input" -> "Phase 2: Build prompts";
     "Phase 2: Build prompts" -> "Phase 3: Display status";
     "Phase 3: Display status" -> "Phase 4: Launch parallel\n(Bash + Agent in one message)";
     "Phase 4: Launch parallel\n(Bash + Agent in one message)" -> "Phase 5: Synthesize report";
     "Phase 5: Synthesize report" -> "Phase 6: Display to user";
+    "Phase 6: Display to user" -> "Has spec file?";
+    "Has spec file?" -> "Has actionable suggestions?" [label="yes"];
+    "Has spec file?" -> "End" [label="no (free-text only)"];
+    "Has actionable suggestions?" -> "Phase 7: Propose & apply\nspec update" [label="yes"];
+    "Has actionable suggestions?" -> "End" [label="no"];
+    "Phase 7: Propose & apply\nspec update" -> "User approves diff?";
+    "User approves diff?" -> "Apply edits with Edit tool" [label="yes"];
+    "User approves diff?" -> "End" [label="no (skip)"];
+    "Apply edits with Edit tool" -> "End";
 }
 ```
 
@@ -240,7 +254,7 @@ After both results return (or one result + one error), build the unified report.
 
 ---
 
-レポートを確認し、必要に応じて仕様書を手動で更新してから `writing-plans` に進んでください。
+レポートを確認し、Phase 7 で提案される仕様書の更新を承認するか決めてください。承認後に `writing-plans` に進むのを推奨します。
 ```
 
 **Confidence rubric:**
@@ -258,7 +272,77 @@ After both results return (or one result + one error), build the unified report.
 
 ### Phase 6: Display to User
 
-Display the synthesized report in the terminal. Do NOT save to disk. Do NOT modify the spec file.
+Display the synthesized report in the terminal. Do NOT save the report to disk. (Spec file edits, if any, happen in Phase 7.) Proceed to Phase 7.
+
+### Phase 7: Propose & Apply Spec Update
+
+After the report is displayed, optionally apply the review's findings back to the spec file as user-approved edits.
+
+#### Skip conditions
+
+Skip Phase 7 entirely (proceed to End) if any of the following holds:
+
+- **No spec file path was provided** — the review ran on free text only; there is no file to edit.
+- **No actionable suggestions** — after filtering (below), zero proposed edits remain. Tell the user: "適用可能な具体的提案がないため、Phase 7 をスキップします。"
+- **Multiple spec files** — if more than one path was provided, ask the user via `AskUserQuestion` which file to update, or skip if none.
+
+#### Step 7.1: Filter findings into actionable edits
+
+Walk through each section of the synthesized report. Keep a finding ONLY if all three hold:
+
+1. **Concrete change** — the finding/suggestion describes a specific text change (not a vague concern like "consider performance").
+2. **Locatable** — the target section in the spec is identifiable by heading or quoted text. Vague references ("the design overall") are rejected.
+3. **Confidence is not Low** — only High / Medium findings are proposed by default. Low-confidence items may be presented separately if the user opts in.
+
+Discard everything else. Findings that disagreed between Codex and the Claude Code Agent are kept ONLY when the disagreement was resolved during synthesis; unresolved conflicts are NOT proposed as edits.
+
+#### Step 7.2: Build the proposed diff
+
+For each kept finding, construct an edit entry:
+
+```
+### Edit {N} — {axis} — {short title}
+**Location:** {heading path in spec, e.g., "## Specification > ### Phase 2"}
+**Operation:** replace | insert-after | insert-before | delete
+**Rationale:** {1 sentence pointing to the report finding}
+
+```diff
+- {original text from spec, if replace/delete}
++ {new text, if replace/insert}
+```
+```
+
+Group entries by axis (技術的裏どり → アルゴリズム改善提案 → アーキテクチャ簡素化提案 → 技術スタック提案). Number them globally (Edit 1, Edit 2, ...).
+
+Display the full diff block in the terminal before asking for approval.
+
+#### Step 7.3: Ask for approval
+
+Use `AskUserQuestion`:
+
+> "上記 {N} 件の変更を `{spec_path}` に適用しますか？"
+>
+> Options:
+> - **適用** — Apply all {N} edits as shown.
+> - **スキップ** — Display the diff only; do not modify the spec.
+
+(Per-edit selection is intentionally NOT offered to keep the loop simple. If the user wants partial application, they choose スキップ and apply manually.)
+
+#### Step 7.4: Apply if approved
+
+If the user chose 適用:
+
+1. For each edit entry, use the `Edit` tool with `old_string` = original text (or empty for inserts) and `new_string` = new text. Set `replace_all: false` (each location should be unique; if `Edit` errors due to non-unique `old_string`, widen the `old_string` to include surrounding context and retry once).
+2. After all edits succeed, report: "{N} 件の変更を `{spec_path}` に適用しました。"
+3. If any edit fails after the retry, stop and report which edit failed with the error message. Do NOT roll back successful edits — leave the partially-updated state for the user to inspect.
+
+If the user chose スキップ, do nothing and end.
+
+#### Step 7.5: End
+
+Suggest next action:
+
+> "仕様書の確認後、`writing-plans` に進むのを推奨します。"
 
 ## Error Handling
 
@@ -269,6 +353,7 @@ Display the synthesized report in the terminal. Do NOT save to disk. Do NOT modi
 | Both fail | Display error message and stop. |
 | Partial / malformed output from either side | Best-effort integration; note which side was incomplete. |
 | Spec file path does not exist | Report missing file to user and stop. |
+| Phase 7 `Edit` fails after retry (e.g., `old_string` not unique or not found) | Stop Phase 7. Report which edit failed and the error. Do NOT roll back already-applied edits — leave partial state for inspection. |
 
 ## Quick Reference
 
@@ -278,6 +363,7 @@ Display the synthesized report in the terminal. Do NOT save to disk. Do NOT modi
 | Prompts | 4 fixed axes, same output format for both, evidence-gathering differs |
 | Launch | 1 message, 2 tool calls (Bash for Codex + Agent for Claude Code) |
 | Output | Synthesized 4-axis report in terminal (no file save) |
+| Update (Phase 7) | Filter findings → propose diff → user approves 適用/スキップ → `Edit` tool applies |
 
 ## Common Mistakes
 
@@ -286,5 +372,8 @@ Display the synthesized report in the terminal. Do NOT save to disk. Do NOT modi
 - **Passing long prompts as CLI arguments** — always use temp file + stdin. Direct CLI args can exceed shell limits (~32KB on Windows) and cause Codex to hang silently.
 - **Inlining full spec text into the prompt** — instead, list the file paths and let each tool `Read` the spec. Shorter prompts produce faster, more focused results.
 - **Forgetting the Bash `timeout: 180000`** — the default 120s timeout will kill longer Codex runs.
-- **Saving the report to disk or editing the spec** — this skill is display-only and read-only. The user manually edits the spec based on findings.
+- **Saving the report to disk** — the report stays in the terminal; only the spec file itself may be edited (Phase 7, with user approval).
+- **Applying spec edits without showing the diff first** — Phase 7 MUST display the full diff and obtain `AskUserQuestion` approval before any `Edit` call. Never silently modify the spec.
+- **Proposing edits for vague or Low-confidence findings** — Phase 7 filter keeps only concrete, locatable, non-Low-confidence findings. Skipping the filter floods the user with noise.
+- **Rolling back on Phase 7 failure** — if one `Edit` fails mid-application, leave the partial state for the user to inspect. Silent rollback hides what was already applied.
 - **Evaluating fewer than 4 axes** — the 4 axes are fixed and required. If an axis has no findings, write `N/A`, do not omit the section.
