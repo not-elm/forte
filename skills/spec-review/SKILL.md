@@ -196,8 +196,7 @@ cat <<'PROMPT_EOF' > "$TMPFILE"
 {codex_prompt}
 PROMPT_EOF
 # --ephemeral: skip session persistence (skills never resume sessions)
-# -m gpt-5.3-codex: coding-optimized model
-cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
+cat "$TMPFILE" | codex exec --ephemeral
 ```
 
 - Set Bash tool `timeout: 180000` (3 minutes).
