@@ -2,7 +2,7 @@
 name: spec-review
 description: >
   Use when reviewing a spec or design document by dispatching parallel reviews to Codex CLI and Claude Code Agent across 4 fixed axes (feasibility, algorithm, architecture, tech stack).
-  Triggers: spec review, 仕様書レビュー, 設計書レビュー, spec-review, design doc review
+  Triggers: spec review, spec-review, design doc review, design document review
 ---
 
 # Spec Review
@@ -29,10 +29,10 @@ Every review evaluates the spec along these four axes:
 
 | # | Axis | Focus |
 |---|------|-------|
-| 1 | **技術的裏どり** (Feasibility & Correctness) | Are technical premises and claims correct? Feasibility, API behavior, overlooked constraints. |
-| 2 | **アルゴリズム改善提案** (Algorithm Improvement) | Are there better algorithms (efficiency, correctness, simplicity)? Complexity, correctness. |
-| 3 | **アーキテクチャ簡素化提案** (Architecture Simplification) | Can the same goal be achieved with fewer components / abstractions? YAGNI perspective. |
-| 4 | **技術スタック提案** (Tech Stack Suggestion) | Is there a better library / framework / language feature for the job? |
+| 1 | **Feasibility & Correctness** | Are technical premises and claims correct? Feasibility, API behavior, overlooked constraints. |
+| 2 | **Algorithm Improvement** | Are there better algorithms (efficiency, correctness, simplicity)? Complexity, correctness. |
+| 3 | **Architecture Simplification** | Can the same goal be achieved with fewer components / abstractions? YAGNI perspective. |
+| 4 | **Tech Stack Suggestion** | Is there a better library / framework / language feature for the job? |
 
 Both Codex and the Claude Code Agent evaluate ALL four axes. Their evidence-gathering methods differ:
 - **Codex**: reads the codebase to ground claims (`[code-verified]`)
@@ -83,7 +83,7 @@ Receive from skill arguments:
 - Or both
 
 If neither is provided, ask the user with `AskUserQuestion`:
-> "レビュー対象の仕様書ファイルパスを教えてください（複数可）。"
+> "Please provide the path(s) to the spec file(s) to review (one or more)."
 
 Verify each provided path exists. If a path is missing, report the error and stop.
 
@@ -96,24 +96,24 @@ Build separate prompts for Codex and the Claude Code Agent. Both use the same 4-
 ```
 Report your findings using EXACTLY this structure. If an axis has no findings, write "N/A".
 
-## 1. 技術的裏どり (Feasibility & Correctness)
+## 1. Feasibility & Correctness
 - Finding: <issue or confirmation>
 - Evidence: [code-verified|web-verified|general-knowledge|unverified] <citation>
 (repeat per finding)
 
-## 2. アルゴリズム改善提案
+## 2. Algorithm Improvement
 - Suggestion: <proposed change>
 - Rationale: <why>
 - Trade-off: <what is lost>
 (repeat per suggestion)
 
-## 3. アーキテクチャ簡素化提案
+## 3. Architecture Simplification
 - Suggestion: <proposed change>
 - Rationale: <why>
 - Trade-off: <what is lost>
 (repeat per suggestion)
 
-## 4. 技術スタック提案
+## 4. Tech Stack Suggestion
 - Current: <what the spec proposes>
 - Alternative: <proposed replacement>
 - Rationale: <why>
@@ -137,10 +137,10 @@ High / Medium / Low — <reasoning>
 You are reviewing the spec document(s) listed above. READ the files yourself (do not rely on inlined excerpts).
 
 Evaluate the spec along these 4 fixed axes:
-1. 技術的裏どり — verify technical premises against the codebase. Flag claims that contradict existing code, misuse APIs, or assume behavior that the codebase does not provide.
-2. アルゴリズム改善提案 — propose more efficient / correct / simpler algorithms when applicable.
-3. アーキテクチャ簡素化提案 — propose ways to reduce components or abstractions while preserving intent.
-4. 技術スタック提案 — suggest better-suited libraries / frameworks / language features. Ground every suggestion in evidence (existing codebase patterns or well-known technical facts).
+1. Feasibility & Correctness — verify technical premises against the codebase. Flag claims that contradict existing code, misuse APIs, or assume behavior that the codebase does not provide.
+2. Algorithm Improvement — propose more efficient / correct / simpler algorithms when applicable.
+3. Architecture Simplification — propose ways to reduce components or abstractions while preserving intent.
+4. Tech Stack Suggestion — suggest better-suited libraries / frameworks / language features. Ground every suggestion in evidence (existing codebase patterns or well-known technical facts).
 
 Evidence requirements:
 - For each finding, cite the spec location (heading or quoted text) AND the supporting evidence (file:line for codebase, or label "[general-knowledge]" if no concrete evidence).
@@ -161,10 +161,10 @@ Evidence requirements:
 
 ## Instructions
 You are reviewing the spec document(s) listed above. Use Read to load the spec file(s). Then evaluate along these 4 fixed axes:
-1. 技術的裏どり — verify technical premises. Use WebSearch/WebFetch to check current behavior of libraries/APIs/tools mentioned in the spec, especially when the spec relies on recent features or third-party services.
-2. アルゴリズム改善提案 — propose more efficient / correct / simpler algorithms. Use Web for state-of-the-art references when applicable.
-3. アーキテクチャ簡素化提案 — propose ways to reduce components or abstractions. Look for related implementations in the codebase via Read/Grep/Glob.
-4. 技術スタック提案 — suggest better-suited libraries / frameworks / language features, including current ecosystem trends. Use WebSearch for recent (last 12 months) comparisons.
+1. Feasibility & Correctness — verify technical premises. Use WebSearch/WebFetch to check current behavior of libraries/APIs/tools mentioned in the spec, especially when the spec relies on recent features or third-party services.
+2. Algorithm Improvement — propose more efficient / correct / simpler algorithms. Use Web for state-of-the-art references when applicable.
+3. Architecture Simplification — propose ways to reduce components or abstractions. Look for related implementations in the codebase via Read/Grep/Glob.
+4. Tech Stack Suggestion — suggest better-suited libraries / frameworks / language features, including current ecosystem trends. Use WebSearch for recent (last 12 months) comparisons.
 
 Evidence requirements:
 - For each finding, cite the spec location AND the supporting evidence:
@@ -181,7 +181,7 @@ Evidence requirements:
 
 Before launching the parallel calls, display:
 
-> "Codex と Claude Code Agent に並列で仕様書レビューを依頼しています（30〜90秒）..."
+> "Requesting a parallel spec review from Codex and the Claude Code Agent (30–90 seconds)..."
 
 ### Phase 4: Launch Parallel
 
@@ -225,13 +225,13 @@ After both results return (or one result + one error), build the unified report.
 ```markdown
 ## Spec Review Report: {spec_path}
 
-{if Codex unavailable: "⚠ Codex未使用: {reason}"}
-{if Agent unavailable: "⚠ Claude Code Agent未使用: {reason}"}
+{if Codex unavailable: "⚠ Codex not used: {reason}"}
+{if Agent unavailable: "⚠ Claude Code Agent not used: {reason}"}
 
 ### Overall Assessment
 {3-5 sentences: is the spec technically sound? Major concerns?}
 
-### 1. 技術的裏どり (Feasibility & Correctness)
+### 1. Feasibility & Correctness
 **Findings:**
 - {finding} — Codex: {evidence}; Claude Code: {evidence}
 {repeat per finding}
@@ -239,13 +239,13 @@ After both results return (or one result + one error), build the unified report.
 **Agreement:** {points where both reached the same conclusion}
 **Differences:** {points found by only one side, or where perspectives differ}
 
-### 2. アルゴリズム改善提案
+### 2. Algorithm Improvement
 {same structure}
 
-### 3. アーキテクチャ簡素化提案
+### 3. Architecture Simplification
 {same structure}
 
-### 4. 技術スタック提案
+### 4. Tech Stack Suggestion
 {same structure}
 
 ### Confidence: High / Medium / Low
@@ -253,7 +253,7 @@ After both results return (or one result + one error), build the unified report.
 
 ---
 
-レポートを確認し、Phase 7 で提案される仕様書の更新を承認するか決めてください。承認後に `writing-plans` に進むのを推奨します。
+Review the report, then decide whether to approve the spec updates proposed in Phase 7. After approval, proceeding to `writing-plans` is recommended.
 ```
 
 **Confidence rubric:**
@@ -282,7 +282,7 @@ After the report is displayed, optionally apply the review's findings back to th
 Skip Phase 7 entirely (proceed to End) if any of the following holds:
 
 - **No spec file path was provided** — the review ran on free text only; there is no file to edit.
-- **No actionable suggestions** — after filtering (below), zero proposed edits remain. Tell the user: "適用可能な具体的提案がないため、Phase 7 をスキップします。"
+- **No actionable suggestions** — after filtering (below), zero proposed edits remain. Tell the user: "No applicable concrete suggestions, so Phase 7 is skipped."
 - **Multiple spec files** — if more than one path was provided, ask the user via `AskUserQuestion` which file to update, or skip if none.
 
 #### Step 7.1: Filter findings into actionable edits
@@ -311,7 +311,7 @@ For each kept finding, construct an edit entry:
 ```
 ```
 
-Group entries by axis (技術的裏どり → アルゴリズム改善提案 → アーキテクチャ簡素化提案 → 技術スタック提案). Number them globally (Edit 1, Edit 2, ...).
+Group entries by axis (Feasibility & Correctness → Algorithm Improvement → Architecture Simplification → Tech Stack Suggestion). Number them globally (Edit 1, Edit 2, ...).
 
 Display the full diff block in the terminal before asking for approval.
 
@@ -319,36 +319,36 @@ Display the full diff block in the terminal before asking for approval.
 
 Use `AskUserQuestion`:
 
-> "上記 {N} 件の変更を `{spec_path}` に適用しますか？"
+> "Apply the {N} changes above to `{spec_path}`?"
 >
 > Options:
-> - **適用** — Apply all {N} edits as shown.
-> - **スキップ** — Display the diff only; do not modify the spec.
+> - **Apply** — Apply all {N} edits as shown.
+> - **Skip** — Display the diff only; do not modify the spec.
 
-(Per-edit selection is intentionally NOT offered to keep the loop simple. If the user wants partial application, they choose スキップ and apply manually.)
+(Per-edit selection is intentionally NOT offered to keep the loop simple. If the user wants partial application, they choose Skip and apply manually.)
 
 #### Step 7.4: Apply if approved
 
-If the user chose 適用:
+If the user chose Apply:
 
 1. For each edit entry, use the `Edit` tool with `old_string` = original text (or empty for inserts) and `new_string` = new text. Set `replace_all: false` (each location should be unique; if `Edit` errors due to non-unique `old_string`, widen the `old_string` to include surrounding context and retry once).
-2. After all edits succeed, report: "{N} 件の変更を `{spec_path}` に適用しました。"
+2. After all edits succeed, report: "Applied {N} changes to `{spec_path}`."
 3. If any edit fails after the retry, stop and report which edit failed with the error message. Do NOT roll back successful edits — leave the partially-updated state for the user to inspect.
 
-If the user chose スキップ, do nothing and end.
+If the user chose Skip, do nothing and end.
 
 #### Step 7.5: End
 
 Suggest next action:
 
-> "仕様書の確認後、`writing-plans` に進むのを推奨します。"
+> "After reviewing the spec, proceeding to `writing-plans` is recommended."
 
 ## Error Handling
 
 | Situation | Action |
 |-----------|--------|
-| Codex CLI not installed (exit 127) or timeout | Report with Claude Code Agent results only. Add note: "⚠ Codex未使用: {reason}" at report top. |
-| Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent未使用: {reason}" at report top. |
+| Codex CLI not installed (exit 127) or timeout | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: {reason}" at report top. |
+| Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent not used: {reason}" at report top. |
 | Both fail | Display error message and stop. |
 | Partial / malformed output from either side | Best-effort integration; note which side was incomplete. |
 | Spec file path does not exist | Report missing file to user and stop. |
@@ -362,7 +362,7 @@ Suggest next action:
 | Prompts | 4 fixed axes, same output format for both, evidence-gathering differs |
 | Launch | 1 message, 2 tool calls (Bash for Codex + Agent for Claude Code) |
 | Output | Synthesized 4-axis report in terminal (no file save) |
-| Update (Phase 7) | Filter findings → propose diff → user approves 適用/スキップ → `Edit` tool applies |
+| Update (Phase 7) | Filter findings → propose diff → user approves Apply/Skip → `Edit` tool applies |
 
 ## Common Mistakes
 
