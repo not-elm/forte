@@ -1,7 +1,7 @@
 ---
 name: spec-review
 description: >
-  Use when reviewing a spec or design document by dispatching parallel reviews to Codex CLI and Claude Code Agent across 4 fixed axes (feasibility, algorithm, architecture, tech stack).
+  Use when reviewing a spec or design document by dispatching parallel reviews to Codex CLI and Claude Code Agent across 4 fixed axes (feasibility, algorithm, architecture, tech stack). Pass the --fix flag to auto-apply the review's suggested edits back to the spec file without an approval prompt.
   Triggers: spec review, spec-review, design doc review, design document review
 ---
 
@@ -9,7 +9,9 @@ description: >
 
 ## Overview
 
-Dispatch parallel reviews of a spec / design document to Codex CLI (codebase-grounded) and a Claude Code Agent (codebase + web), synthesize a 4-axis report in the terminal, then optionally apply user-approved updates back to the spec file. Two AI perspectives on the same spec, combined into one coherent review with a single review-to-revision loop.
+Dispatch parallel reviews of a spec / design document to Codex CLI (codebase-grounded) and a Claude Code Agent (codebase + web), synthesize a 4-axis report in the terminal, then optionally apply updates back to the spec file. Two AI perspectives on the same spec, combined into one coherent review with a single review-to-revision loop.
+
+By default, spec updates are proposed and require user approval (Apply/Skip) before any edit. Pass the **`--fix`** flag in the skill arguments to auto-apply: the proposed diff is still displayed, but the approval gate is skipped and the edits are written to the spec file automatically.
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
@@ -54,6 +56,7 @@ digraph spec_review {
     "Phase 7: Propose & apply\nspec update" [shape=box];
     "Has spec file?" [shape=diamond];
     "Has actionable suggestions?" [shape=diamond];
+    "--fix flag set?" [shape=diamond];
     "User approves diff?" [shape=diamond];
     "Apply edits with Edit tool" [shape=box];
     "End" [shape=doublecircle];
@@ -68,7 +71,9 @@ digraph spec_review {
     "Has spec file?" -> "End" [label="no (free-text only)"];
     "Has actionable suggestions?" -> "Phase 7: Propose & apply\nspec update" [label="yes"];
     "Has actionable suggestions?" -> "End" [label="no"];
-    "Phase 7: Propose & apply\nspec update" -> "User approves diff?";
+    "Phase 7: Propose & apply\nspec update" -> "--fix flag set?";
+    "--fix flag set?" -> "Apply edits with Edit tool" [label="yes (auto-apply)"];
+    "--fix flag set?" -> "User approves diff?" [label="no"];
     "User approves diff?" -> "Apply edits with Edit tool" [label="yes"];
     "User approves diff?" -> "End" [label="no (skip)"];
     "Apply edits with Edit tool" -> "End";
@@ -78,11 +83,12 @@ digraph spec_review {
 ### Phase 1: Collect Input
 
 Receive from skill arguments:
+- **`--fix` flag** (optional) — if present anywhere in the arguments, enable auto-apply mode for Phase 7 (skip the approval gate). Strip the `--fix` token from the arguments before parsing paths / free text so it is not mistaken for a file path. Record `fix_mode = true`.
 - **File paths** (one or more spec files)
 - **Free text** (additional context, e.g., the original brainstorming question)
 - Or both
 
-If neither is provided, ask the user with `AskUserQuestion`:
+If neither a path nor free text is provided (after stripping `--fix`), ask the user with `AskUserQuestion`:
 > "Please provide the path(s) to the spec file(s) to review (one or more)."
 
 Verify each provided path exists. If a path is missing, report the error and stop.
@@ -275,7 +281,12 @@ Display the synthesized report in the terminal. Do NOT save the report to disk. 
 
 ### Phase 7: Propose & Apply Spec Update
 
-After the report is displayed, optionally apply the review's findings back to the spec file as user-approved edits.
+After the report is displayed, optionally apply the review's findings back to the spec file as edits.
+
+- **Default mode** (`fix_mode = false`): edits are proposed and applied only after the user approves the diff (Step 7.3).
+- **Auto-apply mode** (`fix_mode = true`, i.e. `--fix` was passed): the diff is still built and displayed (Steps 7.1–7.2), but the approval gate (Step 7.3) is skipped and the edits are applied automatically (Step 7.4).
+
+The skip conditions and the finding filter (Steps 7.1) apply in BOTH modes — `--fix` only removes the human approval gate, it does not loosen which findings qualify as edits.
 
 #### Skip conditions
 
@@ -317,7 +328,9 @@ Display the full diff block in the terminal before asking for approval.
 
 #### Step 7.3: Ask for approval
 
-Use `AskUserQuestion`:
+**Auto-apply mode (`fix_mode = true`):** Skip this step entirely. Do NOT call `AskUserQuestion`. Print a one-line notice — "`--fix` set: auto-applying the {N} changes above to `{spec_path}`." — and proceed directly to Step 7.4.
+
+**Default mode (`fix_mode = false`):** Use `AskUserQuestion`:
 
 > "Apply the {N} changes above to `{spec_path}`?"
 >
@@ -327,15 +340,15 @@ Use `AskUserQuestion`:
 
 (Per-edit selection is intentionally NOT offered to keep the loop simple. If the user wants partial application, they choose Skip and apply manually.)
 
-#### Step 7.4: Apply if approved
+#### Step 7.4: Apply
 
-If the user chose Apply:
+Apply when EITHER `fix_mode = true` (auto-apply) OR the user chose Apply in Step 7.3:
 
 1. For each edit entry, use the `Edit` tool with `old_string` = original text (or empty for inserts) and `new_string` = new text. Set `replace_all: false` (each location should be unique; if `Edit` errors due to non-unique `old_string`, widen the `old_string` to include surrounding context and retry once).
 2. After all edits succeed, report: "Applied {N} changes to `{spec_path}`."
-3. If any edit fails after the retry, stop and report which edit failed with the error message. Do NOT roll back successful edits — leave the partially-updated state for the user to inspect.
+3. If any edit fails after the retry, stop and report which edit failed with the error message. Do NOT roll back successful edits — leave the partially-updated state for the user to inspect. (This applies in auto-apply mode too — `--fix` never triggers a rollback.)
 
-If the user chose Skip, do nothing and end.
+If the user chose Skip (default mode only), do nothing and end.
 
 #### Step 7.5: End
 
@@ -358,11 +371,12 @@ Suggest next action:
 
 | Step | Action |
 |------|--------|
-| Input | spec file paths (+ optional free text) |
+| Input | spec file paths (+ optional free text) (+ optional `--fix` flag) |
 | Prompts | 4 fixed axes, same output format for both, evidence-gathering differs |
 | Launch | 1 message, 2 tool calls (Bash for Codex + Agent for Claude Code) |
 | Output | Synthesized 4-axis report in terminal (no file save) |
 | Update (Phase 7) | Filter findings → propose diff → user approves Apply/Skip → `Edit` tool applies |
+| Update with `--fix` | Filter findings → propose & display diff → **auto-apply** (no approval gate) → `Edit` tool applies |
 
 ## Common Mistakes
 
@@ -372,7 +386,9 @@ Suggest next action:
 - **Inlining full spec text into the prompt** — instead, list the file paths and let each tool `Read` the spec. Shorter prompts produce faster, more focused results.
 - **Forgetting the Bash `timeout: 180000`** — the default 120s timeout will kill longer Codex runs.
 - **Saving the report to disk** — the report stays in the terminal; only the spec file itself may be edited (Phase 7, with user approval).
-- **Applying spec edits without showing the diff first** — Phase 7 MUST display the full diff and obtain `AskUserQuestion` approval before any `Edit` call. Never silently modify the spec.
+- **Applying spec edits without showing the diff first** — Phase 7 MUST display the full diff before any `Edit` call, in BOTH modes. In default mode it then obtains `AskUserQuestion` approval; in auto-apply mode (`--fix`) it applies after displaying the diff. Never apply edits that were not shown to the user.
+- **Treating `--fix` as a license to skip the filter or the diff** — `--fix` only removes the human approval gate (Step 7.3). The finding filter (Step 7.1) and the diff display (Step 7.2) still run. Do not auto-apply Low-confidence or vague findings.
+- **Treating a path-like `--fix` as a file** — `--fix` is a flag, not a spec path. Strip it during Phase 1 input parsing before verifying file paths exist.
 - **Proposing edits for vague or Low-confidence findings** — Phase 7 filter keeps only concrete, locatable, non-Low-confidence findings. Skipping the filter floods the user with noise.
 - **Rolling back on Phase 7 failure** — if one `Edit` fails mid-application, leave the partial state for the user to inspect. Silent rollback hides what was already applied.
 - **Evaluating fewer than 4 axes** — the 4 axes are fixed and required. If an axis has no findings, write `N/A`, do not omit the section.
