@@ -120,13 +120,13 @@ Before running Codex, display a brief status message to the user:
 
 ```bash
 # For uncommitted changes:
-codex exec review --uncommitted --ephemeral -m gpt-5.3-codex
+codex exec review --uncommitted --ephemeral
 
 # For changes against a base branch:
-codex exec review --base main --ephemeral -m gpt-5.3-codex
+codex exec review --base main --ephemeral
 
 # With custom review instructions (from prompt):
-cat /tmp/codex-review-prompt.txt | codex exec review --uncommitted --ephemeral -m gpt-5.3-codex
+cat /tmp/codex-review-prompt.txt | codex exec review --uncommitted --ephemeral
 ```
 
 **For Design Review and Hypothesis Verification** (no diff-scoping applicable): Use generic `codex exec` with optimization flags:
@@ -138,7 +138,7 @@ cat <<'PROMPT_EOF' > /tmp/codex-review-prompt.txt
 PROMPT_EOF
 
 # 2. Pipe to Codex via stdin
-cat /tmp/codex-review-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+cat /tmp/codex-review-prompt.txt | codex exec --ephemeral
 
 # 3. Clean up
 rm -f /tmp/codex-review-prompt.txt
@@ -146,7 +146,6 @@ rm -f /tmp/codex-review-prompt.txt
 
 - `exec review`: Purpose-built subcommand that scopes context to relevant diffs, reducing context size and latency
 - `--ephemeral`: Skip session persistence (skills never resume sessions)
-- `-m gpt-5.3-codex`: Use a coding-optimized model for fast, accurate analysis (override with `-m gpt-5.4` if deeper reasoning is needed)
 - Set Bash tool `timeout: 180000` (3 minutes) to prevent the default 120s timeout from killing longer runs
 
 **Important:** Codex runs read-only. It can read files in the repo but cannot modify them.

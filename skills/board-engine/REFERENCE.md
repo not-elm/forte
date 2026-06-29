@@ -136,7 +136,7 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
   cat <<'PROMPT_EOF' > "$TMPFILE"
   <constructed_prompt>
   PROMPT_EOF
-  cat "$TMPFILE" | codex exec --ephemeral -m gpt-5.3-codex
+  cat "$TMPFILE" | codex exec --ephemeral
   rm -f "$TMPFILE"
   ```
 

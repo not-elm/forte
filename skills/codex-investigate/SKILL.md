@@ -113,7 +113,7 @@ cat <<'PROMPT_EOF' > /tmp/codex-investigate-prompt.txt
 PROMPT_EOF
 
 # 2. Pipe to Codex via stdin (read-only mode)
-cat /tmp/codex-investigate-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+cat /tmp/codex-investigate-prompt.txt | codex exec --ephemeral
 
 # 3. Clean up
 rm -f /tmp/codex-investigate-prompt.txt

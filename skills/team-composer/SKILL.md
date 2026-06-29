@@ -138,7 +138,7 @@ Before participating in the discussion, run a Codex exploration:
    cat <<'PROMPT_EOF' > /tmp/cx-explore-prompt.txt
    <constructed_prompt>
    PROMPT_EOF
-   cat /tmp/cx-explore-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+   cat /tmp/cx-explore-prompt.txt | codex exec --ephemeral
    rm -f /tmp/cx-explore-prompt.txt
 
 3. Use the findings as your unique perspective when writing hypotheses and critiques.
@@ -172,7 +172,7 @@ Generate 1-2 hypotheses based on the discussion context + codebase analysis.
 Include axis= tags. Cite file:line references where relevant.
 Output: hypothesis entries only, max 300 tokens.
 PROMPT_EOF
-cat /tmp/cx-hypothesize-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+cat /tmp/cx-hypothesize-prompt.txt | codex exec --ephemeral
 rm -f /tmp/cx-hypothesize-prompt.txt
 ```
 
@@ -188,7 +188,7 @@ Each critique must include: label (challenge/support/amend/question), refs=[...]
 Verify claims against the codebase where possible. Cite file:line as evidence.
 Output: critique entries only, max 250 tokens.
 PROMPT_EOF
-cat /tmp/cx-critique-prompt.txt | codex exec --ephemeral -m gpt-5.3-codex
+cat /tmp/cx-critique-prompt.txt | codex exec --ephemeral
 rm -f /tmp/cx-critique-prompt.txt
 ```
 
