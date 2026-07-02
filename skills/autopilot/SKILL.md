@@ -59,7 +59,8 @@ Maintain `.superpowers/autopilot/pipeline.md` — pipeline-level, separate from 
 - **After each stage completes:** append `Stage N (<name>): complete — <key artifact or commit range>`.
 - **When a standing answer defers a decision:** append `DEFERRED: <one-line description>` — Stage 8 assembles its deferred list from these lines.
 - **On stop:** append `STOPPED at Stage N: <reason>`.
-- **Resume:** if the ledger exists with unfinished stages, resume at the first stage not marked complete — but validate artifacts before trusting any `complete` line (spec file exists, plan file exists, commit range is non-empty, working tree state matches the next stage). If validation fails, redo that stage.
+- **On finish:** after presenting the Stage 8 report, append `PIPELINE COMPLETE` — a finished ledger must never be mistaken for an unfinished run.
+- **Resume:** if the ledger exists with unfinished stages, first check identity — resume only if the ledger header's feature/spec matches the current invocation; a `STOPPED` ledger resumes only when the user explicitly re-invokes autopilot for the same feature. For a different feature, archive the old ledger (rename it `pipeline-<date>-<slug>.md`) and start fresh. When resuming, restart at the first stage not marked complete — but validate artifacts before trusting any `complete` line (spec file exists, plan file exists, commit range is non-empty, working tree state matches the next stage). If validation fails, redo that stage.
 
 ## Workflow
 
@@ -113,7 +114,7 @@ Invoke `forte:spec-review` via the Skill tool with args `"<spec-path> --fix"`. T
 
 ### Stage 3: Writing Plans
 
-Invoke `superpowers:writing-plans` via the Skill tool with the spec path. **Gate override (pipeline-side pre-answer):** do not ask writing-plans' Execution Handoff question ("Which approach?") — the pipeline pre-answers it with Subagent-Driven. Record the plan path (`docs/superpowers/plans/YYYY-MM-DD-<feature>.md`) in the ledger completion line.
+Invoke `superpowers:writing-plans` via the Skill tool with the spec path. **Gate overrides (pipeline-side pre-answers):** do not ask writing-plans' Execution Handoff question ("Which approach?") — the pipeline pre-answers it with Subagent-Driven. Pre-answer its Scope Check too: produce a single plan; if the spec genuinely spans multiple independent subsystems, stop the pipeline and report it — Stage 1 should have caught the decomposition need. Record the plan path (`docs/superpowers/plans/YYYY-MM-DD-<feature>.md`) in the ledger completion line.
 
 ### Stage 4: Plan Review
 
@@ -127,6 +128,7 @@ Invoke `superpowers:subagent-driven-development` (SDD) via the Skill tool with t
 - **Per-task plan-mandated findings** ("ask the human which governs") → same standing answer: plan text governs; record as `DEFERRED:`.
 - **Final whole-branch review:** Critical / Important findings → dispatch the fix wave automatically (one fix subagent with the complete findings list, then re-review), as SDD already prescribes. Findings that contradict the plan's text, or that expand scope beyond the spec's deliverables → do NOT auto-apply; record as `DEFERRED:` and continue.
 - **Branch consent:** SDD forbids starting implementation on main/master "without explicit user consent" — an autopilot invocation without `--branch` constitutes that consent; note this in the Stage 8 report.
+- **Workspace:** work in the current checkout (or the `--branch` branch created at pipeline start) — do NOT invoke `superpowers:using-git-worktrees` or create a worktree, even though SDD lists it as a required workflow skill; a mid-pipeline worktree strands the ledger, spec, plan, and start SHA in the original checkout.
 - **Completion handoff:** after SDD's final review, do NOT invoke `superpowers:finishing-a-development-branch` — the pipeline continues to Stage 6; integration options are presented in Stage 8 instead.
 - **BLOCKED** from an implementer that survives SDD's own escalation ladder (more context → stronger model → task split) → stop the pipeline (see Stop Conditions).
 
@@ -134,10 +136,10 @@ Record the implementation commit range in the ledger completion line.
 
 ### Stage 6: Code Review
 
-Invoke the **built-in** `code-review` skill via the Skill tool with args `"max --fix"` — the one whose registered description reviews "the current diff for correctness bugs and reuse/simplification/efficiency cleanups" and supports `--fix` applying findings to the working tree. Do NOT invoke the `code-review:code-review` plugin command (it reviews GitHub PRs and only posts comments). Scope the review to the pipeline's changes by supplying the recorded start SHA range (`<start-sha>..HEAD`) as context — SDD commits every task, so without a range the "current diff" can be empty. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. Commit the result if the skill leaves uncommitted changes:
+Invoke the **built-in** `code-review` skill via the Skill tool with args `"max --fix"` — the one whose registered description reviews "the current diff for correctness bugs and reuse/simplification/efficiency cleanups" and supports `--fix` applying findings to the working tree. Do NOT invoke the `code-review:code-review` plugin command (it reviews GitHub PRs and only posts comments). Scope the review to the pipeline's changes by supplying the recorded start SHA range (`<start-sha>..HEAD`) as context — SDD commits every task, so without a range the "current diff" can be empty. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If the review reports an empty diff (the range was not picked up), record "review saw no diff" in the Stage 8 Notes — do not report it as a clean pass. Commit the result if the skill leaves uncommitted changes:
 
 ```bash
-git add -u
+git add -A
 git commit -m "fix: apply code-review findings"
 ```
 
@@ -146,7 +148,7 @@ git commit -m "fix: apply code-review findings"
 Invoke the **built-in** `simplify` skill via the Skill tool (no args), scoped to the pipeline's start-SHA range like Stage 6. It reviews the changed code for reuse/simplification/efficiency and applies fixes. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. Commit if it leaves uncommitted changes:
 
 ```bash
-git add -u
+git add -A
 git commit -m "refactor: apply simplify pass"
 ```
 
@@ -184,6 +186,7 @@ Stop the pipeline — write the `STOPPED` ledger line and present a partial Stag
 1. A stage's skill reports BLOCKED and the pipeline cannot resolve it by adding context, escalating model, or splitting tasks.
 2. The Stage 1 user gate is not approved (the user chooses neither Approve nor a resolvable Revise).
 3. A destructive operation becomes necessary (force push, history rewrite, deleting user files) — these always require the human.
+4. writing-plans' Scope Check determines the spec spans multiple independent subsystems (Stage 3's pre-answer stops rather than splitting into multiple plans).
 
 Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-review degrade to Agent-only by their own fallbacks); review findings (they are fixed or deferred); a single stage-internal retry.
 
@@ -196,7 +199,7 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 | Spec/plan path expected but missing at a stage boundary | Stop; report which artifact is missing (likely ledger drift). |
 | Built-in `code-review` / `simplify` unavailable | Skip that stage; note in Stage 8 report. |
 | superpowers plugin skills unavailable | Stop before Stage 3; the pipeline cannot run without them. |
-| Ledger shows an unfinished run on invocation | Resume from the first incomplete stage after validating artifacts. |
+| Ledger shows an unfinished run on invocation | Check the header matches the current feature/spec first; then resume from the first incomplete stage after validating artifacts. For a different feature, archive the old ledger and start fresh. |
 
 ## Quick Reference
 
@@ -204,7 +207,7 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 |------|--------|
 | Input | feature description and/or spec path (+ optional `--branch <name>`) |
 | Gate | Stage 1 spec approval ONLY; provided spec = pre-approved |
-| Ledger | `.superpowers/autopilot/pipeline.md`: header + start SHA, started/complete/DEFERRED/STOPPED lines |
+| Ledger | `.superpowers/autopilot/pipeline.md`: header + start SHA, started/complete/DEFERRED/STOPPED/PIPELINE COMPLETE lines |
 | Stage args | spec-review `"<spec> --fix"` · writing-plans (pre-answer Subagent-Driven) · plan-review `"<plan> <spec> --fix"` · SDD (standing answers) · code-review `"max --fix"` · simplify |
 | Deferred | plan-contradicting / scope-expanding / report-only findings → `DEFERRED:` lines → Stage 8 list |
 | Output | Stage 8 terminal report; no disk save, no push |
@@ -212,7 +215,7 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 ## Common Mistakes
 
 - **Invoking the `code-review:code-review` plugin command in Stage 6** — that reviews GitHub PRs and only posts comments; Stage 6 needs the built-in `code-review` skill with `--fix`.
-- **Asking downstream gates the pipeline pre-answers** — writing-plans' Execution Handoff, SDD's pre-flight conflict question, plan-mandated adjudication, and finishing-a-development-branch are all covered by standing answers. Re-asking them breaks the single-gate contract.
+- **Asking downstream gates the pipeline pre-answers** — writing-plans' Execution Handoff and Scope Check, SDD's pre-flight conflict question, plan-mandated adjudication, workspace/worktree choice, and finishing-a-development-branch are all covered by standing answers. Re-asking them breaks the single-gate contract.
 - **Invoking `superpowers:finishing-a-development-branch` after Stage 5** — the pipeline continues to Stage 6; Stage 8 presents integration options.
 - **Auto-applying scope-expanding or plan-contradicting findings** — they go to the `DEFERRED:` list, even though the pipeline is "automated".
 - **Skipping ledger writes** — the started/complete lines are the only compaction-safe record; write them before AND after every stage dispatch.
