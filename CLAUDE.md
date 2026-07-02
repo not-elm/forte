@@ -23,6 +23,8 @@ skills/
   discussion-board/    # Structured team debate with iterative synthesis
   frontend-design-board/ # Frontend design discussion via 2-phase team debate
   investigation-board/ # Evidence-based bug investigation via structured team debate
+  parallel-research/   # Parallel topic investigation via Codex CLI + Claude Code Agent
+  plan-review/         # Parallel implementation-plan review via Codex CLI + Claude Code Agent (4 fixed axes)
   spec-review/         # Parallel spec/design-doc review via Codex CLI + Claude Code Agent (4 fixed axes)
   team-composer/       # Shared team composition for board skills (expertise map + always-doubling)
 ```
@@ -33,10 +35,10 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 
 ### Key Patterns Across Skills
 
-- **Codex-based skills** (codex-investigate, codex-review, parallel-research, spec-review): Use `codex exec` CLI in read-only mode. Prompts are always written to a temp file and piped via stdin to avoid shell argument length limits. `parallel-research` and `spec-review` additionally dispatch a Claude Code Agent in parallel within a single message.
+- **Codex-based skills** (codex-investigate, codex-review, parallel-research, plan-review, spec-review): Use `codex exec` CLI in read-only mode. Prompts are always written to a temp file and piped via stdin to avoid shell argument length limits. `parallel-research`, `spec-review`, and `plan-review` additionally dispatch a Claude Code Agent in parallel within a single message.
 - **Agent Team skills** (code-review-board, design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a round-split WHITEBOARD model (base WHITEBOARD.md + per-round WHITEBOARD-R{N}.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention. Shared debate rules are in `board-engine/REFERENCE.md`; each board SKILL.md contains only board-specific logic.
 
 ## Adding a New Skill
 
 1. Create `skills/<skill-name>/SKILL.md` with frontmatter and skill spec
-2. Bump version in `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`
+2. Bump version in `.claude-plugin/plugin.json` (`marketplace.json` has no version field)
