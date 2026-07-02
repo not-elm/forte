@@ -1,7 +1,7 @@
 ---
 name: plan-review
 description: >
-  Use when reviewing an implementation plan file (produced by writing-plans) by dispatching parallel reviews to Codex CLI and Claude Code Agent across 4 fixed axes (technical correctness, approach improvement, simplification, plan integrity). Pass the --fix flag to auto-apply the review's suggested edits back to the plan file without an approval prompt.
+  Use when reviewing an implementation plan file (produced by writing-plans) by dispatching parallel reviews to Codex CLI and Claude Code Agent across 4 fixed axes (technical correctness, approach improvement, simplification, plan integrity). The review's suggested edits are auto-applied to the plan file by default; pass --review-only to require approval before applying.
   Triggers: plan review, plan-review, implementation plan review, プランレビュー, 実装計画レビュー
 ---
 
@@ -17,7 +17,7 @@ It is a gate between plan writing and plan execution:
 brainstorming → spec-review → writing-plans → plan-review → executing-plans / subagent-driven-development
 ```
 
-By default, plan updates are proposed and require user approval (Apply/Skip) before any edit. Pass the **`--fix`** flag in the skill arguments to auto-apply: the proposed diff is still displayed, but the approval gate is skipped and the edits are written to the plan file automatically.
+By default, plan updates are auto-applied: the proposed diff is displayed, then the edits are written to the plan file without an approval prompt. Pass the **`--review-only`** flag in the skill arguments to restore the approval gate (Apply/Skip) before any edit. The legacy **`--fix`** flag is accepted as a deprecated no-op (auto-apply is now the default).
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
@@ -63,7 +63,7 @@ digraph plan_review {
     "Phase 6: Display to user" [shape=box];
     "Phase 7: Propose & apply\nplan update" [shape=box];
     "Has editable suggestions?" [shape=diamond];
-    "--fix flag set?" [shape=diamond];
+    "--review-only flag set?" [shape=diamond];
     "User approves diff?" [shape=diamond];
     "Apply edits with Edit tool" [shape=box];
     "End" [shape=doublecircle];
@@ -76,9 +76,9 @@ digraph plan_review {
     "Phase 6: Display to user" -> "Has editable suggestions?";
     "Has editable suggestions?" -> "Phase 7: Propose & apply\nplan update" [label="yes"];
     "Has editable suggestions?" -> "End" [label="no"];
-    "Phase 7: Propose & apply\nplan update" -> "--fix flag set?";
-    "--fix flag set?" -> "Apply edits with Edit tool" [label="yes (auto-apply)"];
-    "--fix flag set?" -> "User approves diff?" [label="no"];
+    "Phase 7: Propose & apply\nplan update" -> "--review-only flag set?";
+    "--review-only flag set?" -> "User approves diff?" [label="yes"];
+    "--review-only flag set?" -> "Apply edits with Edit tool" [label="no (default: auto-apply)"];
     "User approves diff?" -> "Apply edits with Edit tool" [label="yes"];
     "User approves diff?" -> "End" [label="no (skip)"];
     "Apply edits with Edit tool" -> "End";
@@ -88,14 +88,14 @@ digraph plan_review {
 ### Phase 1: Collect Input
 
 Receive from skill arguments:
-- **`--fix` flag** (optional) — if present anywhere in the arguments, enable auto-apply mode for Phase 7 (skip the approval gate). Strip the `--fix` token from the arguments before parsing paths / free text. Record `fix_mode = true`.
+- **`--review-only` flag** (optional) — if present anywhere in the arguments, restore the approval gate in Phase 7. Record `review_only = true`; otherwise `review_only = false` (auto-apply is the default). The legacy `--fix` token may also appear — accept it as a deprecated no-op. Strip both `--review-only` and `--fix` tokens from the arguments before parsing paths / free text.
 - **Plan file path(s)** (required) — one or more implementation plan files.
 - **Spec file path** (optional) — the source spec, enables the coverage check in Axis 4.
 - **Free text** (optional additional context).
 
 **Path classification:** a provided path located under a `specs/` directory or whose filename ends in `-design.md` is treated as the spec; any other existing path is a plan file. If classification is ambiguous, ask the user via `AskUserQuestion`.
 
-If no plan path remains after stripping `--fix`, ask the user with `AskUserQuestion`:
+If no plan path remains after stripping the flags, ask the user with `AskUserQuestion`:
 > "Please provide the path(s) to the plan file(s) to review (one or more)."
 
 **Spec auto-discovery (when no spec path was given):**
@@ -340,10 +340,10 @@ Display the synthesized report in the terminal. Do NOT save the report to disk. 
 
 After the report is displayed, optionally apply the review's editable findings back to the plan file as edits.
 
-- **Default mode** (`fix_mode = false`): edits are proposed and applied only after the user approves the diff (Step 7.3).
-- **Auto-apply mode** (`fix_mode = true`, i.e. `--fix` was passed): the diff is still built and displayed (Steps 7.1–7.2), but the approval gate (Step 7.3) is skipped and the edits are applied automatically (Step 7.4).
+- **Default mode** (`review_only = false`): the diff is built and displayed (Steps 7.1–7.2), then the approval gate (Step 7.3) is skipped and the edits are applied automatically (Step 7.4).
+- **Review-only mode** (`review_only = true`, i.e. `--review-only` was passed): edits are proposed and applied only after the user approves the diff (Step 7.3).
 
-The skip conditions and the finding filter (Step 7.1) apply in BOTH modes — `--fix` only removes the human approval gate, it does not loosen which findings qualify as edits.
+The skip conditions and the finding filter (Step 7.1) apply in BOTH modes — auto-apply only removes the human approval gate, it does not loosen which findings qualify as edits.
 
 #### Skip conditions
 
@@ -384,9 +384,9 @@ Display the full diff block in the terminal before asking for approval.
 
 #### Step 7.3: Ask for approval
 
-**Auto-apply mode (`fix_mode = true`):** Skip this step entirely. Do NOT call `AskUserQuestion`. Print a one-line notice — "`--fix` set: auto-applying the {N} changes above to `{plan_path}`." — and proceed directly to Step 7.4.
+**Default mode (`review_only = false`):** Skip this step entirely. Do NOT call `AskUserQuestion`. Print a one-line notice — "Auto-applying the {N} changes above to `{plan_path}` (pass `--review-only` to require approval)." — and proceed directly to Step 7.4.
 
-**Default mode (`fix_mode = false`):** Use `AskUserQuestion`:
+**Review-only mode (`review_only = true`):** Use `AskUserQuestion`:
 
 > "Apply the {N} changes above to `{plan_path}`?"
 >
@@ -398,13 +398,13 @@ Display the full diff block in the terminal before asking for approval.
 
 #### Step 7.4: Apply
 
-Apply when EITHER `fix_mode = true` (auto-apply) OR the user chose Apply in Step 7.3:
+Apply when EITHER `review_only = false` (default auto-apply) OR the user chose Apply in Step 7.3:
 
 1. For each edit entry, use the `Edit` tool with `old_string` = original text (or empty for inserts) and `new_string` = new text. Set `replace_all: false` (each location should be unique; if `Edit` errors due to non-unique `old_string`, widen the `old_string` to include surrounding context and retry once).
 2. After all edits succeed, report: "Applied {N} changes to `{plan_path}`."
-3. If any edit fails after the retry, stop and report which edit failed with the error message. Do NOT roll back successful edits — leave the partially-updated state for the user to inspect. (This applies in auto-apply mode too — `--fix` never triggers a rollback.)
+3. If any edit fails after the retry, stop and report which edit failed with the error message. Do NOT roll back successful edits — leave the partially-updated state for the user to inspect. (This applies in default auto-apply mode too — auto-apply never triggers a rollback.)
 
-If the user chose Skip (default mode only), do nothing and end.
+If the user chose Skip (review-only mode), do nothing and end.
 
 #### Step 7.5: End
 
@@ -428,13 +428,13 @@ Suggest next action:
 
 | Step | Action |
 |------|--------|
-| Input | plan file path(s) (+ optional spec path) (+ optional free text) (+ optional `--fix` flag) |
+| Input | plan file path(s) (+ optional spec path) (+ optional free text) (+ optional `--review-only` flag) |
 | Pre-pass | grep plan for placeholder red flags + Interfaces lines → inject as verification candidates |
 | Prompts | 4 plan-edition axes, same output format for both, evidence-gathering differs |
 | Launch | 1 message, 2 tool calls (Bash `codex exec --ephemeral -s read-only -o "$OUTFILE"` timeout 300000 + Agent) |
 | Output | Synthesized 4-axis report in terminal (no file save); editable vs report-only classification |
-| Update (Phase 7) | Filter editable findings → propose diff (Task N > Step M or section-heading anchors) → user approves Apply/Skip → `Edit` tool applies |
-| Update with `--fix` | Filter editable findings → propose & display diff → **auto-apply** (no approval gate) → `Edit` tool applies |
+| Update (Phase 7, default) | Filter editable findings → propose & display diff (Task N > Step M or section-heading anchors) → **auto-apply** (no approval gate) → `Edit` tool applies |
+| Update with `--review-only` | Filter editable findings → propose diff → user approves Apply/Skip → `Edit` tool applies |
 
 ## Common Mistakes
 
@@ -444,12 +444,12 @@ Suggest next action:
 - **Inlining full plan text into the prompt** — instead, list the file paths and let each tool `Read` the plan. Shorter prompts produce faster, more focused results.
 - **Copying spec-review's 180s timeout** — plan reviews open every referenced file; use `timeout: 300000`.
 - **Parsing Codex event noise for synthesis** — read the final message after `===== FINAL MESSAGE =====` (written by `-o`); do not parse the event log.
-- **Auto-creating tasks for coverage gaps** — coverage findings are report-only, even under `--fix`. Adding tasks is `writing-plans`' responsibility.
+- **Auto-creating tasks for coverage gaps** — coverage findings are report-only, even in default auto-apply mode. Adding tasks is `writing-plans`' responsibility.
 - **Flagging missing Interfaces blocks as defects** — older plans predate Interfaces; absence is reported as "not present", not a defect.
 - **Anchoring edits by heading path alone** — plan steps are bold list items, not headings; every edit needs "Task N > Step M" (or a unique section heading for non-task sections) plus quoted anchor text.
 - **Saving the report to disk** — the report stays in the terminal; only the plan file itself may be edited (Phase 7).
 - **Applying plan edits without showing the diff first** — Phase 7 MUST display the full diff before any `Edit` call, in BOTH modes. Never apply edits that were not shown to the user.
-- **Treating `--fix` as a license to skip the filter or the diff** — `--fix` only removes the human approval gate (Step 7.3). The finding filter (Step 7.1) and the diff display (Step 7.2) still run.
-- **Treating a path-like `--fix` as a file** — `--fix` is a flag, not a plan path. Strip it during Phase 1 input parsing before verifying file paths exist.
+- **Treating default auto-apply as a license to skip the filter or the diff** — auto-apply only removes the human approval gate (Step 7.3). The finding filter (Step 7.1) and the diff display (Step 7.2) still run.
+- **Treating `--review-only` or the legacy `--fix` as a file** — they are flags, not plan paths. Strip them during Phase 1 input parsing before verifying file paths exist. `--fix` is a deprecated no-op; do not error on it.
 - **Rolling back on Phase 7 failure** — if one `Edit` fails mid-application, leave the partial state for the user to inspect.
 - **Evaluating fewer than 4 axes** — the 4 axes are fixed and required. If an axis has no findings, write `N/A`, do not omit the section.

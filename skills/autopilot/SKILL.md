@@ -72,9 +72,9 @@ digraph autopilot {
     "Stage 1: Generate spec\n+ self-review" [shape=box];
     "User approves spec?" [shape=diamond];
     "Revise spec" [shape=box];
-    "Stage 2: forte:spec-review --fix" [shape=box];
+    "Stage 2: forte:spec-review (auto-apply)" [shape=box];
     "Stage 3: superpowers:writing-plans\n(pre-answer: Subagent-Driven)" [shape=box];
-    "Stage 4: forte:plan-review --fix" [shape=box];
+    "Stage 4: forte:plan-review (auto-apply)" [shape=box];
     "Stage 5: subagent-driven-development\n(standing answers)" [shape=box];
     "Stage 6: built-in code-review max --fix" [shape=box];
     "Stage 7: built-in simplify" [shape=box];
@@ -82,16 +82,16 @@ digraph autopilot {
     "STOP: ledger + report" [shape=box style=filled fillcolor=lightcoral];
 
     "Parse args, write ledger header\n(create --branch if given)" -> "Spec path provided?";
-    "Spec path provided?" -> "Stage 2: forte:spec-review --fix" [label="yes (counts as approved)"];
+    "Spec path provided?" -> "Stage 2: forte:spec-review (auto-apply)" [label="yes (counts as approved)"];
     "Spec path provided?" -> "Stage 1: Generate spec\n+ self-review" [label="no"];
     "Stage 1: Generate spec\n+ self-review" -> "User approves spec?";
-    "User approves spec?" -> "Stage 2: forte:spec-review --fix" [label="approve"];
+    "User approves spec?" -> "Stage 2: forte:spec-review (auto-apply)" [label="approve"];
     "User approves spec?" -> "Revise spec" [label="revise"];
     "Revise spec" -> "User approves spec?";
     "User approves spec?" -> "STOP: ledger + report" [label="no resolvable answer"];
-    "Stage 2: forte:spec-review --fix" -> "Stage 3: superpowers:writing-plans\n(pre-answer: Subagent-Driven)";
-    "Stage 3: superpowers:writing-plans\n(pre-answer: Subagent-Driven)" -> "Stage 4: forte:plan-review --fix";
-    "Stage 4: forte:plan-review --fix" -> "Stage 5: subagent-driven-development\n(standing answers)";
+    "Stage 2: forte:spec-review (auto-apply)" -> "Stage 3: superpowers:writing-plans\n(pre-answer: Subagent-Driven)";
+    "Stage 3: superpowers:writing-plans\n(pre-answer: Subagent-Driven)" -> "Stage 4: forte:plan-review (auto-apply)";
+    "Stage 4: forte:plan-review (auto-apply)" -> "Stage 5: subagent-driven-development\n(standing answers)";
     "Stage 5: subagent-driven-development\n(standing answers)" -> "Stage 6: built-in code-review max --fix" [label="done"];
     "Stage 5: subagent-driven-development\n(standing answers)" -> "STOP: ledger + report" [label="unresolvable BLOCKED"];
     "Stage 6: built-in code-review max --fix" -> "Stage 7: built-in simplify";
@@ -110,7 +110,7 @@ digraph autopilot {
 
 ### Stage 2: Spec Review
 
-Invoke `forte:spec-review` via the Skill tool with args `"<spec-path> --fix"`. The `--fix` flag removes the approval gate inside spec-review; its finding filter and diff display still run. Accept the outcome as-is and proceed. Record the spec path in the ledger completion line.
+Invoke `forte:spec-review` via the Skill tool with args `"<spec-path>"`. Auto-apply is spec-review's default (no flag needed; its finding filter and diff display still run) — do NOT pass `--review-only`. Accept the outcome as-is and proceed. Record the spec path in the ledger completion line.
 
 ### Stage 3: Writing Plans
 
@@ -118,7 +118,7 @@ Invoke `superpowers:writing-plans` via the Skill tool with the spec path. **Gate
 
 ### Stage 4: Plan Review
 
-Invoke `forte:plan-review` via the Skill tool with args `"<plan-path> <spec-path> --fix"`. Report-only findings (coverage gaps, new-task proposals) are recorded as `DEFERRED:` ledger lines for the Stage 8 report, not acted on.
+Invoke `forte:plan-review` via the Skill tool with args `"<plan-path> <spec-path>"`. Auto-apply is plan-review's default (no flag needed) — do NOT pass `--review-only`. Report-only findings (coverage gaps, new-task proposals) are recorded as `DEFERRED:` ledger lines for the Stage 8 report, not acted on.
 
 ### Stage 5: Implementation
 
@@ -208,7 +208,7 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 | Input | feature description and/or spec path (+ optional `--branch <name>`) |
 | Gate | Stage 1 spec approval ONLY; provided spec = pre-approved |
 | Ledger | `.superpowers/autopilot/pipeline.md`: header + start SHA, started/complete/DEFERRED/STOPPED/PIPELINE COMPLETE lines |
-| Stage args | spec-review `"<spec> --fix"` · writing-plans (pre-answer Subagent-Driven) · plan-review `"<plan> <spec> --fix"` · SDD (standing answers) · code-review `"max --fix"` · simplify |
+| Stage args | spec-review `"<spec>"` · writing-plans (pre-answer Subagent-Driven) · plan-review `"<plan> <spec>"` (auto-apply is both reviews' default) · SDD (standing answers) · code-review `"max --fix"` · simplify |
 | Deferred | plan-contradicting / scope-expanding / report-only findings → `DEFERRED:` lines → Stage 8 list |
 | Output | Stage 8 terminal report; no disk save, no push |
 
