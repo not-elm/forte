@@ -21,7 +21,7 @@ By default, plan updates are proposed and require user approval (Apply/Skip) bef
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
-> **Maintenance note:** plan-review intentionally clones spec-review's Phases 3–7 mechanics. Any future fix to spec-review's parallel-launch, synthesis rubric, or Phase 7 semantics must be mirrored here (and vice versa).
+> **Maintenance note:** plan-review intentionally clones spec-review's Phases 3–7 mechanics. Any future fix to spec-review's parallel-launch, synthesis rubric, or Phase 7 semantics must be mirrored here (and vice versa). If the two drift repeatedly, extract a shared `review-engine` reference (the board-engine pattern) at that point — not now (YAGNI).
 
 ## When to Use
 
@@ -110,7 +110,7 @@ Verify each provided path exists. If a path is missing, report the error and sto
 
 **Deterministic pre-pass (Grep, before prompt building):** collect two candidate lists from the plan file(s):
 
-1. Placeholder red-flag hits — lines matching `TBD`, `TODO`, `Similar to Task`, or `implement later` (case-sensitive, with line numbers).
+1. Placeholder red-flag hits — lines matching `TBD` or `TODO` (case-sensitive) and `Similar to Task` or `implement later` (case-insensitive), with line numbers.
 2. All Interfaces lines — lines matching `Interfaces`, `Consumes`, or `Produces` (with line numbers).
 
 Inject both lists into BOTH reviewer prompts under a `## Verification Candidates` section (write "none found" for an empty list). Reviewers adjudicate false positives (e.g., a legitimate mention of "TODO" inside example code the plan intentionally shows) and do the semantic checks the grep cannot (type consistency, ordering).
@@ -357,7 +357,7 @@ Skip Phase 7 entirely (proceed to End) if any of the following holds:
 Walk through each **editable** finding from the synthesized report (report-only findings never reach this step). Keep a finding ONLY if all three hold:
 
 1. **Concrete change** — the finding/suggestion describes a specific text change (not a vague concern like "consider performance").
-2. **Locatable** — the target is identifiable as "Task N > Step M" plus quoted text. Plan steps are bold list items, not headings, so heading paths alone are not unique; quoted text is the anchor.
+2. **Locatable** — the target is identifiable as "Task N > Step M" plus quoted text, or — for edits in non-task sections (Goal, Architecture, Tech Stack, Global Constraints) — a unique section heading plus quoted text. Plan steps are bold list items, not headings, so heading paths alone are not unique; quoted text is the anchor.
 3. **Confidence is not Low** — only High / Medium findings are proposed by default. Low-confidence items may be presented separately if the user opts in.
 
 Discard everything else. Findings that disagreed between Codex and the Claude Code Agent are kept ONLY when the disagreement was resolved during synthesis; unresolved conflicts are NOT proposed as edits.
@@ -368,7 +368,7 @@ For each kept finding, construct an edit entry:
 
 ````
 ### Edit {N} — {axis} — {short title}
-**Location:** Task {N} > Step {M} — "{quoted anchor text}"
+**Location:** Task {N} > Step {M} — "{quoted anchor text}" (or, for non-task sections: {section heading} — "{quoted anchor text}")
 **Operation:** replace | insert-after | insert-before | delete
 **Rationale:** {1 sentence pointing to the report finding}
 
@@ -433,7 +433,7 @@ Suggest next action:
 | Prompts | 4 plan-edition axes, same output format for both, evidence-gathering differs |
 | Launch | 1 message, 2 tool calls (Bash `codex exec --ephemeral -s read-only -o "$OUTFILE"` timeout 300000 + Agent) |
 | Output | Synthesized 4-axis report in terminal (no file save); editable vs report-only classification |
-| Update (Phase 7) | Filter editable findings → propose diff (Task N > Step M anchors) → user approves Apply/Skip → `Edit` tool applies |
+| Update (Phase 7) | Filter editable findings → propose diff (Task N > Step M or section-heading anchors) → user approves Apply/Skip → `Edit` tool applies |
 | Update with `--fix` | Filter editable findings → propose & display diff → **auto-apply** (no approval gate) → `Edit` tool applies |
 
 ## Common Mistakes
@@ -446,7 +446,7 @@ Suggest next action:
 - **Parsing Codex event noise for synthesis** — read the final message after `===== FINAL MESSAGE =====` (written by `-o`); do not parse the event log.
 - **Auto-creating tasks for coverage gaps** — coverage findings are report-only, even under `--fix`. Adding tasks is `writing-plans`' responsibility.
 - **Flagging missing Interfaces blocks as defects** — older plans predate Interfaces; absence is reported as "not present", not a defect.
-- **Anchoring edits by heading path alone** — plan steps are bold list items, not headings; every edit needs "Task N > Step M" plus quoted anchor text.
+- **Anchoring edits by heading path alone** — plan steps are bold list items, not headings; every edit needs "Task N > Step M" (or a unique section heading for non-task sections) plus quoted anchor text.
 - **Saving the report to disk** — the report stays in the terminal; only the plan file itself may be edited (Phase 7).
 - **Applying plan edits without showing the diff first** — Phase 7 MUST display the full diff before any `Edit` call, in BOTH modes. Never apply edits that were not shown to the user.
 - **Treating `--fix` as a license to skip the filter or the diff** — `--fix` only removes the human approval gate (Step 7.3). The finding filter (Step 7.1) and the diff display (Step 7.2) still run.
