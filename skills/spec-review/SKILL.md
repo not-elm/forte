@@ -15,6 +15,13 @@ By default, spec updates are auto-applied: the proposed diff is displayed, then 
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
+**Shared contract:** Codex invocation mechanics live in codex-engine REFERENCE.md. Before Phase 4:
+
+1. Use `Glob pattern="**/codex-engine/REFERENCE.md"` to locate the file
+2. Read it
+
+If not found, display: `> Warning: codex-engine reference not found. Using inline rules only.`
+
 ## When to Use
 
 - After `brainstorming` produces a spec and before invoking `writing-plans`, to get a second opinion
@@ -22,7 +29,7 @@ By default, spec updates are auto-applied: the proposed diff is displayed, then 
 - When you want both codebase-grounded review (Codex) and web-aware review (Claude Code Agent + Web)
 
 **When NOT to use:**
-- For implementation code review — use `code-review-board` or `codex-review` instead
+- For implementation code review — use the built-in `code-review` skill instead
 - For deep multi-round debate — use `design-board` or `discussion-board` instead
 
 ## The 4 Fixed Axes
@@ -193,20 +200,16 @@ Before launching the parallel calls, display:
 
 Launch both tools in **a single message with two tool calls**. Sequential calls defeat the purpose of this skill.
 
-**Tool call 1 — Bash (Codex):**
+**Tool call 1 — Bash (Codex):** the canonical invocation from codex-engine REFERENCE.md with:
 
-```bash
-TMPFILE=$(mktemp /tmp/spec-review-codex-XXXXXX)
-trap 'rm -f "$TMPFILE"' EXIT
-cat <<'PROMPT_EOF' > "$TMPFILE"
-{codex_prompt}
-PROMPT_EOF
-# --ephemeral: skip session persistence (skills never resume sessions)
-cat "$TMPFILE" | codex exec --ephemeral
-```
+| Value | |
+|-------|---|
+| `{PREFIX}` | `spec-review-codex` |
+| `{prompt}` | `{codex_prompt}` built in Phase 3 |
 
-- Set Bash tool `timeout: 180000` (3 minutes).
-- Never pass the prompt as a CLI argument — temp file + stdin only.
+The call returns immediately, so it does not block the Agent call that follows it. After both
+are dispatched, follow the reference's wait protocol (Monitor until-loop on
+`CODEX_DONE_MARKER`, 900s ceiling) and read-back protocol before synthesis.
 
 **Tool call 2 — Agent (Claude Code):**
 
@@ -360,7 +363,7 @@ Suggest next action:
 
 | Situation | Action |
 |-----------|--------|
-| Codex CLI not installed (exit 127) or timeout | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: {reason}" at report top. |
+| Codex CLI not installed (exit 127) or ceiling exceeded (900s) | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: {reason}" at report top. |
 | Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent not used: {reason}" at report top. |
 | Both fail | Display error message and stop. |
 | Partial / malformed output from either side | Best-effort integration; note which side was incomplete. |
@@ -373,18 +376,18 @@ Suggest next action:
 |------|--------|
 | Input | spec file paths (+ optional free text) (+ optional `--review-only` flag) |
 | Prompts | 4 fixed axes, same output format for both, evidence-gathering differs |
-| Launch | 1 message, 2 tool calls (Bash for Codex + Agent for Claude Code) |
+| Launch | 1 message, 2 tool calls (Bash: codex-engine canonical invocation, `{PREFIX}` = `spec-review-codex` + Agent), then the reference's wait protocol |
 | Output | Synthesized 4-axis report in terminal (no file save) |
 | Update (Phase 7, default) | Filter findings → propose & display diff → **auto-apply** (no approval gate) → `Edit` tool applies |
 | Update with `--review-only` | Filter findings → propose diff → user approves Apply/Skip → `Edit` tool applies |
 
 ## Common Mistakes
 
+Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation,
+model/effort flags, timeouts) are covered in codex-engine REFERENCE.md. Skill-specific:
+
 - **Not launching both tools in the same message** — sequential calls defeat parallelism.
-- **Using wrong Codex subcommand** — must use `codex exec` for non-interactive mode; other invocations may hang.
-- **Passing long prompts as CLI arguments** — always use temp file + stdin. Direct CLI args can exceed shell limits (~32KB on Windows) and cause Codex to hang silently.
 - **Inlining full spec text into the prompt** — instead, list the file paths and let each tool `Read` the spec. Shorter prompts produce faster, more focused results.
-- **Forgetting the Bash `timeout: 180000`** — the default 120s timeout will kill longer Codex runs.
 - **Saving the report to disk** — the report stays in the terminal; only the spec file itself may be edited (Phase 7, with user approval).
 - **Applying spec edits without showing the diff first** — Phase 7 MUST display the full diff before any `Edit` call, in BOTH modes. In default mode it applies after displaying the diff; in review-only mode it first obtains `AskUserQuestion` approval. Never apply edits that were not shown to the user.
 - **Treating default auto-apply as a license to skip the filter or the diff** — auto-apply only removes the human approval gate (Step 7.3). The finding filter (Step 7.1) and the diff display (Step 7.2) still run. Do not auto-apply Low-confidence or vague findings.

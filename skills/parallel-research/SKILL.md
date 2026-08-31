@@ -13,6 +13,13 @@ Dispatch parallel investigations to Codex CLI (codebase-focused) and a Claude Co
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
+**Shared contract:** Codex invocation mechanics live in codex-engine REFERENCE.md. Before Phase 4:
+
+1. Use `Glob pattern="**/codex-engine/REFERENCE.md"` to locate the file
+2. Read it
+
+If not found, display: `> Warning: codex-engine reference not found. Using inline rules only.`
+
 ## When to Use
 
 - When you want multiple AI perspectives on a technical question, design decision, or bug
@@ -124,27 +131,16 @@ Display a status message, then launch both investigations in a **single message*
 **Status message (display before tool calls):**
 > "Codex と Claude Code Agent に並列で調査を依頼しています（3〜5分程度かかることがあります）..."
 
-**Tool call 1 — Bash (Codex):**
-```bash
-TMPFILE=$(mktemp /tmp/parallel-research-codex-XXXXXX)
-OUTFILE=$(mktemp /tmp/parallel-research-codex-out-XXXXXX)
-trap 'rm -f "$TMPFILE" "$OUTFILE"' EXIT
-cat <<'PROMPT_EOF' > "$TMPFILE"
-{codex_prompt}
-PROMPT_EOF
-# --ephemeral: skip session persistence (skills never resume sessions)
-# -s read-only: research must never write, regardless of user-level sandbox config
-# -c model_reasoning_effort="medium": open-ended research at higher efforts blows past
-#   the Bash tool's 10-minute ceiling on large repos (measured on the same prompt/repo:
-#   xhigh 9m16s vs medium 3m00s with equally evidence-rich output)
-# -o: write only the final message to OUTFILE (no event/progress noise)
-cat "$TMPFILE" | codex exec --ephemeral -s read-only -c model_reasoning_effort="medium" -o "$OUTFILE"
-echo "===== FINAL MESSAGE ====="
-cat "$OUTFILE"
-```
-- Set Bash tool `timeout: 600000` (10 minutes — the tool maximum). Research is the slowest Codex workload in this plugin; shorter caps kill runs mid-flight and lose all output.
-- Run the Codex call in the foreground (no `run_in_background`) — background completion notifications have been observed firing prematurely for long codex runs, which would make the skill read an empty output file.
-- Use the text after `===== FINAL MESSAGE =====` for synthesis; ignore the event log above it.
+**Tool call 1 — Bash (Codex):** the canonical invocation from codex-engine REFERENCE.md with:
+
+| Value | |
+|-------|---|
+| `{PREFIX}` | `parallel-research-codex` |
+| `{prompt}` | `{codex_prompt}` built in Phase 3 |
+
+The call returns immediately — the detached run does not block the Agent call that follows it.
+Research is the slowest Codex workload in this plugin, which is why the reference's 900s
+ceiling matters most here.
 
 **Tool call 2 — Agent:**
 ```json
@@ -158,7 +154,10 @@ cat "$OUTFILE"
 
 **Both tool calls MUST be in the same message for true parallel execution.**
 
-**Codex unavailable fallback:** If `codex` command is not found (exit code 127 or "command not found" in stderr), proceed with Claude Code Agent results only. Note this in the report.
+Then wait per the reference's wait protocol: a Monitor until-loop on `CODEX_DONE_MARKER` with
+a 900s ceiling, and read `CODEX_FINAL_OUTPUT` from line 1 through EOF before synthesis.
+
+**Codex unavailable fallback:** If `CODEX_DONE_MARKER` reports exit code 127, proceed with Claude Code Agent results only. Note this in the report.
 
 ### Phase 5: Synthesize Report
 
@@ -203,16 +202,17 @@ After both results return (or one result + one error), synthesize into this form
 
 | Situation | Action |
 |-----------|--------|
-| Codex CLI not installed or timeout (600s) | Report with Claude Code Agent results only. Add note: "⚠ Codex未使用: {reason}" at report top |
+| Codex CLI not installed (exit 127) or ceiling exceeded (900s) | Report with Claude Code Agent results only. Add note: "⚠ Codex未使用: {reason}" at report top |
 | Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent未使用: {reason}" at report top |
 | Both fail | Display error message and stop |
 | Partial/malformed output from either side | Best-effort integration, note which side was incomplete |
 
 ## Common Mistakes
 
+Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation,
+model/effort flags, `run_in_background`) are covered in codex-engine REFERENCE.md.
+Skill-specific:
+
 - **Not launching both tools in the same message**: Codex Bash call and Agent call MUST be in a single message for parallel execution. Sequential calls defeat the purpose of this skill.
-- **Using wrong Codex subcommand**: Must use `codex exec` for non-interactive mode; other invocations may hang.
-- **Passing long prompts as CLI arguments**: Always use the temp file + stdin approach. Direct CLI arguments can exceed shell limits and cause Codex to hang silently.
-- **Forgetting timeout**: Set Bash tool `timeout: 600000` (10 minutes) for the Codex call. The default 120s — and the 180s this skill previously used — kills research runs mid-flight, losing all output.
-- **Letting user-level reasoning effort leak in**: Always pass `-c model_reasoning_effort="medium"`. If the user's `~/.codex/config.toml` sets a higher effort (e.g. `xhigh`), an open-ended research run can exceed even the 10-minute Bash ceiling (measured: 9m16s at xhigh vs 3m00s at medium on the same prompt).
-- **Running the Codex call with `run_in_background`**: Background completion notifications can fire prematurely for long codex runs, causing the skill to read empty output. Keep the call in the foreground; parallelism comes from the Agent call in the same message.
+- **Waiting on Codex before dispatching the Agent**: the detached Bash call returns immediately, so there is no reason to serialize. Dispatch both, then run the wait protocol once.
+- **Synthesizing from one side while the other is still running**: complete the wait protocol before Phase 5, or the report silently drops half its input.

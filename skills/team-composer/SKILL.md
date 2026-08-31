@@ -134,14 +134,11 @@ Before participating in the discussion, run a Codex exploration:
    Identify key considerations, potential issues, and insights that a {role-name}
    would find relevant. Cite specific file paths and line numbers as evidence."
 
-2. Execute:
-   cat <<'PROMPT_EOF' > /tmp/cx-explore-prompt.txt
-   <constructed_prompt>
-   PROMPT_EOF
-   cat /tmp/cx-explore-prompt.txt | codex exec --ephemeral
-   rm -f /tmp/cx-explore-prompt.txt
+2. Execute the canonical invocation from codex-engine REFERENCE.md with `{PREFIX}` = `cx-explore`.
 
-3. Use the findings as your unique perspective when writing hypotheses and critiques.
+3. Follow the reference's wait protocol (Monitor until-loop on `CODEX_DONE_MARKER`, 900s ceiling) and read-back protocol.
+
+4. Use the findings as your unique perspective when writing hypotheses and critiques.
    Reference Codex findings with [codex-explored] label.
 
 If codex CLI is not installed or fails, report failure to leader via SendMessage: "Codex CLI unavailable."
@@ -162,8 +159,9 @@ Board skills provide the specific prompt with their framing field definitions (e
 
 ### Hypothesize (Round 2+)
 
-```bash
-cat <<'PROMPT_EOF' > /tmp/cx-hypothesize-prompt.txt
+Canonical invocation from codex-engine REFERENCE.md, `{PREFIX}` = `cx-hypothesize`, with:
+
+```
 Read the following file and extract the Round Context Packet:
 - {absolute-path}/phase-{N}/SYNTHESIS.md (read ## Round Context Packet → ### Round {N-1})
 
@@ -171,15 +169,13 @@ From a {role-description} perspective regarding: {topic}
 Generate 1-2 hypotheses based on the discussion context + codebase analysis.
 Include axis= tags. Cite file:line references where relevant.
 Output: hypothesis entries only, max 300 tokens.
-PROMPT_EOF
-cat /tmp/cx-hypothesize-prompt.txt | codex exec --ephemeral
-rm -f /tmp/cx-hypothesize-prompt.txt
 ```
 
 ### Critique
 
-```bash
-cat <<'PROMPT_EOF' > /tmp/cx-critique-prompt.txt
+Canonical invocation from codex-engine REFERENCE.md, `{PREFIX}` = `cx-critique`, with:
+
+```
 Read the following entries from {absolute-path}/phase-{N}/WHITEBOARD-R{round}.md:
 - Grep for: {assigned-ID-1}, {assigned-ID-2}
 
@@ -187,14 +183,11 @@ From a {role-description} perspective, critique these hypotheses.
 Each critique must include: label (challenge/support/amend/question), refs=[...], @{member}, axis={tag}.
 Verify claims against the codebase where possible. Cite file:line as evidence.
 Output: critique entries only, max 250 tokens.
-PROMPT_EOF
-cat /tmp/cx-critique-prompt.txt | codex exec --ephemeral
-rm -f /tmp/cx-critique-prompt.txt
 ```
 
 ### Transcription rule
 
--cx members transcribe Codex output directly into their `### {name}` subsection. Only ID assignment (e.g., `[H-{P}-{I}X-{seq}]`, `[CR-{P}-{I}X-R{N}-{seq}]`) is performed by the -cx member. Content is not re-interpreted or summarized by Claude.
+-cx members transcribe the complete Codex final-message file directly into their `### {name}` subsection. Only ID assignment (e.g., `[H-{P}-{I}X-{seq}]`, `[CR-{P}-{I}X-R{N}-{seq}]`) is performed by the -cx member. Content is not re-interpreted, summarized, or recovered from a partial terminal excerpt by Claude.
 
 ### Codex Failure
 
@@ -205,7 +198,15 @@ Leader terminates the skill immediately. Clean up: delete working directory if i
 
 -cx members SHOULD be spawned with `model: "sonnet"` for cost efficiency. Their work is primarily Codex mediation (prompt construction → execution → transcription → ID assignment). Board skills specify the model when spawning -cx members via the Agent tool.
 
-Set Bash tool `timeout: 180000` (3 minutes) for all codex exec invocations.
+All Codex invocations follow codex-engine REFERENCE.md — invocation block, 900s wait ceiling,
+read-back rules, and failure handling. -cx members MUST load it:
+
+1. Use `Glob pattern="**/codex-engine/REFERENCE.md"` to locate the file
+2. Read it
+
+If not found, display: `> Warning: codex-engine reference not found. Using inline rules only.`
+
+This skill supplies only `{PREFIX}` and the phase-specific prompt.
 
 ## Error Handling
 

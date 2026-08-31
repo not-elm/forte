@@ -130,18 +130,13 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
   {hypotheses and critique claims from current round}
   ```
 
-- Execute via temp file + stdin:
-  ```bash
-  TMPFILE=$(mktemp)
-  cat <<'PROMPT_EOF' > "$TMPFILE"
-  <constructed_prompt>
-  PROMPT_EOF
-  cat "$TMPFILE" | codex exec --ephemeral
-  rm -f "$TMPFILE"
-  ```
+- Execute the canonical invocation from codex-engine REFERENCE.md with `{PREFIX}` = `board-audit`.
+  Locate it with `Glob pattern="**/codex-engine/REFERENCE.md"` and read it first; if not found,
+  display `> Warning: codex-engine reference not found. Using inline rules only.`
 
-- Write results to WHITEBOARD-R{N}.md `## Audit` section.
-- Set Bash tool `timeout: 180000` (3 minutes) for the Codex invocation.
+- Follow that reference's wait protocol (Monitor until-loop on `CODEX_DONE_MARKER`, 900s ceiling)
+  and read-back protocol. Only after the complete final message has been read, write the results
+  to WHITEBOARD-R{N}.md `## Audit`.
 
 - **Error handling:**
   - Codex exits non-zero or times out → leader terminates the skill immediately with error: "Codex execution failed (exit code {N} / timeout). Skill aborted." Clean up working directory and temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).

@@ -16,9 +16,8 @@ skills/
   autopilot/           # Full-pipeline orchestrator: spec → reviews → plan → implementation → code-review → simplify
   batch-fix/           # Batch-fix code review findings with clear solutions
   board-engine/        # Shared debate engine reference for all board skills (round-split WB, debate cycle, rules)
-  code-review-board/   # Multi-perspective parallel code review (8 reviewer agents)
+  codex-engine/        # Shared Codex CLI execution contract for all codex-based skills (invocation, wait, read-back)
   codex-investigate/   # Bug root-cause investigation via Codex CLI
-  codex-review/        # Design/code/hypothesis review via Codex CLI
   deep-fix/            # Deep-fix complex code review findings requiring design
   design-board/        # Implementation design via 2-phase structured team debate
   discussion-board/    # Structured team debate with iterative synthesis
@@ -36,8 +35,8 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 
 ### Key Patterns Across Skills
 
-- **Codex-based skills** (codex-investigate, codex-review, parallel-research, plan-review, spec-review): Use `codex exec` CLI in read-only mode. Prompts are always written to a temp file and piped via stdin to avoid shell argument length limits. `parallel-research`, `spec-review`, and `plan-review` additionally dispatch a Claude Code Agent in parallel within a single message.
-- **Agent Team skills** (code-review-board, design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a round-split WHITEBOARD model (base WHITEBOARD.md + per-round WHITEBOARD-R{N}.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention. Shared debate rules are in `board-engine/REFERENCE.md`; each board SKILL.md contains only board-specific logic.
+- **Codex-based skills** (codex-investigate, parallel-research, plan-review, spec-review, plus board `-cx` members): Invocation mechanics are defined once in `codex-engine/REFERENCE.md` — detached `codex exec` in read-only mode, prompt via temp file + stdin, completion signalled by a sentinel file carrying the exit code, a 900s Monitor wait ceiling, and full-file read-back. Each SKILL.md owns only its prompt and its `{PREFIX}`; it never sets a timeout, a model, or a reasoning effort. `parallel-research`, `spec-review`, and `plan-review` additionally dispatch a Claude Code Agent in parallel within a single message.
+- **Agent Team skills** (design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a round-split WHITEBOARD model (base WHITEBOARD.md + per-round WHITEBOARD-R{N}.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention. Shared debate rules are in `board-engine/REFERENCE.md`; each board SKILL.md contains only board-specific logic.
 - **Orchestrator skills** (autopilot): Chain existing skills via sequential Skill invocations with pipeline-side gate overrides (standing answers to downstream skills' user prompts). Own only stage ordering, arguments, ledger, and stop conditions — never duplicate stage logic.
 
 ## Adding a New Skill

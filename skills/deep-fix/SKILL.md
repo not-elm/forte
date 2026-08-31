@@ -8,7 +8,7 @@ description: >-
 
 # deep-fix — Deep Fix Complex Review Findings
 
-Address code-review-board findings that lack a `> Solution:` line and require design discussion or planning before implementation. Parses the review Markdown, validates findings against current code, ranks candidates by dependency analysis, and delegates to brainstorming or Plan mode for design and implementation.
+Address code review findings that lack a `> Solution:` line and require design discussion or planning before implementation. Parses the review Markdown, validates findings against current code, ranks candidates by dependency analysis, and delegates to brainstorming or Plan mode for design and implementation.
 
 ## When to Use
 
@@ -92,7 +92,7 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        - Line starts with `- [ ]` (unchecked only — skip `- [x]`)
                        - Has `> Impact:` line starting with `[multi-site]` or `[cross-module]`
                        - Does NOT have a `> Solution:` line (findings with Solution belong to batch-fix)
-                    c. Finding line format (from code-review-board report):
+                    c. Finding line format (from the review report):
                        `- [ ] [R-XX-NNN] **Severity** | `perspective` | `file:line` | Description`
                        For each matching finding, extract:
                        - Finding ID (e.g., [R-AR-003])

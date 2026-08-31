@@ -21,6 +21,13 @@ By default, plan updates are auto-applied: the proposed diff is displayed, then 
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
+**Shared contract:** Codex invocation mechanics live in codex-engine REFERENCE.md. Before Phase 4:
+
+1. Use `Glob pattern="**/codex-engine/REFERENCE.md"` to locate the file
+2. Read it
+
+If not found, display: `> Warning: codex-engine reference not found. Using inline rules only.`
+
 > **Maintenance note:** plan-review intentionally clones spec-review's Phases 3–7 mechanics. Any future fix to spec-review's parallel-launch, synthesis rubric, or Phase 7 semantics must be mirrored here (and vice versa). If the two drift repeatedly, extract a shared `review-engine` reference (the board-engine pattern) at that point — not now (YAGNI).
 
 ## When to Use
@@ -30,7 +37,7 @@ By default, plan updates are auto-applied: the proposed diff is displayed, then 
 
 **When NOT to use:**
 - For a spec / design document — use `spec-review` instead
-- For implementation code review — use `code-review-board` or `codex-review` instead
+- For implementation code review — use the built-in `code-review` skill instead
 - To generate missing tasks — adding tasks is `writing-plans`' responsibility; this skill reports coverage gaps but never creates tasks
 
 ## The 4 Fixed Axes (Plan Edition)
@@ -232,26 +239,19 @@ Before launching the parallel calls, display:
 
 Launch both tools in **a single message with two tool calls**. Sequential calls defeat the purpose of this skill.
 
-**Tool call 1 — Bash (Codex):**
+**Tool call 1 — Bash (Codex):** the canonical invocation from codex-engine REFERENCE.md with:
 
-```bash
-TMPFILE=$(mktemp /tmp/plan-review-codex-XXXXXX)
-OUTFILE=$(mktemp /tmp/plan-review-codex-out-XXXXXX)
-trap 'rm -f "$TMPFILE" "$OUTFILE"' EXIT
-cat <<'PROMPT_EOF' > "$TMPFILE"
-{codex_prompt}
-PROMPT_EOF
-# --ephemeral: skip session persistence (skills never resume sessions)
-# -s read-only: the reviewer must never write, regardless of user config
-# -o: write only the final message to OUTFILE (no event/progress noise)
-cat "$TMPFILE" | codex exec --ephemeral -s read-only -o "$OUTFILE"
-echo "===== FINAL MESSAGE ====="
-cat "$OUTFILE"
-```
+| Value | |
+|-------|---|
+| `{PREFIX}` | `plan-review-codex` |
+| `{prompt}` | `{codex_prompt}` built in Phase 3 |
 
-- Set Bash tool `timeout: 300000` (5 minutes). This is deliberately higher than spec-review's 180s: Axis 1 requires opening every file referenced by `Modify: path:line` entries, so plan reviews fan out wider than spec reviews.
-- Never pass the prompt as a CLI argument — temp file + stdin only.
-- Use the text after `===== FINAL MESSAGE =====` for synthesis; ignore the event log above it.
+The call returns immediately, so it does not block the Agent call that follows it. After both
+are dispatched, follow the reference's wait protocol (Monitor until-loop on
+`CODEX_DONE_MARKER`, 900s ceiling) and read-back protocol before synthesis.
+
+Plan reviews fan out wider than spec reviews — Axis 1 requires opening every file referenced by
+`Modify: path:line` entries — so they sit closer to the ceiling than most Codex workloads.
 
 **Tool call 2 — Agent (Claude Code):**
 
@@ -416,7 +416,7 @@ Suggest next action:
 
 | Situation | Action |
 |-----------|--------|
-| Codex CLI not installed (exit 127) or timeout (300s) | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: {reason}" at report top. |
+| Codex CLI not installed (exit 127) or ceiling exceeded (900s) | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: {reason}" at report top. |
 | Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent not used: {reason}" at report top. |
 | Both fail | Display error message and stop. |
 | Partial / malformed output from either side | Best-effort integration; note which side was incomplete. |
@@ -431,19 +431,18 @@ Suggest next action:
 | Input | plan file path(s) (+ optional spec path) (+ optional free text) (+ optional `--review-only` flag) |
 | Pre-pass | grep plan for placeholder red flags + Interfaces lines → inject as verification candidates |
 | Prompts | 4 plan-edition axes, same output format for both, evidence-gathering differs |
-| Launch | 1 message, 2 tool calls (Bash `codex exec --ephemeral -s read-only -o "$OUTFILE"` timeout 300000 + Agent) |
+| Launch | 1 message, 2 tool calls (Bash: codex-engine canonical invocation, `{PREFIX}` = `plan-review-codex` + Agent), then the reference's wait protocol |
 | Output | Synthesized 4-axis report in terminal (no file save); editable vs report-only classification |
 | Update (Phase 7, default) | Filter editable findings → propose & display diff (Task N > Step M or section-heading anchors) → **auto-apply** (no approval gate) → `Edit` tool applies |
 | Update with `--review-only` | Filter editable findings → propose diff → user approves Apply/Skip → `Edit` tool applies |
 
 ## Common Mistakes
 
+Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation,
+model/effort flags, timeouts) are covered in codex-engine REFERENCE.md. Skill-specific:
+
 - **Not launching both tools in the same message** — sequential calls defeat parallelism.
-- **Using wrong Codex subcommand** — must use `codex exec` for non-interactive mode; other invocations may hang.
-- **Passing long prompts as CLI arguments** — always use temp file + stdin. Direct CLI args can exceed shell limits (~32KB on Windows) and cause Codex to hang silently.
 - **Inlining full plan text into the prompt** — instead, list the file paths and let each tool `Read` the plan. Shorter prompts produce faster, more focused results.
-- **Copying spec-review's 180s timeout** — plan reviews open every referenced file; use `timeout: 300000`.
-- **Parsing Codex event noise for synthesis** — read the final message after `===== FINAL MESSAGE =====` (written by `-o`); do not parse the event log.
 - **Auto-creating tasks for coverage gaps** — coverage findings are report-only, even in default auto-apply mode. Adding tasks is `writing-plans`' responsibility.
 - **Flagging missing Interfaces blocks as defects** — older plans predate Interfaces; absence is reported as "not present", not a defect.
 - **Anchoring edits by heading path alone** — plan steps are bold list items, not headings; every edit needs "Task N > Step M" (or a unique section heading for non-task sections) plus quoted anchor text.

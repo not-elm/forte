@@ -14,6 +14,13 @@ Claude collects the symptom description, sends it to Codex for codebase-wide inv
 
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`).
 
+**Shared contract:** Codex invocation mechanics live in codex-engine REFERENCE.md. Before Phase 3:
+
+1. Use `Glob pattern="**/codex-engine/REFERENCE.md"` to locate the file
+2. Read it
+
+If not found, display: `> Warning: codex-engine reference not found. Using inline rules only.`
+
 ## When to Use
 
 - When you have a bug symptom but don't know where in the code the problem is
@@ -21,7 +28,7 @@ Claude collects the symptom description, sends it to Codex for codebase-wide inv
 - When you need a second opinion on what's causing unexpected behavior
 
 **When NOT to use:**
-- When you already know the problematic code and want a review (use `codex-review` instead)
+- When you already know the problematic code and want a review (use the built-in `code-review` skill instead)
 - When you want Codex to modify files (this skill is read-only)
 
 ## Workflow
@@ -104,45 +111,26 @@ Before running Codex, display a brief status message to the user:
 
 > "Running Codex investigation — this typically takes 30-90 seconds..."
 
-Write the prompt to a temporary file, then pipe it to Codex via stdin to avoid shell argument length limits:
+Run the canonical invocation from codex-engine REFERENCE.md with:
 
-```bash
-# 1. Write prompt to temp file
-cat <<'PROMPT_EOF' > /tmp/codex-investigate-prompt.txt
-<constructed_prompt>
-PROMPT_EOF
+| Value | |
+|-------|---|
+| `{PREFIX}` | `codex-investigate` |
+| `{prompt}` | The prompt constructed in Phase 2 |
 
-# 2. Pipe to Codex via stdin (read-only mode)
-cat /tmp/codex-investigate-prompt.txt | codex exec --ephemeral
-
-# 3. Clean up
-rm -f /tmp/codex-investigate-prompt.txt
-```
-
-- `exec`: Non-interactive subcommand (runs the prompt and exits)
-- Codex runs **read-only** — it can read files in the repo but cannot modify them
-- Using a temp file avoids shell argument length limits that cause hangs with long prompts
-- Set Bash tool `timeout: 180000` (3 minutes) to prevent the default 120s timeout from killing longer runs
+Then follow the reference's wait protocol (Monitor until-loop on `CODEX_DONE_MARKER`, 900s
+ceiling) and read-back protocol. `CODEX_FINAL_OUTPUT` is the sole source for Phase 4.
 
 ### Phase 4: Display Results
 
-Parse Codex output and display in the terminal. Expected sections:
+Read the `CODEX_FINAL_OUTPUT` file completely, then parse and display it in the terminal. Expected sections:
 
 1. **Root Cause** — Why the bug happens (with file:line references)
 2. **Impact Scope** — What else is affected
 3. **Suggested Fix** — Concrete steps to resolve
 4. **Confidence** — High / Medium / Low with reasoning
 
-If the output does not follow the expected format, display Codex's raw output as-is (fallback).
-
-## Comparison with codex-review
-
-| Aspect | codex-review | codex-investigate |
-|--------|-------------|-------------------|
-| Purpose | Quality check of known code/design | Root cause analysis of unknown bugs |
-| Input | File paths + free text | Symptom description (+ optional context) |
-| Output | Issues (Critical/Warning/Info) | Root Cause + Impact + Fix + Confidence |
-| Codex directive | List problems | Identify cause and suggest fix |
+If the output does not follow the expected format, display Codex's raw final message as-is (fallback). Remove the temporary final-message file after parsing or fallback display is complete.
 
 ## Error Handling
 
@@ -152,6 +140,8 @@ If the output does not follow the expected format, display Codex's raw output as
 
 ## Common Mistakes
 
-- **Using wrong subcommand**: Must use `codex exec` for non-interactive mode; other invocations may hang
-- **Passing long prompts as CLI arguments**: Always use the temp file + stdin approach shown in Phase 3. Passing the prompt directly as a CLI argument (e.g. `codex exec "<prompt>"`) can exceed shell argument length limits (~32KB on Windows) and cause Codex to hang silently
+Invocation-level mistakes (wrong subcommand, CLI-argument prompts, truncated final message,
+model/effort flags) are covered in codex-engine REFERENCE.md. Skill-specific:
+
 - **Symptom too vague**: Ensure the user provides enough detail for Codex to narrow down the search area
+- **Parsing a partial response**: If the four expected sections are missing, fall back to displaying the raw final message rather than inventing structure

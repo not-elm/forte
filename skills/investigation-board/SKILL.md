@@ -21,7 +21,7 @@ Investigate bugs through structured evidence gathering, hypothesis testing, and 
 - Use `codex-investigate` for quick single-agent bug investigation
 - Use `discussion-board` for open-ended questions that aren't bug investigations
 - Use `design-board` for implementation design decisions
-- Use `code-review-board` for code review
+- Use the built-in `code-review` skill for code review
 
 ## Core Principles
 
