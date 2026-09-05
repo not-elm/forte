@@ -46,7 +46,7 @@ Insertion points are named by **action**, not by upstream checklist item name, s
 - CP1 fires "after context exploration completes, before the first clarifying question is asked."
 - CP2 fires "before the 2–3 approaches are presented."
 
-The overlay overrides only two upstream behaviors: how question candidates are produced, and how approach candidates are produced. Everything else follows brainstorming unchanged.
+The overlay's authority matches its footprint: how question candidates are produced, how approach candidates are produced, provenance tagging in what the human sees, the State file and its lifecycle, checkpoint sequencing relative to the interview and the approaches step, and the "Alternatives considered" section of the written spec. Everything else follows brainstorming unchanged. Writing STATE.md and launching a read-only Codex run are not implementation actions and do not trip brainstorming's HARD-GATE.
 
 ### Codex Invocation
 
@@ -69,7 +69,9 @@ No model, effort, or timeout overrides. While Codex runs, Claude displays one st
 
 ## State File
 
-Location: `docs/brainstorms/{topic-id}/STATE.md`, where `{topic-id}` is a kebab-case slug of the request. `docs/brainstorms/` must be gitignored (the repo already ignores `docs/`; the skill checks and adds the line if missing, mirroring the board skills' `docs/discussions/` rule). The directory is deleted after the spec is written, matching the board skills' lifecycle.
+Location: `docs/brainstorms/{topic-id}/STATE.md`, where `{topic-id}` is a kebab-case slug of the request. `docs/brainstorms/` must be ignored: before the first write the skill runs `git check-ignore -q docs/brainstorms` and, on a non-zero exit, appends `docs/brainstorms/` to `.git/info/exclude` — autopilot's convention. The tracked `.gitignore` is never edited, so a brainstorm leaves no unrequested diff in the user's repository.
+
+The file is created when context exploration completes, at the moment User Brief and Evidence are written; CP1 launches immediately after that write. Deletion is path-aware: after the human approves the in-chat design on the bounded path, and after the spec is written and committed on the architectural path. The bounded path writes no spec, so a spec-only deletion rule would never fire there. The delete runs only when `{topic-id}` resolves to a non-empty slug.
 
 Codex is stateless, so this file is its only memory. **Claude is the sole writer.**
 
@@ -98,8 +100,9 @@ Codex is stateless, so this file is its only memory. **Claude is the sole writer
 <!-- Used to evaluate the CP2 trigger -->
 
 ## Human Answers
-- U1 (→Q1): "{verbatim}"
-<!-- Consequential answers verbatim. Never summarize an answer that backs a Decision -->
+- U1 (→Q1, rev 1): "{verbatim}"
+<!-- Consequential answers verbatim. rev N = the State Revision current when the answer arrived -->
+<!-- Never summarize an answer that backs a Decision -->
 
 ## Question Ledger
 | ID | Question | Origin | Decision affected | Status |
@@ -133,7 +136,7 @@ Codex is stateless, so this file is its only memory. **Claude is the sole writer
 2. Launch Codex with `{PREFIX}` = `trio-cp1`. Prompt = full State + the CP1 request below.
 3. While Codex runs, and **before reading its output**, Claude writes its own question candidates to the Question Ledger with `origin: claude`. Ordering is mandatory: neither party's frame may contaminate the other's initial list.
 4. Read Codex output; add its questions with `origin: codex`. Merge semantically identical questions into one row with `origin: joint`. Move any Codex evidence into Evidence.
-5. Rank by the consequence of the decision each answer affects (not by origin). Ask the human one question at a time per brainstorming rules, each tagged `[Codex]`, `[Claude]`, or `[共同]`.
+5. Rank by the consequence of the decision each answer affects (not by origin). Ask the human one question at a time per brainstorming rules, each tagged `[Codex]`, `[Claude]`, or `[Joint]`. All three tags may be localized to the session language (e.g. `[共同]`), but the set is never mixed.
 6. Follow-up questions between checkpoints are Claude's alone; add them to the Ledger with `origin: claude`.
 
 **CP1 request (appended to State)**
@@ -152,9 +155,11 @@ followed by an "Additional Evidence" list (file:line — finding).
 
 Architectural path only.
 
-**Trigger (either):**
-- Question Ledger has zero `pending` rows, or
+**Trigger:** "Changes Since Last Codex Call" is non-empty — at least one human answer has landed since the previous Codex call — **and** either:
+- the Question Ledger has zero `pending` rows, or
 - a human answer invalidates a row in Assumptions. Claude makes this call and records the Assumption ID in Changes.
+
+The non-emptiness guard is what stops CP2 from firing back-to-back with CP1 over State that Codex has already seen.
 
 **Procedure**
 1. Save State as Revision +1, with Changes Since Last Codex Call populated.
@@ -174,7 +179,7 @@ Output: question table (same columns as before) + approaches + disagreements + C
 
 ### Additional Rounds
 
-After CP2, the CP2 procedure may run again **only if** the Ledger still has `pending` rows tied to a named undecided Decision. "Just in case" re-calls are forbidden.
+The evaluation point is explicit: after the questions merged at the previous CP2 have been asked and answered, never immediately after read-back. At that point the CP2 procedure may run again **only if** an answer received since the last Codex call invalidated an Assumptions row or changed a Decisions row that is not `confirmed`. Pendingness on its own is not a reason, and "just in case" re-calls are forbidden.
 
 ## Provenance and Disagreement
 
@@ -187,11 +192,11 @@ After CP2, the CP2 procedure may run again **only if** the Ledger still has `pen
 
 | Situation | Action |
 |---|---|
-| `codex` not installed (exit 127) | Show one line: `⚠ Codex 不在: 通常の brainstorming で続行`. Skip every remaining checkpoint. Keep the State file (the Ledger is still useful). |
-| Codex non-zero exit | Surface `CODEX_LOG` highlights, continue this checkpoint with Claude alone. Retry Codex at the next checkpoint. |
+| `codex` not installed (the sentinel file contains `127`) | Show one line: `⚠ Codex 不在: 通常の brainstorming で続行`. Record `Codex (rev N): unavailable` in Positions. Skip every remaining checkpoint. Keep the State file (the Ledger is still useful). |
+| Codex non-zero exit | Surface `CODEX_LOG` highlights, record `Codex (rev N): failed — {reason}` in Positions, continue this checkpoint with Claude alone. Retry Codex at the next checkpoint. |
 | 900 s ceiling exceeded | Kill `CODEX_PID`, continue alone. Record `Codex (rev N): timeout` in Positions so absence is not mistaken for agreement. |
 | Codex output malformed | Import what is readable; mark rows `origin: codex (unstructured)`. |
-| Human answered while Codex was running | After read-back, reconcile against answers received since the call's Revision. Mark already-answered Codex questions `superseded`; do not present them. |
+| Human answered while Codex was running | After read-back, reconcile against Human Answers whose `rev` marker equals the Revision the call was launched at. Mark already-answered Codex questions `superseded`; do not present them. |
 
 Temp files are cleaned on every path per codex-engine.
 
@@ -207,10 +212,10 @@ Temp files are cleaned on every path per codex-engine.
 
 The skill is a natural-language spec, so verification is by running it:
 
-1. **Bounded path** — run on forte itself with a small topic (e.g. "add a `--codex-only` flag to parallel-research"). Expect exactly one Codex call (CP1), a Ledger mixing claude/codex/joint origins, origin tags on questions shown to the human, and no CP2.
+1. **Bounded path** — run on forte itself with a small topic (e.g. "add a `--codex-only` flag to parallel-research"). Expect exactly one Codex call (CP1), a Ledger whose rows carry at least two distinct Origin values (a `joint` row appears only when the two models happen to overlap, so it is not required), origin tags on questions shown to the human, and no CP2.
 2. **Architectural path** — run on a medium topic. Expect CP1 → questions consumed → CP2 fires → approaches include at least one Codex-originated option → spec saved → writing-plans hand-off. Observe whether State stays ≤ 200 lines.
 3. **Codex unavailable** — remove `codex` from `PATH`; expect the one-line warning and a normal brainstorming run to completion.
-4. **Cleanup** — after the spec is written, `docs/brainstorms/{topic-id}/` no longer exists.
+4. **Cleanup** — `docs/brainstorms/{topic-id}/` no longer exists once the run ends: after the human approves the in-chat design on the bounded path, after the spec is committed on the architectural path.
 
 ## Out of Scope
 
