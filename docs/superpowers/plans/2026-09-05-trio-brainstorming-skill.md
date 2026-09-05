@@ -332,8 +332,8 @@ grep -c '^## \(Overview\|When to Use\|Overlay Model\|State File\|Checkpoint 1\|C
 grep -n 'name: trio-brainstorming' "$f"
 grep -n 'Triggers: trio brainstorming, codex brainstorming, 3者ブレスト, Codexと一緒に設計, brainstorm with codex' "$f"
 grep -n '`trio-cp1`\|`trio-cp2`' "$f" | wc -l
-grep -n 'codex-engine/REFERENCE.md' "$f" | wc -l
-grep -n -- '-m\b\|--model\|model_reasoning_effort' "$f"
+grep -c 'codex-engine.*REFERENCE.md' "$f"
+grep -n -- ' -m \|--model\|model_reasoning_effort' "$f"
 ```
 Expected:
 - line 1 is `---`
@@ -341,7 +341,7 @@ Expected:
 - `name:` line found
 - Triggers line found
 - prefix matches is exactly `2` (one `trio-cp1` table row, one `trio-cp2` table row)
-- codex-engine references ≥ 2
+- codex-engine REFERENCE.md references ≥ 2 (both "codex-engine REFERENCE.md" and the Glob path "codex-engine/REFERENCE.md" count)
 - the last grep prints nothing — the skill never uses `-m`, `--model`, or `model_reasoning_effort`
 
 - [ ] **Step 3: Verify the checkpoint section headers and request templates exist**
