@@ -27,6 +27,7 @@ skills/
   plan-review/         # Parallel implementation-plan review via Codex CLI + Claude Code Agent (4 fixed axes)
   spec-review/         # Parallel spec/design-doc review via Codex CLI + Claude Code Agent (4 fixed axes)
   team-composer/       # Shared team composition for board skills (expertise map + always-doubling)
+  trio-brainstorming/  # Three-party brainstorming (Claude + Codex + human) as an overlay on superpowers:brainstorming
 ```
 
 ## Plugin Architecture
@@ -35,9 +36,10 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 
 ### Key Patterns Across Skills
 
-- **Codex-based skills** (codex-investigate, parallel-research, plan-review, spec-review, plus board `-cx` members): Invocation mechanics are defined once in `codex-engine/REFERENCE.md` — detached `codex exec` in read-only mode, prompt via temp file + stdin, completion signalled by a sentinel file carrying the exit code, a 900s Monitor wait ceiling, and full-file read-back. Each SKILL.md owns only its prompt and its `{PREFIX}`; it never sets a timeout, a model, or a reasoning effort. `parallel-research`, `spec-review`, and `plan-review` additionally dispatch a Claude Code Agent in parallel within a single message.
+- **Codex-based skills** (codex-investigate, parallel-research, plan-review, spec-review, trio-brainstorming, plus board `-cx` members): Invocation mechanics are defined once in `codex-engine/REFERENCE.md` — detached `codex exec` in read-only mode, prompt via temp file + stdin, completion signalled by a sentinel file carrying the exit code, a 900s Monitor wait ceiling, and full-file read-back. Each SKILL.md owns only its prompt and its `{PREFIX}`; it never sets a timeout, a model, or a reasoning effort. `parallel-research`, `spec-review`, and `plan-review` additionally dispatch a Claude Code Agent in parallel within a single message.
 - **Agent Team skills** (design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a round-split WHITEBOARD model (base WHITEBOARD.md + per-round WHITEBOARD-R{N}.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention. Shared debate rules are in `board-engine/REFERENCE.md`; each board SKILL.md contains only board-specific logic.
 - **Orchestrator skills** (autopilot): Chain existing skills via sequential Skill invocations with pipeline-side gate overrides (standing answers to downstream skills' user prompts). Own only stage ordering, arguments, ledger, and stop conditions — never duplicate stage logic.
+- **Overlay skills** (trio-brainstorming): Load an upstream skill via the Skill tool and override a small, named set of its behaviors at insertion points named by action. Own only the overlay's added state and prompts — never restate the upstream flow.
 
 ## Adding a New Skill
 
