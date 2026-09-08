@@ -11,9 +11,11 @@ description: >
 
 Dispatch parallel investigations to Codex CLI (codebase-focused) and a Claude Code Agent (codebase + web), then synthesize a unified report in the terminal. Two AI perspectives on the same topic, combined into one coherent answer.
 
+Before dispatching, the skill checks the topic for ambiguity that only the user can resolve and asks once — a single AskUserQuestion round, skipped entirely when the topic is already unambiguous. Two investigations cost 3-5 minutes, so one question beats one wasted run; but asking about something the investigation itself would answer wastes the user's time instead.
+
 **Prerequisite:** The `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, fall back to Claude Code Agent results only.
 
-**Shared contract:** Codex invocation mechanics live in codex-engine REFERENCE.md. Before Phase 4:
+**Shared contract:** Codex invocation mechanics live in codex-engine REFERENCE.md. Before Phase 5:
 
 1. Use `Glob pattern="**/codex-engine/REFERENCE.md"` to locate the file
 2. Read it
@@ -37,6 +39,8 @@ If not found, display: `> Warning: codex-engine reference not found. Using inlin
 digraph parallel_research {
     rankdir=TB;
     "Receive topic" [shape=box];
+    "Evaluate clarify triggers" [shape=diamond];
+    "AskUserQuestion\n(1 round, max 4 questions)" [shape=box];
     "Classify topic" [shape=box];
     "Build prompts" [shape=box];
     "Display status" [shape=box];
@@ -44,7 +48,10 @@ digraph parallel_research {
     "Synthesize report" [shape=box];
     "Display to user" [shape=doublecircle];
 
-    "Receive topic" -> "Classify topic";
+    "Receive topic" -> "Evaluate clarify triggers";
+    "Evaluate clarify triggers" -> "AskUserQuestion\n(1 round, max 4 questions)" [label="1+ trigger"];
+    "Evaluate clarify triggers" -> "Classify topic" [label="no trigger / --no-clarify"];
+    "AskUserQuestion\n(1 round, max 4 questions)" -> "Classify topic";
     "Classify topic" -> "Build prompts";
     "Build prompts" -> "Display status";
     "Display status" -> "Launch Bash + Agent\nin parallel";
@@ -60,7 +67,53 @@ Receive the topic from the user via skill arguments. The topic is free-form text
 If no topic is provided in the arguments, ask the user with AskUserQuestion:
 > "What topic would you like me to investigate with parallel research?"
 
-### Phase 2: Classify Topic
+**Flags:** `--no-clarify` anywhere in the arguments sets `no_clarify = true` and is stripped from the topic text. Everything else is the topic.
+
+### Phase 2: Clarify Ambiguities (skippable)
+
+A clarification round runs **only when the topic is ambiguous in a way the investigation itself cannot resolve**. The default outcome is to skip — most topics are already clear enough to dispatch.
+
+#### Skip conditions
+
+Skip Phase 2 entirely and go straight to Phase 3 if ANY holds:
+
+- **`no_clarify = true`** — the caller (a user in a hurry, or an orchestrator skill) opted out.
+- **No trigger condition matches** the checklist below. Skip silently — do not announce the skip, do not ask a filler question.
+- **Every unknown is answerable by the investigation** — which files implement X, whether a bug is real, how a library behaves, what the current architecture is. Those unknowns ARE the research. Asking the user to pre-answer them defeats the skill.
+
+Before asking anything, do a cheap resolution pass: `Glob`/`Grep` the repo for the nouns in the topic. If that resolves the ambiguity, it was never a question for the user. Questions must be about **user intent, context, or constraints**, never about facts stored in the repo.
+
+#### Trigger Condition Checklist
+
+Run the clarification round if one or more match:
+
+| # | Condition | Criteria | Example question |
+|---|-----------|----------|------------------|
+| 1 | **Target ambiguity** | The topic names no concrete file/module, and the repo holds several plausible candidates that would lead to different investigations | 「認証まわりの調査対象は API 側と CLI 側のどちらですか？」 |
+| 2 | **Competing interpretations** | The topic reads as 2+ materially different investigations that would produce different reports | 「『パフォーマンス』は起動時間とスループットのどちらを指しますか？」 |
+| 3 | **Missing decision criteria** | The research feeds a decision, but the criteria the user will judge by are unstated | 「採用判断で重視するのは移行コストと将来の拡張性のどちらですか？」 |
+| 4 | **Unstated external constraints** | The answer depends on environment, version, or deployment facts that are not discoverable in the repo | 「対象の本番環境は Node 20 系ですか、22 系ですか？」 |
+| 5 | **Undefined deliverable shape** | The user appears to expect a specific output (comparison table, migration steps, risk list) that the topic does not imply | 「比較表と移行手順のどちらを主に必要としていますか？」 |
+
+#### Execution
+
+1. **One round, one call.** A single `AskUserQuestion` with at most **4** questions — only the ones whose answers would change what the two investigators read. Do not chain a second round.
+2. **Each question gets 2-4 concrete options.** The first option is the recommended default, suffixed with `（推奨）`. Whenever narrowing the scope is optional, include an option that keeps it broad (e.g.「両方を対象にする」). The user can always answer free-form via "Other".
+3. `header` ≤ 12 chars (e.g. `調査対象`, `判断基準`).
+4. **Never block on a second question.** Whatever stays unclear after this round is carried forward as an explicit assumption and stated in the Phase 6 report — not re-asked.
+
+#### Record the answers
+
+Build a `clarified_constraints` block from the responses:
+
+```
+## Clarified Constraints
+- {question}: {answer}
+```
+
+Carry it verbatim into both Phase 4 prompts. If Phase 2 was skipped, the block is **omitted entirely** — do not emit an empty or "N/A" section.
+
+### Phase 3: Classify Topic
 
 Classify the topic into one of three categories to determine prompt strategy:
 
@@ -72,7 +125,7 @@ Classify the topic into one of three categories to determine prompt strategy:
 
 When uncertain, default to **Mixed**.
 
-### Phase 3: Build Prompts
+### Phase 4: Build Prompts
 
 Build separate prompts for Codex and Claude Code Agent.
 
@@ -85,10 +138,14 @@ Report your findings in this structure:
 - Confidence: High / Medium / Low with reasoning
 ```
 
+Both templates carry `{clarified_constraints}` — the Phase 2 block, or nothing at all if Phase 2 was skipped. Constraints are binding: they narrow what each investigator looks at, they are not background colour.
+
 **Codex prompt template:**
 ```
 ## Research Topic
 {user_topic}
+
+{clarified_constraints}
 
 ## Instructions
 Investigate this topic by reading the codebase. {category_specific_codex_instructions}
@@ -110,6 +167,8 @@ Be concise — if a section has no findings, write "N/A".
 ## Research Topic
 {user_topic}
 
+{clarified_constraints}
+
 ## Instructions
 Investigate this topic thoroughly. {category_specific_agent_instructions}
 
@@ -124,7 +183,7 @@ Report only what you find with evidence. Do not speculate.
 - **Knowledge:** "Use WebSearch and WebFetch to research this topic online (documentation, Stack Overflow, blog posts, RFCs). Also check the codebase with Read/Grep/Glob for related implementations."
 - **Mixed:** "Combine codebase investigation (Read/Grep/Glob) with web research (WebSearch/WebFetch) to build a complete picture."
 
-### Phase 4: Launch Parallel
+### Phase 5: Launch Parallel
 
 Display a status message, then launch both investigations in a **single message** with two tool calls:
 
@@ -136,7 +195,7 @@ Display a status message, then launch both investigations in a **single message*
 | Value | |
 |-------|---|
 | `{PREFIX}` | `parallel-research-codex` |
-| `{prompt}` | `{codex_prompt}` built in Phase 3 |
+| `{prompt}` | `{codex_prompt}` built in Phase 4 |
 
 The call returns immediately — the detached run does not block the Agent call that follows it.
 Research is the slowest Codex workload in this plugin, which is why the reference's 900s
@@ -159,12 +218,14 @@ a 900s ceiling, and read `CODEX_FINAL_OUTPUT` from line 1 through EOF before syn
 
 **Codex unavailable fallback:** If `CODEX_DONE_MARKER` reports exit code 127, proceed with Claude Code Agent results only. Note this in the report.
 
-### Phase 5: Synthesize Report
+### Phase 6: Synthesize Report
 
 After both results return (or one result + one error), synthesize into this format and display in the terminal:
 
 ```markdown
 ## Parallel Research Report: {topic}
+
+**Clarified scope:** {one-line summary of the Phase 2 answers — omit this line entirely if Phase 2 was skipped}
 
 ### Overall Conclusion
 {Integrated conclusion drawing from both investigations}
@@ -193,6 +254,8 @@ After both results return (or one result + one error), synthesize into this form
 | **Medium** | Mostly agree with minor differences, or evidence is limited |
 | **Low** | Significant disagreement, weak evidence, or only one source available |
 
+If an ambiguity was identified in Phase 2 but left unresolved (the user's answer did not settle it, or it fell outside the 4-question cap), state the assumption the report was written under in **Overall Conclusion** — one sentence, e.g. 「起動時間の観点で調査した」.
+
 **Fallback cases:**
 - If only one side returned results, still use this format but note the missing source and set confidence to Low
 - If one side's output doesn't match the expected structure, include whatever was returned under the appropriate section and note it was unstructured
@@ -215,4 +278,8 @@ Skill-specific:
 
 - **Not launching both tools in the same message**: Codex Bash call and Agent call MUST be in a single message for parallel execution. Sequential calls defeat the purpose of this skill.
 - **Waiting on Codex before dispatching the Agent**: the detached Bash call returns immediately, so there is no reason to serialize. Dispatch both, then run the wait protocol once.
-- **Synthesizing from one side while the other is still running**: complete the wait protocol before Phase 5, or the report silently drops half its input.
+- **Synthesizing from one side while the other is still running**: complete the wait protocol before Phase 6, or the report silently drops half its input.
+- **Asking clarification questions the investigation would answer**: "Which file implements the auth flow?" is the research, not a question for the user. Phase 2 exists for intent and constraints only.
+- **Asking when nothing is genuinely ambiguous**: an unnecessary question costs a full round trip before any work starts. No trigger match means skip, silently.
+- **Chaining clarification rounds**: one AskUserQuestion call, max 4 questions. Residual ambiguity becomes a stated assumption in the report, never a second round.
+- **Collecting constraints and then not using them**: Phase 2 answers MUST appear in both Phase 4 prompts and be reflected in the Phase 6 scope line. A discarded answer is worse than never asking.
