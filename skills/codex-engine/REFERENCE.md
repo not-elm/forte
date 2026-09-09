@@ -42,6 +42,20 @@ cat <<'PROMPT_EOF' > "$TMPFILE"
 {prompt}
 PROMPT_EOF
 
+CODEX_CFG="${CODEX_HOME:-$HOME/.codex}/config.toml"
+cfg_get() {
+  awk -v sec="$1" -v key="$2" '
+    /^[[:space:]]*\[/ { cur=$0; gsub(/^[[:space:]]*\[|\][[:space:]]*$/,"",cur); next }
+    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" && cur == sec {
+      sub("^[^=]*=[[:space:]]*",""); sub(/[[:space:]]*#.*$/,""); gsub(/^"|"$/,""); print; exit }
+  ' "$CODEX_CFG" 2>/dev/null
+}
+CODEX_PROFILE=$(cfg_get "" profile)
+CODEX_MODEL=$(cfg_get "profiles.$CODEX_PROFILE" model)
+[ -n "$CODEX_MODEL" ] || CODEX_MODEL=$(cfg_get "" model)
+CODEX_EFFORT=$(cfg_get "profiles.$CODEX_PROFILE" model_reasoning_effort)
+[ -n "$CODEX_EFFORT" ] || CODEX_EFFORT=$(cfg_get "" model_reasoning_effort)
+
 nohup sh -c '
   cat "'"$TMPFILE"'" | codex exec --ephemeral -s read-only \
     -c approval_policy="never" -o "'"$OUTFILE"'" > "'"$LOGFILE"'" 2>&1
@@ -53,6 +67,8 @@ printf 'CODEX_FINAL_OUTPUT=%s\n' "$OUTFILE"
 printf 'CODEX_DONE_MARKER=%s\n' "$DONEFILE"
 printf 'CODEX_LOG=%s\n' "$LOGFILE"
 printf 'CODEX_PROMPT=%s\n' "$TMPFILE"
+printf 'CODEX_MODEL=%s\n' "${CODEX_MODEL:-(codex default)}"
+printf 'CODEX_EFFORT=%s\n' "${CODEX_EFFORT:-(codex default)}"
 ```
 
 Flag rationale:
@@ -66,6 +82,10 @@ Flag rationale:
 - `-o "$OUTFILE"` — persist the final message separately from progress/event output
 - temp file + stdin — passing the prompt as a CLI argument can exceed shell argument length
   limits (~32KB on Windows) and cause Codex to hang silently
+- `cfg_get` — reads the model and effort the run will inherit, so they can be announced before
+  the wait starts (see below). It resolves the active profile first, then the top-level table,
+  and stops at the first `[section]` header so `[projects.*]` entries never leak in. Costs no
+  wall-clock and touches nothing the run depends on
 
 Set the **launching** Bash call's `timeout` to the default. It returns in milliseconds; the
 15-minute ceiling below applies to the detached run, not to this call.
@@ -79,6 +99,26 @@ Effort directly drives wall-clock: on one measured research prompt, `xhigh` took
 `medium` took 3m00s. The 15-minute ceiling exists to accommodate high-effort configurations.
 If a user's configuration routinely exceeds the ceiling, raise the ceiling here — do not
 reintroduce per-skill effort overrides.
+
+### Announcing the Resolved Configuration
+
+Because effort is what decides whether a run takes three minutes or nine, the user must be
+told which configuration they are waiting on **before** the wait begins, not after. Immediately
+after the launching Bash call returns — before entering the wait protocol — display exactly one
+line from its `CODEX_MODEL` / `CODEX_EFFORT` output:
+
+```
+> Codex: model=gpt-5.6-sol / reasoning effort=high
+```
+
+- One line, no surrounding commentary. It is a status marker, not a report section
+- Print whatever the values are, `(codex default)` included — an unset key is itself
+  information ("Codex is running on its own defaults")
+- A skill dispatching several Codex runs at once prints one line per run, labelled with the
+  member or axis it belongs to (e.g. `> Codex [architecture-cx]: model=… / reasoning effort=…`)
+- These values are read from config, not from the live run. The run's own authoritative header
+  (`model:` and `reasoning effort:` lines) lands in `CODEX_LOG` within about a second of
+  launch; consult it only if a configuration mismatch is actually suspected
 
 ## Wait Protocol
 
@@ -119,6 +159,8 @@ Always clean up temp files on every path, including failure.
 
 - **Passing a model or effort flag** — the contract inherits the user's CLI configuration.
   Per-skill overrides are what this reference exists to eliminate
+- **Skipping the model/effort line, or printing it after the run** — its whole purpose is to
+  let the user judge the expected wait before committing to it
 - **Setting a per-skill Bash timeout for the Codex run** — the detached run is bounded by the
   Monitor ceiling, not by the Bash tool. The old 180s/300s/600s per-skill values are gone
 - **Using the Bash tool's `run_in_background` instead of this block** — background completion
