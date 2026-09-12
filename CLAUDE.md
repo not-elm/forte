@@ -25,6 +25,8 @@ skills/
   investigation-board/ # Evidence-based bug investigation via structured team debate
   parallel-research/   # Parallel topic investigation via Codex CLI + Claude Code Agent
   plan-review/         # Parallel implementation-plan review via Codex CLI + Claude Code Agent (4 fixed axes)
+  qwen-commit/         # Local Ollama/Qwen message handling and staged commit via a compact Python runner
+  rust-diagnostics/    # Compact Cargo diagnostics with deterministic extraction and optional local Qwen analysis
   spec-review/         # Parallel spec/design-doc review via Codex CLI + Claude Code Agent (4 fixed axes)
   team-composer/       # Shared team composition for board skills (expertise map + always-doubling)
   trio-brainstorming/  # Three-party brainstorming (Claude + Codex + human) as an overlay on superpowers:brainstorming
@@ -40,6 +42,7 @@ Each skill is a standalone SKILL.md with YAML frontmatter (name, description wit
 - **Agent Team skills** (design-board, discussion-board, frontend-design-board, investigation-board): Use Claude Code's TeamCreate/SendMessage/Agent tools to orchestrate multiple parallel agents. Follow a round-split WHITEBOARD model (base WHITEBOARD.md + per-round WHITEBOARD-R{N}.md for member writes, SYNTHESIS.md for leader-only writes) with per-member write zones and append-only conflict prevention. Shared debate rules are in `board-engine/REFERENCE.md`; each board SKILL.md contains only board-specific logic.
 - **Orchestrator skills** (autopilot): Chain existing skills via sequential Skill invocations with pipeline-side gate overrides (standing answers to downstream skills' user prompts). Own only stage ordering, arguments, ledger, and stop conditions — never duplicate stage logic.
 - **Overlay skills** (trio-brainstorming): Load an upstream skill via the Skill tool and override a small, named set of its behaviors at insertion points named by action. Own only the overlay's added state and prompts — never restate the upstream flow.
+- **Automatic local-runner skills** (rust-diagnostics, qwen-commit): Route ordinary Cargo diagnostics and authorized commits through short skills whose standard-library runners keep raw inputs outside caller context. The runners are terminal execution steps and are never wrapped recursively.
 
 ## Adding a New Skill
 
