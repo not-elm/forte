@@ -1,7 +1,7 @@
 # qwen-commit Skill Design
 
 **Date:** 2026-09-12
-**Status:** Proposed specification; approach approved, written specification awaiting user review
+**Status:** Approved and implemented; automatic routing/message-policy extension verified on 2026-09-12, release commit blocked by sandbox Git permissions
 
 ## Goal and approved scope
 

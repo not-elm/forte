@@ -265,16 +265,20 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                     This matches the batch-fix update format exactly.
 
 10. COMMIT       → a. If the delegated workflow already committed the fix
-                       (HEAD advanced during EXECUTE), commit only the review
-                       Markdown update with message:
+                       (HEAD advanced during EXECUTE), stage only the review
+                       Markdown update and select this exact subject:
                        `docs: mark [R-XX-NNN] fixed in {review-file-name}`
                     b. If the fix is uncommitted, stage all modified source files
                        + the updated review Markdown.
                        Use specific file paths (not `git add -A`).
-                       Commit with message:
+                       Select this exact subject:
                        `fix: deep-fix [R-XX-NNN] from {review-file-name}`
-                    c. Include `Co-Authored-By: Claude <noreply@anthropic.com>`
-                       in all commit messages.
+                    c. Create a private mode-0600 temporary message file with
+                       the selected subject, a blank line, this trailer, and a
+                       final newline:
+                       `Co-Authored-By: Claude <noreply@anthropic.com>`
+                       Invoke `forte:qwen-commit` with
+                       `--message-file <path>`, then delete only that file.
 
 11. REPORT       → Display terminal summary:
 

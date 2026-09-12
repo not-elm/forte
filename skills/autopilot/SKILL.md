@@ -131,25 +131,27 @@ Invoke `superpowers:subagent-driven-development` (SDD) via the Skill tool with t
 - **Workspace:** work in the current checkout (or the `--branch` branch created at pipeline start) — do NOT invoke `superpowers:using-git-worktrees` or create a worktree, even though SDD lists it as a required workflow skill; a mid-pipeline worktree strands the ledger, spec, plan, and start SHA in the original checkout.
 - **Completion handoff:** after SDD's final review, do NOT invoke `superpowers:finishing-a-development-branch` — the pipeline continues to Stage 6; integration options are presented in Stage 8 instead.
 - **BLOCKED** from an implementer that survives SDD's own escalation ladder (more context → stronger model → task split) → stop the pipeline (see Stop Conditions).
+- **Rust diagnostics:** when an implementation task needs `cargo check` or
+  `cargo clippy`, invoke `forte:rust-diagnostics` with the task's exact
+  toolchain/Cargo/lint arguments and consume its compact result before opening
+  a referenced artifact. Do not wrap the runner's internal Cargo invocation.
 
 Record the implementation commit range in the ledger completion line.
 
 ### Stage 6: Code Review
 
-Invoke the **built-in** `code-review` skill via the Skill tool with args `"max --fix"` — the one whose registered description reviews "the current diff for correctness bugs and reuse/simplification/efficiency cleanups" and supports `--fix` applying findings to the working tree. Do NOT invoke the `code-review:code-review` plugin command (it reviews GitHub PRs and only posts comments). Scope the review to the pipeline's changes by supplying the recorded start SHA range (`<start-sha>..HEAD`) as context — SDD commits every task, so without a range the "current diff" can be empty. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If the review reports an empty diff (the range was not picked up), record "review saw no diff" in the Stage 8 Notes — do not report it as a clean pass. Commit the result if the skill leaves uncommitted changes:
+Invoke the **built-in** `code-review` skill via the Skill tool with args `"max --fix"` — the one whose registered description reviews "the current diff for correctness bugs and reuse/simplification/efficiency cleanups" and supports `--fix` applying findings to the working tree. Do NOT invoke the `code-review:code-review` plugin command (it reviews GitHub PRs and only posts comments). Scope the review to the pipeline's changes by supplying the recorded start SHA range (`<start-sha>..HEAD`) as context — SDD commits every task, so without a range the "current diff" can be empty. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If the review reports an empty diff (the range was not picked up), record "review saw no diff" in the Stage 8 Notes — do not report it as a clean pass. If the skill leaves uncommitted changes, stage them as before, create a private mode-0600 temporary message file containing exactly `fix: apply code-review findings` plus its final newline, invoke `forte:qwen-commit` with `--message-file <path>`, then delete only that temporary file:
 
 ```bash
 git add -A
-git commit -m "fix: apply code-review findings"
 ```
 
 ### Stage 7: Simplify
 
-Invoke the **built-in** `simplify` skill via the Skill tool (no args), scoped to the pipeline's start-SHA range like Stage 6. It reviews the changed code for reuse/simplification/efficiency and applies fixes. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. Commit if it leaves uncommitted changes:
+Invoke the **built-in** `simplify` skill via the Skill tool (no args), scoped to the pipeline's start-SHA range like Stage 6. It reviews the changed code for reuse/simplification/efficiency and applies fixes. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If it leaves uncommitted changes, stage them as before, create a private mode-0600 temporary message file containing exactly `refactor: apply simplify pass` plus its final newline, invoke `forte:qwen-commit` with `--message-file <path>`, then delete only that temporary file:
 
 ```bash
 git add -A
-git commit -m "refactor: apply simplify pass"
 ```
 
 ### Stage 8: Final Report
