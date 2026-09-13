@@ -550,5 +550,124 @@ class SelfRepairTests(DispatchFixture):
         self.assertFalse((self.root / "src" / "greet.py").exists())
 
 
+class ReportTests(DispatchFixture):
+    def dispatch(self, **overrides):
+        with ollama_stub(self.li):
+            return self.li.load_dispatch(self.options(**overrides))
+
+    def test_report_records_command_output_and_unexecuted_suggestions(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "print('probe output')"))
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        body = response_body(files=(("src/greet.py", "ok\n"),), notes="added greet()",
+                             concerns=("naming",), suggested_tests=("pytest -q",))
+        with ollama_stub(self.li, responses=[body]):
+            proposal, changed, run, used = self.li.implement(dispatch, artifacts)
+        self.li.write_report(dispatch, proposal, changed, run, used, artifacts)
+        text = self.report.read_text()
+        self.assertIn("added greet()", text)
+        self.assertIn("src/greet.py", text)
+        self.assertIn("probe output", text)
+        self.assertIn("pytest -q", text)
+        self.assertIn("not executed", text)
+        self.assertIn("naming", text)
+
+
+class StatusMappingTests(DispatchFixture):
+    def test_passing_tests_keep_the_model_status(self):
+        proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
+        run = self.li.TestRun(("python3",), "pass", "")
+        self.assertEqual(self.li.resolve_status(proposal, run)[0], "DONE")
+
+    def test_concerns_status_is_preserved(self):
+        proposal = self.li.Proposal("DONE_WITH_CONCERNS", (("a", "b"),), "n", ("c",), (), "")
+        run = self.li.TestRun(("python3",), "pass", "")
+        self.assertEqual(self.li.resolve_status(proposal, run)[0], "DONE_WITH_CONCERNS")
+
+    def test_failing_tests_become_blocked(self):
+        proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
+        run = self.li.TestRun(("python3",), "fail", "boom")
+        status, blocker = self.li.resolve_status(proposal, run)
+        self.assertEqual(status, "BLOCKED")
+        self.assertIn("still failing", blocker)
+
+    def test_timed_out_tests_become_blocked(self):
+        proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
+        run = self.li.TestRun(("python3",), "timeout", "")
+        self.assertEqual(self.li.resolve_status(proposal, run)[0], "BLOCKED")
+
+    def test_model_blocked_is_passed_through(self):
+        proposal = self.li.Proposal("BLOCKED", (), "n", (), (), "no interface given")
+        self.assertEqual(self.li.resolve_status(proposal, None),
+                         ("BLOCKED", "no interface given"))
+
+
+class ResultTests(DispatchFixture):
+    def invoke(self, argv, responses):
+        with ollama_stub(self.li, responses=responses):
+            return self.li.run_skill(argv)
+
+    def argv(self, *extra):
+        return ["--brief", str(self.brief), "--report", str(self.report),
+                "--context", str(self.context), "--base", self.base,
+                "--workdir", str(self.root), *extra]
+
+    def test_successful_run_emits_a_verified_result(self):
+        result = self.invoke(self.argv(),
+                             [response_body(files=(("src/greet.py", "ok\n"),))])
+        self.assertEqual(result["status"], "DONE")
+        self.assertEqual(result["changed"], ["src/greet.py"])
+        self.assertTrue(result["verified"]["report_written"])
+        self.assertTrue(result["verified"]["paths_allowed"])
+        self.assertTrue(result["verified"]["untouched_dirty"])
+        self.assertEqual(result["verified"]["base"], self.base)
+        self.assertTrue(self.report.is_file())
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+
+    def test_result_line_stays_within_the_budget_and_hides_raw_output(self):
+        long_notes = "n" * 20000
+        body = response_body(files=(("src/greet.py", "x" * 5000),), notes=long_notes,
+                             concerns=tuple(f"concern {i} " + "c" * 200 for i in range(40)))
+        result = self.invoke(self.argv(), [body])
+        encoded = json.dumps(result, ensure_ascii=False).encode("utf-8")
+        self.assertLessEqual(len(encoded), self.li.RESULT_LIMIT)
+        self.assertNotIn(long_notes, json.dumps(result))
+        self.assertNotIn("x" * 100, json.dumps(result))
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+
+    def test_undeclared_path_reports_verify_failed_without_writing(self):
+        result = self.invoke(self.argv(),
+                             [response_body(files=(("src/other.py", "x\n"),))])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["code"], "UNDECLARED_PATH")
+        self.assertFalse((self.root / "src" / "other.py").exists())
+
+    def test_missing_files_section_reports_needs_context(self):
+        self.context.write_text("## Notes\n- nothing here\n")
+        result = self.invoke(self.argv(), [])
+        self.assertEqual(result["status"], "NEEDS_CONTEXT")
+        self.assertEqual(result["code"], "NO_FILES_SECTION")
+
+    def test_git_state_is_untouched_on_every_path(self):
+        head_before = self.git("rev-parse", "HEAD").decode().strip()
+        result = self.invoke(self.argv(),
+                             [response_body(files=(("src/greet.py", "ok\n"),))])
+        self.assertEqual(self.git("rev-parse", "HEAD").decode().strip(), head_before)
+        staged = self.git("diff", "--cached", "--name-only").decode().strip()
+        self.assertEqual(staged, "")
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+
+    def test_main_exit_codes_follow_the_status(self):
+        with ollama_stub(self.li, responses=[response_body(
+                files=(("src/greet.py", "ok\n"),))]):
+            self.assertEqual(self.li.main(self.argv()), 0)
+        with ollama_stub(self.li, responses=[response_body(
+                status="BLOCKED", files=(), blocker="no interface")]):
+            self.assertEqual(self.li.main(self.argv()), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ import re
 import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -561,3 +562,135 @@ def _write_raw(artifacts: Artifacts, label: str, proposal: Proposal) -> None:
                               "concerns": list(proposal.concerns),
                               "blocker": proposal.blocker},
                              ensure_ascii=False) + "\n")
+
+
+def write_report(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...],
+                 run: Optional[TestRun], used: int, artifacts: Artifacts) -> None:
+    lines = [f"# Local implementer report — base {dispatch.base}", "",
+             "## What was implemented", "", proposal.notes.strip() or "(no notes returned)", "",
+             "## Files changed", ""]
+    lines += [f"- `{path}`" for path in changed] or ["- none"]
+    lines += ["", "## Test evidence", ""]
+    if run is None:
+        lines += ["No test command was supplied by the caller (`--test-cmd` absent), so no "
+                  "tests were executed by the runner."]
+    else:
+        lines += [f"Command: `{' '.join(run.command)}`", f"Result: **{run.result}**", "",
+                  "```", _failure_excerpt(run, 16 * 1024).rstrip("\n") or "(no output)", "```"]
+    lines += ["", f"Self-repair rounds used: {used}", "", "## Concerns", ""]
+    lines += [f"- {item}" for item in proposal.concerns] or ["- none"]
+    lines += ["", "## Model-suggested tests (not executed)", ""]
+    lines += [f"- `{item}`" for item in proposal.suggested_tests] or ["- none"]
+    if proposal.blocker.strip():
+        lines += ["", "## Blocker", "", proposal.blocker.strip()]
+    lines += ["", f"Full test log and raw model output: `{artifacts.root}`", ""]
+    dispatch.report.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(dispatch.report, "\n".join(lines))
+
+
+def resolve_status(proposal: Proposal, run: Optional[TestRun]) -> Tuple[str, str]:
+    if proposal.status == "BLOCKED":
+        return "BLOCKED", proposal.blocker
+    if run is not None and run.result != "pass":
+        return "BLOCKED", (f"The declared test command {run.result}ed after "
+                           "the self-repair round; the declared tests are still failing.")
+    return proposal.status, ""
+
+
+def build_result(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...],
+                 run: Optional[TestRun], used: int, artifacts: Artifacts) -> dict:
+    status, blocker = resolve_status(proposal, run)
+    return {
+        "status": status,
+        "changed": list(changed),
+        "tests": {"command": " ".join(run.command) if run else "",
+                  "result": run.result if run else "not_run"},
+        "concerns": list(proposal.concerns),
+        "blocker": blocker,
+        "report": str(dispatch.report),
+        "repair_rounds_used": used,
+        "verified": {"base": dispatch.base, "paths_allowed": True,
+                     "untouched_dirty": True,
+                     "report_written": dispatch.report.is_file()
+                     and dispatch.report.stat().st_size > 0},
+        "artifacts": str(artifacts.root),
+    }
+
+
+def _truncate(value: str, limit: int) -> str:
+    encoded = value.encode("utf-8")
+    if len(encoded) <= limit:
+        return value
+    return encoded[:limit].decode("utf-8", errors="ignore") + "…"
+
+
+def compact_result(result: dict) -> dict:
+    compact = dict(result)
+    compact["blocker"] = _truncate(compact.get("blocker", ""), 400)
+    compact["concerns"] = [_truncate(item, 160) for item in compact.get("concerns", [])]
+    while len(json.dumps(compact, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
+        if len(compact["concerns"]) > 1:
+            dropped = len(compact["concerns"]) - 1
+            compact["concerns"] = compact["concerns"][:1]
+            compact["concerns_omitted"] = dropped
+            continue
+        if len(compact.get("changed", [])) > 1:
+            compact["changed_count"] = len(compact["changed"])
+            compact["changed"] = compact["changed"][:1]
+            continue
+        if compact["concerns"]:
+            compact["concerns_omitted"] = compact.get("concerns_omitted", 0) + 1
+            compact["concerns"] = []
+            continue
+        compact["blocker"] = _truncate(compact["blocker"], 120)
+        break
+    return compact
+
+
+def emit_result(result: dict) -> None:
+    sys.stdout.write(json.dumps(compact_result(result), ensure_ascii=False) + "\n")
+
+
+def _error_result(error: LocalImplementError) -> dict:
+    needs_context = {"NO_FILES_SECTION", "MISSING_BRIEF", "EMPTY_BRIEF",
+                     "MISSING_CONTEXT", "EMPTY_CONTEXT"}
+    verify_failed = {"INVALID_RESPONSE", "UNDECLARED_PATH", "DIRTY_PATH_CONFLICT"}
+    if error.code in needs_context:
+        status = "NEEDS_CONTEXT"
+    elif error.code in verify_failed:
+        status = "VERIFY_FAILED"
+    else:
+        status = "BLOCKED"
+    return {"status": status, "code": error.code, "message": error.message,
+            "changed": [], "tests": {"command": "", "result": "not_run"},
+            "concerns": [], "blocker": error.message, "report": "",
+            "repair_rounds_used": 0,
+            "verified": {"base": "", "paths_allowed": error.code != "UNDECLARED_PATH",
+                         "untouched_dirty": error.code != "DIRTY_PATH_CONFLICT",
+                         "report_written": False},
+            "artifacts": ""}
+
+
+def run_skill(argv: Sequence[str]) -> dict:
+    artifacts = None
+    try:
+        dispatch = load_dispatch(parse_argv(argv))
+        artifacts = create_artifacts()
+        proposal, changed, run, used = implement(dispatch, artifacts)
+        write_report(dispatch, proposal, changed, run, used, artifacts)
+        return compact_result(build_result(dispatch, proposal, changed, run, used, artifacts))
+    except LocalImplementError as error:
+        result = _error_result(error)
+        if artifacts is not None:
+            result["artifacts"] = str(artifacts.root)
+        return compact_result(result)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    result = run_skill(list(sys.argv[1:] if argv is None else argv))
+    emit_result(result)
+    return 0 if result["status"] in ("DONE", "DONE_WITH_CONCERNS") else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
