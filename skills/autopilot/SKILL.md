@@ -46,6 +46,10 @@ Receive from skill arguments:
 - **Feature description** (free text) — drives Stage 1 spec generation and is passed as context downstream.
 - **Spec file path** (optional) — classified by the plan-review rule: a path under a `specs/` directory or matching `*-design.md`. If provided: verify it exists, record it, skip Stage 1's generation AND its user gate (an explicitly provided spec counts as already approved), and start at Stage 2.
 - **`--branch <name>`** (optional) — create and switch to the branch at pipeline start (before Stage 1), so the spec, plan, and implementation all land on the same branch. Default: run on the current branch; invoking autopilot without `--branch` constitutes the explicit consent that subagent-driven-development requires for main-branch work.
+- **`--local-impl`** (optional) — run each task's **initial implementation** on the local model
+  via `forte:local-implement` instead of a Claude implementer subagent. Opt-in: the default is
+  off, because the local model's per-task success rate and wall clock are not yet measured.
+  Review, fix rounds, and commits stay on Claude either way.
 
 If neither a feature description nor a spec path is provided, ask via `AskUserQuestion`.
 
@@ -131,6 +135,33 @@ Invoke `superpowers:subagent-driven-development` (SDD) via the Skill tool with t
 - **Workspace:** work in the current checkout (or the `--branch` branch created at pipeline start) — do NOT invoke `superpowers:using-git-worktrees` or create a worktree, even though SDD lists it as a required workflow skill; a mid-pipeline worktree strands the ledger, spec, plan, and start SHA in the original checkout.
 - **Completion handoff:** after SDD's final review, do NOT invoke `superpowers:finishing-a-development-branch` — the pipeline continues to Stage 6; integration options are presented in Stage 8 instead.
 - **BLOCKED** from an implementer that survives SDD's own escalation ladder (more context → stronger model → task split) → stop the pipeline (see Stop Conditions).
+- **Local initial implementation (only when `--local-impl` was passed):**
+  - Dispatch each task's initial implementation to `forte:local-implement` instead of the Agent
+    tool. Record BASE, run SDD's `scripts/task-brief`, then write a context file beside the
+    brief (`task-<N>-context.md`) carrying the plan's Global Constraints verbatim, prior-task
+    interfaces, your rulings on any ambiguity in the brief, pointers to parked findings in the
+    area, and a `## Files` section listing every path the task creates or modifies. Pass
+    `--brief`, `--report`, `--context`, `--base`, and `--test-cmd` (the plan's verification
+    command) — the `## Files` list is the runner's write allowlist.
+  - A task whose files cannot be declared up front is not a fit: dispatch a Claude implementer
+    for it and note why in the ledger.
+  - **Batching is disabled under `--local-impl`** — one local run per task, even for small
+    same-shape tasks SDD would otherwise combine.
+  - On `DONE` / `DONE_WITH_CONCERNS`: verify the result yourself before reviewing — every
+    changed path was declared, no path that was already dirty changed, the report file is
+    non-empty, and the declared test command actually ran with its output in the report. Then
+    stage exactly the changed paths and commit via `forte:qwen-commit` — the runner never
+    commits. Only then generate the review package from the recorded BASE.
+  - On `BLOCKED` / `NEEDS_CONTEXT` / `VERIFY_FAILED`, or any runner failure: fall back to a
+    Claude implementer for that task, carrying the brief path, the same report path, and the
+    working-tree state (`git status --porcelain`, `git diff --stat`). **Never** reset, check
+    out, stash, or otherwise discard the partial work — the Claude implementer decides whether
+    to build on it.
+  - **Fix rounds always use a fresh Claude implementer.** SDD normally resumes the original
+    implementer for rounds 1–3; a local run leaves no resumable agent, so take SDD's documented
+    fallback for harnesses that cannot resume a live session: a fresh implementer with the
+    brief path, the same report file path, and the findings.
+  - Append one ledger line per task: `LOCAL-IMPL: task <N> → <ok|fallback> (<reason>)`.
 - **Rust diagnostics:** when an implementation task needs `cargo check` or
   `cargo clippy`, invoke `forte:rust-diagnostics` with the task's exact
   toolchain/Cargo/lint arguments and consume its compact result before opening
@@ -168,6 +199,7 @@ Present in the terminal (do NOT save the report to disk):
 | 3 Plan | {done} | {plan_path} |
 | 4 Plan review | {done — N edits applied} | {plan_path} |
 | 5 Implementation | {done — N tasks} | {start_sha}..{head_sha} |
+| 5a ローカル実装 | {N件成功 / M件フォールバック / 未使用} | {LOCAL-IMPL ledger lines} |
 | 6 Code review | {done — N findings fixed / skipped: reason} | {commit or "no changes"} |
 | 7 Simplify | {done / skipped: reason} | {commit or "no changes"} |
 
@@ -207,7 +239,7 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 
 | Step | Action |
 |------|--------|
-| Input | feature description and/or spec path (+ optional `--branch <name>`) |
+| Input | feature description and/or spec path (+ optional `--branch <name>`, `--local-impl`) |
 | Gate | Stage 1 spec approval ONLY; provided spec = pre-approved |
 | Ledger | `.superpowers/autopilot/pipeline.md`: header + start SHA, started/complete/DEFERRED/STOPPED/PIPELINE COMPLETE lines |
 | Stage args | spec-review `"<spec>"` · writing-plans (pre-answer Subagent-Driven) · plan-review `"<plan> <spec>"` (auto-apply is both reviews' default) · SDD (standing answers) · code-review `"max --fix"` · simplify |
@@ -227,3 +259,10 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 - **Re-running Stage 1's gate for a provided spec** — an explicit spec path counts as approved; the pipeline starts at Stage 2.
 - **Pushing or creating a PR automatically** — Stage 8 suggests; the user decides.
 - **Generating a spec for fuzzy requirements instead of recommending brainstorming** — Stage 1's condensed questions cannot replace design exploration; say so and stop if the feature description is too vague to write concrete requirements.
+- **Letting the local implementer commit, or committing for it with `git add -A`** — the runner
+  never commits; the pipeline stages exactly the paths it reported as changed.
+- **Discarding a failed local run's partial work** — fall back with the working-tree state
+  attached; resetting or checking out is a destructive operation reserved for the human.
+- **Resuming an implementer that does not exist** — after a local run, fix round R1 is a fresh
+  Claude implementer, not a resume.
+- **Batching tasks under `--local-impl`** — one local run per task.
