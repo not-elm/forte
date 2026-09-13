@@ -650,16 +650,18 @@ def _minimal_result(compact: dict) -> dict:
 
 
 def compact_result(result: dict) -> dict:
-    if result.get("_already_compacted"):
-        return result
     compact = dict(result)
+    if "message" in compact:
+        del compact["message"]
     compact["blocker"] = _truncate(compact.get("blocker", ""), 400)
-    compact["message"] = _truncate(compact.get("message", ""), 400)
     compact["concerns"] = [_truncate(item, 160) for item in compact.get("concerns", [])]
     compact["tests"] = dict(compact.get("tests", {}))
     compact["tests"]["command"] = _truncate(compact["tests"].get("command", ""), 200)
 
-    while len(json.dumps(compact, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
+    def size_with_newline(payload: dict) -> int:
+        return len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) + 1
+
+    while size_with_newline(compact) > RESULT_LIMIT:
         if len(compact["concerns"]) > 1:
             dropped = len(compact["concerns"]) - 1
             compact["concerns"] = compact["concerns"][:1]
@@ -674,19 +676,17 @@ def compact_result(result: dict) -> dict:
             compact["concerns"] = []
             continue
         compact["blocker"] = _truncate(compact["blocker"], 120)
-        compact["message"] = _truncate(compact["message"], 120)
-        if len(json.dumps(compact, ensure_ascii=False).encode("utf-8")) <= RESULT_LIMIT:
+        if size_with_newline(compact) <= RESULT_LIMIT:
             break
         minimal = _minimal_result(compact)
-        if len(json.dumps(minimal, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
+        if size_with_newline(minimal) > RESULT_LIMIT:
             minimal["report"] = _truncate(minimal["report"], 400)
-            if len(json.dumps(minimal, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
+            if size_with_newline(minimal) > RESULT_LIMIT:
                 minimal["artifacts"] = _truncate(minimal["artifacts"], 200)
                 minimal["paths_truncated"] = True
         compact = minimal
         break
 
-    compact["_already_compacted"] = True
     return compact
 
 

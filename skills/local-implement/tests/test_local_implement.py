@@ -638,6 +638,22 @@ class BudgetTests(DispatchFixture):
         self.addCleanup(lambda: subprocess.run(
             ["rm", "-rf", result["artifacts"]], check=False))
 
+    def test_report_path_length_sweep(self):
+        body = response_body(files=(("src/greet.py", "ok\n"),))
+        for path_extra_len in range(100, 300, 25):
+            long_report_path = str(self.report.parent / ("r" * path_extra_len + ".md"))
+            argv = ["--brief", str(self.brief), "--report", long_report_path,
+                    "--context", str(self.context), "--base", self.base,
+                    "--workdir", str(self.root)]
+            result = self.invoke(argv, [body])
+            emitted = json.dumps(result, ensure_ascii=False).encode("utf-8") + b"\n"
+            self.assertLessEqual(len(emitted), self.li.RESULT_LIMIT,
+                               f"Emitted result exceeds budget at path length {path_extra_len}: {len(emitted)} > {self.li.RESULT_LIMIT}")
+            artifacts_to_cleanup = result.get("artifacts", "")
+            if artifacts_to_cleanup:
+                self.addCleanup(lambda path=artifacts_to_cleanup: subprocess.run(
+                    ["rm", "-rf", path], check=False))
+
 
 class ErrorStatusTests(DispatchFixture):
     def test_illegal_path_reports_paths_allowed_false(self):
@@ -670,22 +686,52 @@ class ErrorStatusTests(DispatchFixture):
                 self.assertEqual(result["status"], "NEEDS_CONTEXT")
 
 
+class ErrorDispatchPopulationTests(DispatchFixture):
+    def invoke(self, argv, responses):
+        with ollama_stub(self.li, responses=responses):
+            return self.li.run_skill(argv)
+
+    def argv(self, *extra):
+        return ["--brief", str(self.brief), "--report", str(self.report),
+                "--context", str(self.context), "--base", self.base,
+                "--workdir", str(self.root), *extra]
+
+    def test_dispatch_fields_populated_on_post_load_error(self):
+        body = response_body(files=(("src/undeclared.py", "x\n"),))
+        result = self.invoke(self.argv(), [body])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["code"], "UNDECLARED_PATH")
+        self.assertEqual(result["verified"]["base"], self.base)
+        self.assertEqual(result["report"], str(self.report))
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+
+
 class PartialWorkTests(DispatchFixture):
-    def dispatch(self, **overrides):
-        with ollama_stub(self.li):
-            return self.li.load_dispatch(self.options(**overrides))
+    def invoke(self, argv, responses):
+        with ollama_stub(self.li, responses=responses):
+            return self.li.run_skill(argv)
+
+    def argv(self, *extra):
+        return ["--brief", str(self.brief), "--report", str(self.report),
+                "--context", str(self.context), "--base", self.base,
+                "--workdir", str(self.root), *extra]
 
     def test_partial_work_reported_when_repair_fails(self):
-        dispatch = self.dispatch()
-        artifacts = self.li.create_artifacts()
-        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
         body_initial = response_body(files=(("src/greet.py", "ok\n"),))
         body_repair = response_body(files=(("src/bad.py", "x\n"),))
-        with ollama_stub(self.li, responses=[body_initial, body_repair]):
-            proposal, changed, run, used = self.li.implement(
-                dispatch, artifacts, applied=[])
-        self.assertEqual(changed, ("src/greet.py",))
-        self.assertEqual((self.root / "src" / "greet.py").read_text(), "ok\n")
+        result = self.invoke(
+            self.argv("--test-cmd", "python3", "-c", "raise SystemExit(1)"),
+            [body_initial, body_repair])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["code"], "UNDECLARED_PATH")
+        self.assertEqual(result["changed"], ["src/greet.py"])
+        self.assertTrue(result["verified"]["report_written"])
+        self.assertTrue((self.root / "src" / "greet.py").is_file())
+        report_text = Path(result["report"]).read_text()
+        self.assertIn("Run stopped partway", report_text)
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
 
 
 class ResultTests(DispatchFixture):
@@ -756,8 +802,9 @@ class ResultTests(DispatchFixture):
                     files=(("src/greet.py", "ok\n"),))]):
                 self.assertEqual(self.li.main(self.argv()), 0)
         result = json.loads(stdout_capture.getvalue().strip())
-        self.addCleanup(lambda: subprocess.run(
-            ["rm", "-rf", result.get("artifacts", "")], check=False))
+        artifacts_path1 = result.get("artifacts", "")
+        self.addCleanup(lambda path=artifacts_path1: subprocess.run(
+            ["rm", "-rf", path], check=False))
 
         stdout_capture = io.StringIO()
         with patch.object(sys, 'stdout', stdout_capture):
@@ -765,8 +812,9 @@ class ResultTests(DispatchFixture):
                     status="BLOCKED", files=(), blocker="no interface")]):
                 self.assertEqual(self.li.main(self.argv()), 1)
         result = json.loads(stdout_capture.getvalue().strip())
-        self.addCleanup(lambda: subprocess.run(
-            ["rm", "-rf", result.get("artifacts", "")], check=False))
+        artifacts_path2 = result.get("artifacts", "")
+        self.addCleanup(lambda path=artifacts_path2: subprocess.run(
+            ["rm", "-rf", path], check=False))
 
 
 if __name__ == "__main__":
