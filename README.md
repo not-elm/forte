@@ -65,6 +65,37 @@ an unexpected result.
 Automatic selection applies to assistants that load this plugin. It does not
 intercept commands typed directly in a terminal, CI, or unrelated agents.
 
+### forte:local-implement
+
+Produce one already-planned implementation task with a local model instead of a
+Claude implementer subagent. A local Python runner builds the prompt from the SDD
+task brief and a caller-written context file, asks Ollama for the complete new
+content of each declared file, applies only the declared paths, runs the caller's
+test command, allows one self-repair round if those tests fail, writes the SDD
+report file, and returns at most 2 KiB of JSON.
+
+```text
+/forte:local-implement --brief .superpowers/sdd/plan/task-1-brief.md \
+  --report .superpowers/sdd/plan/task-1-report.md \
+  --context .superpowers/sdd/plan/task-1-context.md \
+  --base $(git rev-parse HEAD) --test-cmd python3 -m unittest -q
+```
+
+The context file's `## Files` section is the write allowlist: the runner refuses
+any other path, refuses a path that already had uncommitted changes, and never
+stages, commits, or changes Git state — the caller commits after verifying. Model
+suggested commands are recorded in the report and never executed. Generation has
+a 1,800-second deadline, a 48 KiB prompt limit, a 16 KiB per-file limit, and no
+retry or cloud fallback beyond the single self-repair round.
+
+Requires Python 3.9+, Git, and a running Ollama service with `qwen3.8:27b-q8_0`.
+`FORTE_LOCAL_IMPL_MODEL` selects another installed model and
+`FORTE_LOCAL_IMPL_TIMEOUT` changes the deadline. The full test log and raw model
+output stay in the mode-0700 temporary directory named by the result.
+
+`autopilot --local-impl` opts the pipeline into using this skill for Stage 5's
+initial implementation; review and fix rounds stay on Claude.
+
 ### forte:codex-investigate
 
 Run Codex CLI in read-only mode to investigate a bug's root cause from its symptoms. Describe the bug and Codex searches the codebase, identifies root causes with file paths and line numbers, assesses impact scope, and suggests fix approaches.
@@ -98,6 +129,7 @@ npm i -g @openai/codex
 Local-runner development tests:
 
 ```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/local-implement/tests -v
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/rust-diagnostics/tests -v
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s skills/qwen-commit/tests -v
 ```
