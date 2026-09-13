@@ -179,6 +179,10 @@ class FilesSectionTests(DispatchFixture):
         self.assert_code("NO_FILES_SECTION",
                          lambda: self.li.parse_files_section("## Files\n\n## Notes\n"))
 
+    def test_bare_bullet_is_skipped(self):
+        text = "## Files\n-\n- src/main.py\n\n## Notes\n"
+        self.assertEqual(self.li.parse_files_section(text), ("src/main.py",))
+
 
 class PreflightTests(DispatchFixture):
     def test_accepts_a_valid_dispatch(self):
@@ -236,6 +240,18 @@ class PreflightTests(DispatchFixture):
         with ollama_stub(self.li, status=0):
             self.assert_code("OLLAMA_UNAVAILABLE",
                             lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_dangling_symlink_ancestor(self):
+        (self.root / "link_dir").symlink_to(self.root.parent / "outside_target")
+        self.write_context(["link_dir/new.py"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_symlink_ancestor_targeting_outside(self):
+        outside = Path(tempfile.mkdtemp(prefix="test-local-implement-target-"))
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(outside)], check=False))
+        (self.root / "link_dir").symlink_to(outside)
+        self.write_context(["link_dir/new.py"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
 
 
 if __name__ == "__main__":

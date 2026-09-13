@@ -137,7 +137,7 @@ def parse_files_section(text: str) -> Tuple[str, ...]:
         entry = line.strip()
         if not entry:
             continue
-        entry = re.sub(r"^[-*]\s+", "", entry).strip().strip("`").strip()
+        entry = re.sub(r"^[-*]\s*", "", entry).strip().strip("`").strip()
         if entry:
             paths.append(entry)
     if not paths:
@@ -158,8 +158,13 @@ def validate_declared_path(root: Path, raw: str) -> None:
         raise illegal
     root_resolved = root.resolve()
     candidate = root_resolved / raw
+    current = root_resolved
+    for part in Path(raw).parts:
+        current = current / part
+        if current.is_symlink():
+            raise illegal
     existing = candidate
-    while not existing.exists():
+    while not os.path.lexists(existing):
         parent = existing.parent
         if parent == existing:
             break
