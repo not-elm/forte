@@ -577,29 +577,114 @@ class StatusMappingTests(DispatchFixture):
     def test_passing_tests_keep_the_model_status(self):
         proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
         run = self.li.TestRun(("python3",), "pass", "")
-        self.assertEqual(self.li.resolve_status(proposal, run)[0], "DONE")
+        self.assertEqual(self.li.resolve_status(proposal, run, used=0)[0], "DONE")
 
     def test_concerns_status_is_preserved(self):
         proposal = self.li.Proposal("DONE_WITH_CONCERNS", (("a", "b"),), "n", ("c",), (), "")
         run = self.li.TestRun(("python3",), "pass", "")
-        self.assertEqual(self.li.resolve_status(proposal, run)[0], "DONE_WITH_CONCERNS")
+        self.assertEqual(self.li.resolve_status(proposal, run, used=0)[0], "DONE_WITH_CONCERNS")
 
     def test_failing_tests_become_blocked(self):
         proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
         run = self.li.TestRun(("python3",), "fail", "boom")
-        status, blocker = self.li.resolve_status(proposal, run)
+        status, blocker = self.li.resolve_status(proposal, run, used=0)
         self.assertEqual(status, "BLOCKED")
         self.assertIn("still failing", blocker)
 
     def test_timed_out_tests_become_blocked(self):
         proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
         run = self.li.TestRun(("python3",), "timeout", "")
-        self.assertEqual(self.li.resolve_status(proposal, run)[0], "BLOCKED")
+        status, blocker = self.li.resolve_status(proposal, run, used=0)
+        self.assertEqual(status, "BLOCKED")
+        self.assertIn("timed out", blocker)
 
     def test_model_blocked_is_passed_through(self):
         proposal = self.li.Proposal("BLOCKED", (), "n", (), (), "no interface given")
-        self.assertEqual(self.li.resolve_status(proposal, None),
+        self.assertEqual(self.li.resolve_status(proposal, None, used=0),
                          ("BLOCKED", "no interface given"))
+
+    def test_failure_message_mentions_repair_only_when_round_ran(self):
+        proposal = self.li.Proposal("DONE", (("a", "b"),), "n", (), (), "")
+        run = self.li.TestRun(("python3",), "fail", "boom")
+        status, blocker = self.li.resolve_status(proposal, run, used=0)
+        self.assertNotIn("self-repair round", blocker)
+        status, blocker = self.li.resolve_status(proposal, run, used=1)
+        self.assertIn("self-repair round", blocker)
+
+
+class BudgetTests(DispatchFixture):
+    def invoke(self, argv, responses):
+        with ollama_stub(self.li, responses=responses):
+            return self.li.run_skill(argv)
+
+    def argv(self, *extra):
+        return ["--brief", str(self.brief), "--report", str(self.report),
+                "--context", str(self.context), "--base", self.base,
+                "--workdir", str(self.root), *extra]
+
+    def test_extreme_paths_still_fit_in_budget(self):
+        long_report_path = str(self.report.parent / ("x" * 200 + ".md"))
+        long_context_path = str(self.context.parent / ("y" * 200 + ".md"))
+        argv = ["--brief", str(self.brief), "--report", long_report_path,
+                "--context", long_context_path, "--base", self.base,
+                "--workdir", str(self.root)]
+        long_concerns = tuple(f"concern {i} " + "z" * 200 for i in range(40))
+        body = response_body(files=(("src/greet.py", "x" * 5000),),
+                           concerns=long_concerns)
+        result = self.invoke(argv, [body])
+        encoded = json.dumps(result, ensure_ascii=False).encode("utf-8")
+        self.assertLessEqual(len(encoded), self.li.RESULT_LIMIT)
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+
+
+class ErrorStatusTests(DispatchFixture):
+    def test_illegal_path_reports_paths_allowed_false(self):
+        self.write_context(["../outside.py"])
+        with ollama_stub(self.li):
+            try:
+                self.li.load_dispatch(self.options())
+            except self.li.LocalImplementError as e:
+                result = self.li._error_result(e)
+                self.assertFalse(result["verified"]["paths_allowed"])
+
+    def test_illegal_path_is_needs_context(self):
+        self.write_context(["../outside.py"])
+        with ollama_stub(self.li):
+            try:
+                self.li.load_dispatch(self.options())
+            except self.li.LocalImplementError as e:
+                result = self.li._error_result(e)
+                self.assertEqual(result["status"], "NEEDS_CONTEXT")
+
+    def test_input_too_large_is_needs_context(self):
+        target = self.root / "src" / "greet.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("x" * (self.li.FILE_LIMIT + 1))
+        with ollama_stub(self.li):
+            try:
+                self.li.load_dispatch(self.options())
+            except self.li.LocalImplementError as e:
+                result = self.li._error_result(e)
+                self.assertEqual(result["status"], "NEEDS_CONTEXT")
+
+
+class PartialWorkTests(DispatchFixture):
+    def dispatch(self, **overrides):
+        with ollama_stub(self.li):
+            return self.li.load_dispatch(self.options(**overrides))
+
+    def test_partial_work_reported_when_repair_fails(self):
+        dispatch = self.dispatch()
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        body_initial = response_body(files=(("src/greet.py", "ok\n"),))
+        body_repair = response_body(files=(("src/bad.py", "x\n"),))
+        with ollama_stub(self.li, responses=[body_initial, body_repair]):
+            proposal, changed, run, used = self.li.implement(
+                dispatch, artifacts, applied=[])
+        self.assertEqual(changed, ("src/greet.py",))
+        self.assertEqual((self.root / "src" / "greet.py").read_text(), "ok\n")
 
 
 class ResultTests(DispatchFixture):
@@ -643,6 +728,8 @@ class ResultTests(DispatchFixture):
         self.assertEqual(result["status"], "VERIFY_FAILED")
         self.assertEqual(result["code"], "UNDECLARED_PATH")
         self.assertFalse((self.root / "src" / "other.py").exists())
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
 
     def test_missing_files_section_reports_needs_context(self):
         self.context.write_text("## Notes\n- nothing here\n")
@@ -661,12 +748,24 @@ class ResultTests(DispatchFixture):
             ["rm", "-rf", result["artifacts"]], check=False))
 
     def test_main_exit_codes_follow_the_status(self):
-        with ollama_stub(self.li, responses=[response_body(
-                files=(("src/greet.py", "ok\n"),))]):
-            self.assertEqual(self.li.main(self.argv()), 0)
-        with ollama_stub(self.li, responses=[response_body(
-                status="BLOCKED", files=(), blocker="no interface")]):
-            self.assertEqual(self.li.main(self.argv()), 1)
+        import io
+        stdout_capture = io.StringIO()
+        with patch.object(sys, 'stdout', stdout_capture):
+            with ollama_stub(self.li, responses=[response_body(
+                    files=(("src/greet.py", "ok\n"),))]):
+                self.assertEqual(self.li.main(self.argv()), 0)
+        result = json.loads(stdout_capture.getvalue().strip())
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result.get("artifacts", "")], check=False))
+
+        stdout_capture = io.StringIO()
+        with patch.object(sys, 'stdout', stdout_capture):
+            with ollama_stub(self.li, responses=[response_body(
+                    status="BLOCKED", files=(), blocker="no interface")]):
+                self.assertEqual(self.li.main(self.argv()), 1)
+        result = json.loads(stdout_capture.getvalue().strip())
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result.get("artifacts", "")], check=False))
 
 
 if __name__ == "__main__":

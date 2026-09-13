@@ -529,13 +529,15 @@ def _failure_excerpt(run: TestRun, budget: int = 8 * 1024) -> str:
     return "…(earlier output omitted)…\n" + encoded[-budget:].decode("utf-8", errors="replace")
 
 
-def implement(dispatch: Dispatch, artifacts: Artifacts):
+def implement(dispatch: Dispatch, artifacts: Artifacts, applied: Optional[list] = None):
     dirty = dirty_digests(dispatch.root)
     proposal = generate(dispatch)
     _write_raw(artifacts, "initial", proposal)
     if proposal.status == "BLOCKED":
         return proposal, (), None, 0
     changed = apply_proposal(dispatch, proposal, dirty)
+    if applied is not None:
+        applied.extend(changed)
     run = run_declared_tests(dispatch, artifacts, "initial")
     used = 0
     if (run is not None and run.result != "pass" and dispatch.repair_rounds > 0):
@@ -545,6 +547,10 @@ def implement(dispatch: Dispatch, artifacts: Artifacts):
         if repaired.status != "BLOCKED" and repaired.files:
             changed = tuple(dict.fromkeys(
                 changed + apply_proposal(dispatch, repaired, dirty)))
+            if applied is not None:
+                for path in changed:
+                    if path not in applied:
+                        applied.append(path)
             proposal = Proposal(status=repaired.status, files=repaired.files,
                                 notes=proposal.notes + "\n\nRepair round: " + repaired.notes,
                                 concerns=proposal.concerns + repaired.concerns,
@@ -588,18 +594,24 @@ def write_report(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...
     write_atomic(dispatch.report, "\n".join(lines))
 
 
-def resolve_status(proposal: Proposal, run: Optional[TestRun]) -> Tuple[str, str]:
+def resolve_status(proposal: Proposal, run: Optional[TestRun], used: int = 0) -> Tuple[str, str]:
     if proposal.status == "BLOCKED":
         return "BLOCKED", proposal.blocker
     if run is not None and run.result != "pass":
-        return "BLOCKED", (f"The declared test command {run.result}ed after "
-                           "the self-repair round; the declared tests are still failing.")
+        if run.result == "timeout":
+            failure_msg = "The declared test command timed out"
+        else:
+            failure_msg = "The declared test command failed"
+        if used > 0:
+            failure_msg += " after the self-repair round"
+        failure_msg += "; the declared tests are still failing."
+        return "BLOCKED", failure_msg
     return proposal.status, ""
 
 
 def build_result(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...],
                  run: Optional[TestRun], used: int, artifacts: Artifacts) -> dict:
-    status, blocker = resolve_status(proposal, run)
+    status, blocker = resolve_status(proposal, run, used)
     return {
         "status": status,
         "changed": list(changed),
@@ -624,10 +636,29 @@ def _truncate(value: str, limit: int) -> str:
     return encoded[:limit].decode("utf-8", errors="ignore") + "…"
 
 
+def _minimal_result(compact: dict) -> dict:
+    minimal = {
+        "status": compact.get("status", "VERIFY_FAILED"),
+        "code": compact.get("code", ""),
+        "result_truncated": True,
+        "changed_count": compact.get("changed_count", len(compact.get("changed", []))),
+        "tests": {"result": compact.get("tests", {}).get("result", "not_run")},
+        "report": compact.get("report", ""),
+        "artifacts": compact.get("artifacts", ""),
+    }
+    return minimal
+
+
 def compact_result(result: dict) -> dict:
+    if result.get("_already_compacted"):
+        return result
     compact = dict(result)
     compact["blocker"] = _truncate(compact.get("blocker", ""), 400)
+    compact["message"] = _truncate(compact.get("message", ""), 400)
     compact["concerns"] = [_truncate(item, 160) for item in compact.get("concerns", [])]
+    compact["tests"] = dict(compact.get("tests", {}))
+    compact["tests"]["command"] = _truncate(compact["tests"].get("command", ""), 200)
+
     while len(json.dumps(compact, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
         if len(compact["concerns"]) > 1:
             dropped = len(compact["concerns"]) - 1
@@ -643,7 +674,19 @@ def compact_result(result: dict) -> dict:
             compact["concerns"] = []
             continue
         compact["blocker"] = _truncate(compact["blocker"], 120)
+        compact["message"] = _truncate(compact["message"], 120)
+        if len(json.dumps(compact, ensure_ascii=False).encode("utf-8")) <= RESULT_LIMIT:
+            break
+        minimal = _minimal_result(compact)
+        if len(json.dumps(minimal, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
+            minimal["report"] = _truncate(minimal["report"], 400)
+            if len(json.dumps(minimal, ensure_ascii=False).encode("utf-8")) > RESULT_LIMIT:
+                minimal["artifacts"] = _truncate(minimal["artifacts"], 200)
+                minimal["paths_truncated"] = True
+        compact = minimal
         break
+
+    compact["_already_compacted"] = True
     return compact
 
 
@@ -651,9 +694,9 @@ def emit_result(result: dict) -> None:
     sys.stdout.write(json.dumps(compact_result(result), ensure_ascii=False) + "\n")
 
 
-def _error_result(error: LocalImplementError) -> dict:
+def _error_result(error: LocalImplementError, dispatch: Optional[Dispatch] = None) -> dict:
     needs_context = {"NO_FILES_SECTION", "MISSING_BRIEF", "EMPTY_BRIEF",
-                     "MISSING_CONTEXT", "EMPTY_CONTEXT"}
+                     "MISSING_CONTEXT", "EMPTY_CONTEXT", "ILLEGAL_PATH", "INPUT_TOO_LARGE"}
     verify_failed = {"INVALID_RESPONSE", "UNDECLARED_PATH", "DIRTY_PATH_CONFLICT"}
     if error.code in needs_context:
         status = "NEEDS_CONTEXT"
@@ -663,9 +706,10 @@ def _error_result(error: LocalImplementError) -> dict:
         status = "BLOCKED"
     return {"status": status, "code": error.code, "message": error.message,
             "changed": [], "tests": {"command": "", "result": "not_run"},
-            "concerns": [], "blocker": error.message, "report": "",
+            "concerns": [], "blocker": error.message, "report": str(dispatch.report) if dispatch else "",
             "repair_rounds_used": 0,
-            "verified": {"base": "", "paths_allowed": error.code != "UNDECLARED_PATH",
+            "verified": {"base": dispatch.base if dispatch else "",
+                         "paths_allowed": error.code not in ("UNDECLARED_PATH", "ILLEGAL_PATH"),
                          "untouched_dirty": error.code != "DIRTY_PATH_CONFLICT",
                          "report_written": False},
             "artifacts": ""}
@@ -673,16 +717,26 @@ def _error_result(error: LocalImplementError) -> dict:
 
 def run_skill(argv: Sequence[str]) -> dict:
     artifacts = None
+    dispatch = None
+    applied: list = []
     try:
         dispatch = load_dispatch(parse_argv(argv))
         artifacts = create_artifacts()
-        proposal, changed, run, used = implement(dispatch, artifacts)
+        proposal, changed, run, used = implement(dispatch, artifacts, applied=applied)
         write_report(dispatch, proposal, changed, run, used, artifacts)
         return compact_result(build_result(dispatch, proposal, changed, run, used, artifacts))
     except LocalImplementError as error:
-        result = _error_result(error)
+        result = _error_result(error, dispatch)
         if artifacts is not None:
             result["artifacts"] = str(artifacts.root)
+        if applied:
+            result["changed"] = applied
+            if dispatch is not None:
+                error_proposal = Proposal(status="BLOCKED", files=(), notes="Run stopped partway through. See blocker message.",
+                                        concerns=(), suggested_tests=(), blocker=error.message)
+                write_report(dispatch, error_proposal, tuple(applied), None, 0, artifacts)
+                result["report"] = str(dispatch.report)
+                result["verified"]["report_written"] = True
         return compact_result(result)
 
 
