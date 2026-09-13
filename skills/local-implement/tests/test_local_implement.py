@@ -1,6 +1,7 @@
 """Behavioral tests; all Git mutations stay in disposable repositories."""
 import importlib.util
 from contextlib import contextmanager
+import io
 import json
 import os
 from pathlib import Path
@@ -638,67 +639,97 @@ class BudgetTests(DispatchFixture):
         self.addCleanup(lambda: subprocess.run(
             ["rm", "-rf", result["artifacts"]], check=False))
 
-    def test_result_budget_across_boundary_region(self):
-        import io
-        for path_extra_len in range(600, 1200, 50):
-            long_report_path = str(self.report.parent / ("r" * path_extra_len + ".md"))
-            long_blocker = "blocker " + "b" * 300
-            many_concerns = tuple(f"concern {i} " + "c" * 120 for i in range(25))
-            many_changed = tuple(f"file{i}.py" for i in range(15))
-            body = response_body(files=tuple((f, "x\n") for f in many_changed),
-                               blocker=long_blocker, concerns=many_concerns)
-            argv = ["--brief", str(self.brief), "--report", long_report_path,
-                    "--context", str(self.context), "--base", self.base,
-                    "--workdir", str(self.root)]
+    def _sweep_payload(self, report_extra_len):
+        """The large-field shape used by the effectiveness sweeps: a long report
+        path (the swept variable) alongside a long message, many long concerns,
+        a long blocker, a long test command, several long changed paths, and a
+        long artifacts path — big enough on every field to actually engage
+        compact_result's reduction stages and the minimal-result fallback."""
+        report = str(self.report.parent / ("r" * report_extra_len + ".md"))
+        artifacts = "/tmp/" + "a" * 900
+        changed = [f"src/module_{i}/" + "p" * 60 + f"file_{i}.py" for i in range(12)]
+        concerns = [f"concern {i} " + "c" * 300 for i in range(40)]
+        blocker = "blocker " + "b" * 2000
+        command = "test-command " + "t" * 600
+        message = "m" * 3000
+        return {
+            "status": "DONE_WITH_CONCERNS",
+            "message": message,
+            "changed": changed,
+            "tests": {"command": command, "result": "fail"},
+            "concerns": concerns,
+            "blocker": blocker,
+            "report": report,
+            "repair_rounds_used": 1,
+            "verified": {"base": "abc123def456", "paths_allowed": True,
+                        "untouched_dirty": True, "report_written": True},
+            "artifacts": artifacts,
+        }
+
+    def test_result_line_stays_within_budget_across_a_self_validating_sweep(self):
+        """Replaces test_result_budget_across_boundary_region,
+        test_paths_truncated_flag_set_on_report_only, and
+        test_compact_result_is_idempotent: those swept input sizes too small to
+        ever reach the minimal-result fallback, so their guarded assertions
+        never ran and they pinned no defect. This sweep asserts the budget,
+        fixed-point, and paths_truncated invariants on every case from 0 to
+        3000, then asserts its own coverage so a range that stops engaging the
+        machinery under test fails loudly instead of passing vacuously."""
+        reached_minimal_fallback = False
+        reached_paths_truncated = False
+        reached_report_only_shortened = False
+
+        for report_extra_len in range(0, 3001, 50):
+            payload = self._sweep_payload(report_extra_len)
+            compact_once = self.li.compact_result(payload)
+            compact_twice = self.li.compact_result(compact_once)
+
             stdout_capture = io.StringIO()
-            with patch.object(sys, 'stdout', stdout_capture):
-                with ollama_stub(self.li, responses=[body]):
-                    self.li.main(argv)
+            with patch.object(sys, "stdout", stdout_capture):
+                self.li.emit_result(payload)
             emitted = stdout_capture.getvalue().encode("utf-8")
-            self.assertLessEqual(len(emitted), self.li.RESULT_LIMIT,
-                               f"Emitted result exceeds budget at path_len={path_extra_len}: {len(emitted)} > {self.li.RESULT_LIMIT}")
-            # Parse and get artifacts to cleanup
-            result = json.loads(emitted.decode("utf-8").strip())
-            artifacts_to_cleanup = result.get("artifacts", "")
-            if artifacts_to_cleanup and not artifacts_to_cleanup.startswith("/tmp/a"):
-                self.addCleanup(lambda path=artifacts_to_cleanup: subprocess.run(
-                    ["rm", "-rf", path], check=False))
 
-    def test_compact_result_is_idempotent(self):
-        long_report = "/tmp/" + "r" * 500
-        long_artifacts = "/tmp/" + "a" * 500
-        result = {
-            "status": "DONE",
-            "changed": ["f1.py", "f2.py", "f3.py", "f4.py"],
-            "tests": {"command": "test cmd " + "x" * 300, "result": "pass"},
-            "concerns": [f"concern {i} " + "c" * 180 for i in range(20)],
-            "blocker": "blocker " + "b" * 500,
-            "report": long_report,
-            "repair_rounds_used": 0,
-            "verified": {"base": "abc123", "paths_allowed": True, "untouched_dirty": True, "report_written": True},
-            "artifacts": long_artifacts,
-        }
-        compact1 = self.li.compact_result(result)
-        compact2 = self.li.compact_result(compact1)
-        self.assertEqual(json.dumps(compact1, sort_keys=True),
-                        json.dumps(compact2, sort_keys=True),
-                        "compact_result is not idempotent")
+            report_shortened = compact_once.get("report") != payload["report"]
+            artifacts_shortened = compact_once.get("artifacts") != payload["artifacts"]
 
-    def test_paths_truncated_flag_set_on_report_only(self):
-        long_report = "/tmp/" + "r" * 1000
-        result = {
-            "status": "DONE",
-            "changed": [],
-            "tests": {"result": "not_run"},
-            "report": long_report,
-            "repair_rounds_used": 0,
-            "verified": {"base": "abc123", "paths_allowed": True, "untouched_dirty": True, "report_written": True},
-            "artifacts": "/tmp/small",
-        }
-        compact = self.li.compact_result(result)
-        if "report" in compact and len(compact["report"]) < len(long_report):
-            self.assertTrue(compact.get("paths_truncated", False),
-                          "paths_truncated should be True when report is shortened")
+            with self.subTest(report_extra_len=report_extra_len, check="budget"):
+                self.assertLessEqual(
+                    len(emitted), self.li.RESULT_LIMIT,
+                    f"emitted line exceeds RESULT_LIMIT at report_extra_len="
+                    f"{report_extra_len}: {len(emitted)} > {self.li.RESULT_LIMIT}")
+
+            with self.subTest(report_extra_len=report_extra_len, check="fixed_point"):
+                self.assertEqual(
+                    json.dumps(compact_once, sort_keys=True),
+                    json.dumps(compact_twice, sort_keys=True),
+                    f"compact_result is not a fixed point at report_extra_len="
+                    f"{report_extra_len}")
+
+            if report_shortened or artifacts_shortened:
+                with self.subTest(report_extra_len=report_extra_len, check="paths_truncated"):
+                    self.assertTrue(
+                        compact_once.get("paths_truncated", False),
+                        f"paths_truncated not set despite shortening at "
+                        f"report_extra_len={report_extra_len} "
+                        f"(report_shortened={report_shortened}, "
+                        f"artifacts_shortened={artifacts_shortened})")
+
+            if "result_truncated" in compact_once:
+                reached_minimal_fallback = True
+            if compact_once.get("paths_truncated"):
+                reached_paths_truncated = True
+            if report_shortened and not artifacts_shortened:
+                reached_report_only_shortened = True
+
+        self.assertTrue(reached_minimal_fallback,
+                       "sweep never reached the minimal-result fallback "
+                       "(result_truncated); the swept range is ineffective")
+        self.assertTrue(reached_paths_truncated,
+                       "sweep never set paths_truncated; the swept range is "
+                       "ineffective")
+        self.assertTrue(reached_report_only_shortened,
+                       "sweep never shortened report while leaving artifacts "
+                       "intact; the swept range is ineffective")
 
 
 class ErrorStatusTests(DispatchFixture):
