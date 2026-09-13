@@ -380,5 +380,175 @@ class GenerationTests(DispatchFixture):
         self.assertEqual(len([r for r in requests if r[0] == "/api/generate"]), 1)
 
 
+class ApplicationTests(DispatchFixture):
+    def dispatch(self, **overrides):
+        with ollama_stub(self.li):
+            return self.li.load_dispatch(self.options(**overrides))
+
+    def proposal(self, files):
+        return self.li.Proposal("DONE", tuple(files), "notes", (), (), "")
+
+    def test_creates_a_new_file_with_parent_directories(self):
+        dispatch = self.dispatch()
+        changed = self.li.apply_proposal(
+            dispatch, self.proposal([("src/greet.py", "def greet():\n    return 'HELLO'\n")]),
+            self.li.dirty_digests(self.root))
+        self.assertEqual(changed, ("src/greet.py",))
+        self.assertEqual((self.root / "src" / "greet.py").read_text(),
+                         "def greet():\n    return 'HELLO'\n")
+
+    def test_preserves_the_mode_of_an_existing_file(self):
+        dispatch = self.dispatch()
+        dirty = self.li.dirty_digests(self.root)
+        target = self.root / "src" / "greet.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("old\n")
+        target.chmod(0o755)
+        self.li.apply_proposal(dispatch, self.proposal([("src/greet.py", "new\n")]), dirty)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o755)
+        self.assertEqual(target.read_text(), "new\n")
+
+    def test_refuses_a_path_that_was_already_dirty(self):
+        target = self.root / "src" / "greet.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("uncommitted work\n")
+        dispatch = self.dispatch()
+        dirty = self.li.dirty_digests(self.root)
+        self.assert_code("DIRTY_PATH_CONFLICT", lambda: self.li.apply_proposal(
+            dispatch, self.proposal([("src/greet.py", "overwritten\n")]), dirty))
+        self.assertEqual(target.read_text(), "uncommitted work\n")
+
+    def test_refuses_an_undeclared_path_and_writes_nothing(self):
+        dispatch = self.dispatch()
+        self.assert_code("UNDECLARED_PATH", lambda: self.li.apply_proposal(
+            dispatch,
+            self.proposal([("src/greet.py", "ok\n"), ("src/sneaky.py", "bad\n")]),
+            self.li.dirty_digests(self.root)))
+        self.assertFalse((self.root / "src" / "greet.py").exists())
+        self.assertFalse((self.root / "src" / "sneaky.py").exists())
+
+    def test_dirty_digests_reports_untracked_and_modified_paths(self):
+        (self.root / "untracked.txt").write_text("u\n")
+        (self.root / "seed.txt").write_text("changed\n")
+        digests = self.li.dirty_digests(self.root)
+        self.assertIn("untracked.txt", digests)
+        self.assertIn("seed.txt", digests)
+
+
+class DeclaredTestTests(DispatchFixture):
+    def dispatch(self, **overrides):
+        with ollama_stub(self.li):
+            return self.li.load_dispatch(self.options(**overrides))
+
+    def test_returns_none_without_a_test_command(self):
+        dispatch = self.dispatch()
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        self.assertIsNone(self.li.run_declared_tests(dispatch, artifacts, "initial"))
+
+    def test_records_a_passing_command(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "print('all good')"))
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        run = self.li.run_declared_tests(dispatch, artifacts, "initial")
+        self.assertEqual(run.result, "pass")
+        self.assertIn("all good", artifacts.test_log.read_text())
+
+    def test_records_a_failing_command(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "raise SystemExit(3)"))
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        run = self.li.run_declared_tests(dispatch, artifacts, "initial")
+        self.assertEqual(run.result, "fail")
+
+    def test_timeout_terminates_the_process_group(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "import time; time.sleep(30)"))
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        with patch.object(self.li, "TEST_TIMEOUT", 0.2):
+            run = self.li.run_declared_tests(dispatch, artifacts, "initial")
+        self.assertEqual(run.result, "timeout")
+
+    def test_never_runs_model_suggested_commands(self):
+        marker = self.root / "should-not-exist.txt"
+        dispatch = self.dispatch()
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        proposal = self.li.Proposal("DONE", (("src/greet.py", "x\n"),), "n", (),
+                                    (f"touch {marker}",), "")
+        self.li.apply_proposal(dispatch, proposal, self.li.dirty_digests(self.root))
+        self.li.run_declared_tests(dispatch, artifacts, "initial")
+        self.assertFalse(marker.exists())
+
+
+class SelfRepairTests(DispatchFixture):
+    def dispatch(self, **overrides):
+        with ollama_stub(self.li):
+            return self.li.load_dispatch(self.options(**overrides))
+
+    def artifacts(self):
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        return artifacts
+
+    def test_no_repair_when_tests_pass(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "pass"))
+        body = response_body(files=(("src/greet.py", "ok\n"),))
+        with ollama_stub(self.li, responses=[body]) as requests:
+            proposal, changed, run, used = self.li.implement(dispatch, self.artifacts())
+        self.assertEqual(used, 0)
+        self.assertEqual(run.result, "pass")
+        self.assertEqual(changed, ("src/greet.py",))
+        self.assertEqual(len([r for r in requests if r[0] == "/api/generate"]), 1)
+
+    def test_one_repair_round_when_tests_fail_then_pass(self):
+        script = self.root / "check.py"
+        script.write_text(
+            "import pathlib, sys\n"
+            "sys.exit(0 if pathlib.Path('src/greet.py').read_text() == 'fixed\\n' else 1)\n")
+        self.git("add", "--", "check.py")
+        self.git("commit", "-qm", "chore: add check")
+        dispatch = self.dispatch(test_cmd=("python3", str(script)))
+        bodies = [response_body(files=(("src/greet.py", "broken\n"),)),
+                  response_body(files=(("src/greet.py", "fixed\n"),))]
+        with ollama_stub(self.li, responses=bodies) as requests:
+            _proposal, changed, run, used = self.li.implement(dispatch, self.artifacts())
+        self.assertEqual(used, 1)
+        self.assertEqual(run.result, "pass")
+        self.assertEqual(changed, ("src/greet.py",))
+        self.assertEqual(len([r for r in requests if r[0] == "/api/generate"]), 2)
+
+    def test_stops_after_one_repair_round(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "raise SystemExit(1)"))
+        bodies = [response_body(files=(("src/greet.py", "a\n"),)),
+                  response_body(files=(("src/greet.py", "b\n"),))]
+        with ollama_stub(self.li, responses=bodies) as requests:
+            _proposal, _changed, run, used = self.li.implement(dispatch, self.artifacts())
+        self.assertEqual(used, 1)
+        self.assertEqual(run.result, "fail")
+        self.assertEqual(len([r for r in requests if r[0] == "/api/generate"]), 2)
+
+    def test_repair_rounds_zero_disables_repair(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "raise SystemExit(1)"),
+                                 repair_rounds=0)
+        with ollama_stub(self.li, responses=[response_body(
+                files=(("src/greet.py", "a\n"),))]) as requests:
+            _proposal, _changed, run, used = self.li.implement(dispatch, self.artifacts())
+        self.assertEqual(used, 0)
+        self.assertEqual(run.result, "fail")
+        self.assertEqual(len([r for r in requests if r[0] == "/api/generate"]), 1)
+
+    def test_blocked_proposal_writes_nothing_and_skips_tests(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "raise SystemExit(1)"))
+        with ollama_stub(self.li, responses=[response_body(
+                status="BLOCKED", files=(), blocker="missing interface")]):
+            proposal, changed, run, used = self.li.implement(dispatch, self.artifacts())
+        self.assertEqual(proposal.status, "BLOCKED")
+        self.assertEqual(changed, ())
+        self.assertIsNone(run)
+        self.assertEqual(used, 0)
+        self.assertFalse((self.root / "src" / "greet.py").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

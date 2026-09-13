@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Implement one SDD task with a local model; this runner performs every side effect."""
 from dataclasses import dataclass
+import hashlib
 import http.client
 import json
 import os
 from pathlib import Path
 import re
+import signal
 import socket
 import subprocess
+import tempfile
 import threading
 import time
-from typing import Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
 
 MODEL_ENV = "FORTE_LOCAL_IMPL_MODEL"
@@ -405,3 +408,156 @@ def generate(dispatch: Dispatch, failure: Optional[str] = None,
     }
     return validate_proposal(ollama_request("/api/generate", payload, request_timeout()),
                              dispatch)
+
+
+@dataclass(frozen=True)
+class Artifacts:
+    root: Path
+    test_log: Path
+    raw_path: Path
+
+
+def create_artifacts() -> Artifacts:
+    root = Path(tempfile.mkdtemp(prefix="forte-local-implement-")).resolve()
+    root.chmod(0o700)
+    return Artifacts(root=root, test_log=root / "tests.log", raw_path=root / "raw.json")
+
+
+def dirty_digests(root: Path) -> Dict[str, Optional[str]]:
+    raw = git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    entries = raw.split(b"\x00")
+    digests: Dict[str, Optional[str]] = {}
+    index = 0
+    while index < len(entries):
+        entry = entries[index]
+        index += 1
+        if len(entry) < 4:
+            continue
+        status = entry[:2].decode("utf-8", errors="replace")
+        path = entry[3:].decode("utf-8", errors="replace")
+        if status[0] in ("R", "C") and index < len(entries):
+            index += 1  # consume the rename/copy source path
+        target = root / path
+        if target.is_file() and not target.is_symlink():
+            digests[path] = hashlib.sha256(target.read_bytes()).hexdigest()
+        else:
+            digests[path] = None
+    return digests
+
+
+def write_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = path.stat().st_mode & 0o777 if path.is_file() else None
+    descriptor, temporary = tempfile.mkstemp(prefix="." + path.name + ".", dir=str(path.parent))
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as output:
+            output.write(content)
+        if mode is not None:
+            os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def apply_proposal(dispatch: Dispatch, proposal: Proposal,
+                   dirty: Dict[str, Optional[str]]) -> Tuple[str, ...]:
+    for path, _content in proposal.files:
+        if path not in dispatch.files:
+            raise LocalImplementError(
+                "UNDECLARED_PATH", f"Refusing to write an undeclared path: {path}")
+        validate_declared_path(dispatch.root, path)
+        if path in dirty:
+            raise LocalImplementError(
+                "DIRTY_PATH_CONFLICT",
+                f"{path} already had uncommitted changes before the run; refusing to overwrite.")
+    for path, content in proposal.files:
+        write_atomic(dispatch.root / path, content)
+    return tuple(path for path, _content in proposal.files)
+
+
+@dataclass(frozen=True)
+class TestRun:
+    command: Tuple[str, ...]
+    result: str
+    output: str
+
+
+def _terminate_process_group(process: subprocess.Popen) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        return
+    grace_end = time.monotonic() + TERMINATE_GRACE
+    while process.poll() is None and time.monotonic() < grace_end:
+        time.sleep(min(0.02, max(0.0, grace_end - time.monotonic())))
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def run_declared_tests(dispatch: Dispatch, artifacts: Artifacts,
+                       label: str) -> Optional[TestRun]:
+    if not dispatch.test_cmd:
+        return None
+    process = subprocess.Popen(list(dispatch.test_cmd), cwd=str(dispatch.root),
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                               start_new_session=True)
+    timed_out = False
+    try:
+        output, _ = process.communicate(timeout=TEST_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        _terminate_process_group(process)
+        output, _ = process.communicate()
+    text = (output or b"").decode("utf-8", errors="replace")
+    with artifacts.test_log.open("a", encoding="utf-8") as log:
+        log.write(f"=== {label}: {' '.join(dispatch.test_cmd)} ===\n{text}\n")
+    result = "timeout" if timed_out else ("pass" if process.returncode == 0 else "fail")
+    return TestRun(command=dispatch.test_cmd, result=result, output=text)
+
+
+def _failure_excerpt(run: TestRun, budget: int = 8 * 1024) -> str:
+    encoded = run.output.encode("utf-8")
+    if len(encoded) <= budget:
+        return run.output
+    return "…(earlier output omitted)…\n" + encoded[-budget:].decode("utf-8", errors="replace")
+
+
+def implement(dispatch: Dispatch, artifacts: Artifacts):
+    dirty = dirty_digests(dispatch.root)
+    proposal = generate(dispatch)
+    _write_raw(artifacts, "initial", proposal)
+    if proposal.status == "BLOCKED":
+        return proposal, (), None, 0
+    changed = apply_proposal(dispatch, proposal, dirty)
+    run = run_declared_tests(dispatch, artifacts, "initial")
+    used = 0
+    if (run is not None and run.result != "pass" and dispatch.repair_rounds > 0):
+        repaired = generate(dispatch, failure=_failure_excerpt(run), previous=proposal)
+        _write_raw(artifacts, "repair", repaired)
+        used = 1
+        if repaired.status != "BLOCKED" and repaired.files:
+            changed = tuple(dict.fromkeys(
+                changed + apply_proposal(dispatch, repaired, dirty)))
+            proposal = Proposal(status=repaired.status, files=repaired.files,
+                                notes=proposal.notes + "\n\nRepair round: " + repaired.notes,
+                                concerns=proposal.concerns + repaired.concerns,
+                                suggested_tests=repaired.suggested_tests,
+                                blocker=repaired.blocker)
+            run = run_declared_tests(dispatch, artifacts, "repair")
+    return proposal, changed, run, used
+
+
+def _write_raw(artifacts: Artifacts, label: str, proposal: Proposal) -> None:
+    with artifacts.raw_path.open("a", encoding="utf-8") as raw:
+        raw.write(json.dumps({"round": label, "status": proposal.status,
+                              "paths": [path for path, _ in proposal.files],
+                              "notes": proposal.notes,
+                              "concerns": list(proposal.concerns),
+                              "blocker": proposal.blocker},
+                             ensure_ascii=False) + "\n")
