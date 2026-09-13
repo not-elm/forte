@@ -625,6 +625,7 @@ class BudgetTests(DispatchFixture):
     def test_extreme_paths_still_fit_in_budget(self):
         long_report_path = str(self.report.parent / ("x" * 200 + ".md"))
         long_context_path = str(self.context.parent / ("y" * 200 + ".md"))
+        Path(long_context_path).write_text(self.context.read_text())
         argv = ["--brief", str(self.brief), "--report", long_report_path,
                 "--context", long_context_path, "--base", self.base,
                 "--workdir", str(self.root)]
