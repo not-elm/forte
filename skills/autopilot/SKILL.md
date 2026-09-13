@@ -163,7 +163,7 @@ Invoke `superpowers:subagent-driven-development` (SDD) via the Skill tool with t
     is not usable), `verified.report_written` is true, and `tests.result` is `pass`. A
     `tests.result` of `not_run` means nothing was verified: the task review is then the only
     gate, so say so in the ledger. Then stage exactly the paths the result lists in `changed`
-    and commit via `forte:qwen-commit` — the runner never commits. Only then generate the
+    and commit them with `git commit` — the runner never commits. Only then generate the
     review package from the recorded BASE.
   - On `BLOCKED` / `NEEDS_CONTEXT` / `VERIFY_FAILED`, or any runner failure: fall back to a
     Claude implementer for that task, carrying the brief path, the same report file path, and
@@ -187,18 +187,20 @@ Record the implementation commit range in the ledger completion line.
 
 ### Stage 6: Code Review
 
-Invoke the **built-in** `code-review` skill via the Skill tool with args `"max --fix"` — the one whose registered description reviews "the current diff for correctness bugs and reuse/simplification/efficiency cleanups" and supports `--fix` applying findings to the working tree. Do NOT invoke the `code-review:code-review` plugin command (it reviews GitHub PRs and only posts comments). Scope the review to the pipeline's changes by supplying the recorded start SHA range (`<start-sha>..HEAD`) as context — SDD commits every task, so without a range the "current diff" can be empty. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If the review reports an empty diff (the range was not picked up), record "review saw no diff" in the Stage 8 Notes — do not report it as a clean pass. If the skill leaves uncommitted changes, stage them as before, create a private mode-0600 temporary message file containing exactly `fix: apply code-review findings` plus its final newline, invoke `forte:qwen-commit` with `--message-file <path>`, then delete only that temporary file:
+Invoke the **built-in** `code-review` skill via the Skill tool with args `"max --fix"` — the one whose registered description reviews "the current diff for correctness bugs and reuse/simplification/efficiency cleanups" and supports `--fix` applying findings to the working tree. Do NOT invoke the `code-review:code-review` plugin command (it reviews GitHub PRs and only posts comments). Scope the review to the pipeline's changes by supplying the recorded start SHA range (`<start-sha>..HEAD`) as context — SDD commits every task, so without a range the "current diff" can be empty. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If the review reports an empty diff (the range was not picked up), record "review saw no diff" in the Stage 8 Notes — do not report it as a clean pass. Commit if it leaves uncommitted changes:
 
 ```bash
 git add -A
+git commit -m "fix: apply code-review findings"
 ```
 
 ### Stage 7: Simplify
 
-Invoke the **built-in** `simplify` skill via the Skill tool (no args), scoped to the pipeline's start-SHA range like Stage 6. It reviews the changed code for reuse/simplification/efficiency and applies fixes. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. If it leaves uncommitted changes, stage them as before, create a private mode-0600 temporary message file containing exactly `refactor: apply simplify pass` plus its final newline, invoke `forte:qwen-commit` with `--message-file <path>`, then delete only that temporary file:
+Invoke the **built-in** `simplify` skill via the Skill tool (no args), scoped to the pipeline's start-SHA range like Stage 6. It reviews the changed code for reuse/simplification/efficiency and applies fixes. If the built-in skill is unavailable in the session, skip this stage and note it in the Stage 8 report. Commit if it leaves uncommitted changes:
 
 ```bash
 git add -A
+git commit -m "refactor: apply simplify pass"
 ```
 
 ### Stage 8: Final Report

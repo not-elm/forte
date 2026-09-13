@@ -292,13 +292,8 @@ batch-fix is a **coordinator skill** — it uses Agent tool calls for dispatch b
                         skip the commit entirely.
                      b. Stage all modified source files + the updated review Markdown.
                         Use specific file paths (not `git add -A`).
-                     c. Create a private mode-0600 temporary message file with
-                        this exact subject, a blank line, the trailer below,
-                        and a final newline:
-                        `fix: batch-fix {N} findings from {review-file-name}`
-                        `Co-Authored-By: Claude <noreply@anthropic.com>`
-                        Invoke `forte:qwen-commit` with
-                        `--message-file <path>`, then delete only that file.
+                     c. Commit with this exact subject and trailer:
+                        `git commit -m "fix: batch-fix {N} findings from {review-file-name}" -m "Co-Authored-By: Claude <noreply@anthropic.com>"`
 
  9. REPORT        → Display terminal summary:
 

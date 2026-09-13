@@ -273,12 +273,8 @@ deep-fix is a **lightweight orchestrator skill**. It handles review file parsing
                        Use specific file paths (not `git add -A`).
                        Select this exact subject:
                        `fix: deep-fix [R-XX-NNN] from {review-file-name}`
-                    c. Create a private mode-0600 temporary message file with
-                       the selected subject, a blank line, this trailer, and a
-                       final newline:
-                       `Co-Authored-By: Claude <noreply@anthropic.com>`
-                       Invoke `forte:qwen-commit` with
-                       `--message-file <path>`, then delete only that file.
+                    c. Commit with the selected subject and this trailer:
+                       `git commit -m "<selected subject>" -m "Co-Authored-By: Claude <noreply@anthropic.com>"`
 
 11. REPORT       → Display terminal summary:
 
