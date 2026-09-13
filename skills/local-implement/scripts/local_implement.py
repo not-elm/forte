@@ -639,13 +639,18 @@ def _truncate(value: str, limit: int) -> str:
 def _minimal_result(compact: dict) -> dict:
     minimal = {
         "status": compact.get("status", "VERIFY_FAILED"),
-        "code": compact.get("code", ""),
         "result_truncated": True,
-        "changed_count": compact.get("changed_count", len(compact.get("changed", []))),
-        "tests": {"result": compact.get("tests", {}).get("result", "not_run")},
-        "report": compact.get("report", ""),
-        "artifacts": compact.get("artifacts", ""),
     }
+    if "code" in compact:
+        minimal["code"] = compact["code"]
+    if "changed_count" in compact or "changed" in compact:
+        minimal["changed_count"] = compact.get("changed_count", len(compact.get("changed", [])))
+    if "tests" in compact:
+        minimal["tests"] = {"result": compact["tests"].get("result", "not_run")}
+    if "report" in compact:
+        minimal["report"] = compact["report"]
+    if "artifacts" in compact:
+        minimal["artifacts"] = compact["artifacts"]
     return minimal
 
 
@@ -653,36 +658,52 @@ def compact_result(result: dict) -> dict:
     compact = dict(result)
     if "message" in compact:
         del compact["message"]
-    compact["blocker"] = _truncate(compact.get("blocker", ""), 400)
-    compact["concerns"] = [_truncate(item, 160) for item in compact.get("concerns", [])]
-    compact["tests"] = dict(compact.get("tests", {}))
-    compact["tests"]["command"] = _truncate(compact["tests"].get("command", ""), 200)
+    if "blocker" in compact:
+        compact["blocker"] = _truncate(compact["blocker"], 400)
+    if "concerns" in compact:
+        compact["concerns"] = [_truncate(item, 160) for item in compact["concerns"]]
+    if "tests" in compact:
+        compact["tests"] = dict(compact["tests"])
+        if "command" in compact["tests"]:
+            compact["tests"]["command"] = _truncate(compact["tests"]["command"], 200)
 
     def size_with_newline(payload: dict) -> int:
         return len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) + 1
 
     while size_with_newline(compact) > RESULT_LIMIT:
-        if len(compact["concerns"]) > 1:
+        if "concerns" in compact and len(compact["concerns"]) > 1:
             dropped = len(compact["concerns"]) - 1
             compact["concerns"] = compact["concerns"][:1]
             compact["concerns_omitted"] = dropped
             continue
-        if len(compact.get("changed", [])) > 1:
+        if "changed" in compact and len(compact["changed"]) > 1:
             compact["changed_count"] = len(compact["changed"])
             compact["changed"] = compact["changed"][:1]
             continue
-        if compact["concerns"]:
+        if "concerns" in compact and compact["concerns"]:
             compact["concerns_omitted"] = compact.get("concerns_omitted", 0) + 1
-            compact["concerns"] = []
+            del compact["concerns"]
             continue
-        compact["blocker"] = _truncate(compact["blocker"], 120)
+        if "blocker" in compact:
+            compact["blocker"] = _truncate(compact["blocker"], 120)
         if size_with_newline(compact) <= RESULT_LIMIT:
             break
         minimal = _minimal_result(compact)
         if size_with_newline(minimal) > RESULT_LIMIT:
-            minimal["report"] = _truncate(minimal["report"], 400)
+            report_shortened = False
+            if "report" in minimal:
+                original_report = minimal["report"]
+                minimal["report"] = _truncate(minimal["report"], 400)
+                report_shortened = (minimal["report"] != original_report)
             if size_with_newline(minimal) > RESULT_LIMIT:
-                minimal["artifacts"] = _truncate(minimal["artifacts"], 200)
+                artifacts_shortened = False
+                if "artifacts" in minimal:
+                    original_artifacts = minimal["artifacts"]
+                    minimal["artifacts"] = _truncate(minimal["artifacts"], 200)
+                    artifacts_shortened = (minimal["artifacts"] != original_artifacts)
+                if report_shortened or artifacts_shortened:
+                    minimal["paths_truncated"] = True
+            elif report_shortened:
                 minimal["paths_truncated"] = True
         compact = minimal
         break
