@@ -90,6 +90,7 @@ class DispatchFixture(unittest.TestCase):
     def setUp(self):
         self.assertTrue(RUNNER.exists(), "The local implementer runner is not implemented")
         self.li = load_runner()
+        self.guard_git_subcommands()
         self.temp = tempfile.TemporaryDirectory(prefix="test-local-implement-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
@@ -114,6 +115,21 @@ class DispatchFixture(unittest.TestCase):
         self.context = self.work / "task-1-context.md"
         self.brief.write_text("### Task 1: Add greeter\nCreate greet() returning HELLO.\n")
         self.write_context(["src/greet.py"])
+
+    def guard_git_subcommands(self):
+        """No runner path may invoke a Git verb that can mutate the repository."""
+        original = self.li._git_result
+
+        def guarded(root, *args):
+            self.assertTrue(args, "the runner invoked git with no subcommand")
+            self.assertIn(args[0], {"rev-parse", "status"},
+                          "the runner invoked a git subcommand that is not read-only: "
+                          + " ".join(args))
+            return original(root, *args)
+
+        patcher = patch.object(self.li, "_git_result", guarded)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def write_context(self, files, extra=""):
         lines = ["## Global Constraints", "- stdlib only", "", "## Files"]
@@ -166,6 +182,20 @@ class ArgumentTests(DispatchFixture):
             "--context", str(self.context), "--base", self.base,
             "--repair-rounds", "2"]))
 
+    def test_a_runner_flag_after_test_cmd_is_rejected(self):
+        self.assert_code("BAD_ARGUMENTS", lambda: self.li.parse_argv([
+            "--brief", str(self.brief), "--report", str(self.report),
+            "--context", str(self.context), "--base", self.base,
+            "--test-cmd", "cargo", "test", "--repair-rounds", "0"]))
+
+    def test_test_cmd_keeps_its_own_dashed_options(self):
+        options = self.li.parse_argv([
+            "--brief", str(self.brief), "--report", str(self.report),
+            "--context", str(self.context), "--base", self.base,
+            "--test-cmd", "pytest", "-q", "--maxfail=1", "--tb=short"])
+        self.assertEqual(options["test_cmd"],
+                         ("pytest", "-q", "--maxfail=1", "--tb=short"))
+
 
 class FilesSectionTests(DispatchFixture):
     def test_parses_bulleted_and_bare_paths(self):
@@ -183,6 +213,14 @@ class FilesSectionTests(DispatchFixture):
     def test_bare_bullet_is_skipped(self):
         text = "## Files\n-\n- src/main.py\n\n## Notes\n"
         self.assertEqual(self.li.parse_files_section(text), ("src/main.py",))
+
+    def test_rejects_a_prose_line(self):
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.parse_files_section(
+            "## Files\nThe following files:\n- src/main.py\n"))
+
+    def test_rejects_an_entry_containing_spaces(self):
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.parse_files_section(
+            "## Files\n- spaces in path.py\n"))
 
 
 class PreflightTests(DispatchFixture):
@@ -252,6 +290,39 @@ class PreflightTests(DispatchFixture):
         self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(outside)], check=False))
         (self.root / "link_dir").symlink_to(outside)
         self.write_context(["link_dir/new.py"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_symlink_component_resolving_inside_the_root(self):
+        """The resolved path is inside the root, so only the per-component
+        symlink scan can reject this."""
+        (self.root / "real" / "sub").mkdir(parents=True)
+        (self.root / "link_dir").symlink_to(self.root / "real")
+        self.write_context(["link_dir/sub/new.py"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_uppercase_git_declared_path(self):
+        self.write_context([".GIT/config"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_mixed_case_git_hook_declared_path(self):
+        self.write_context([".Git/hooks/pre-commit"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_nested_git_declared_path(self):
+        self.write_context(["sub/.git/config"])
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_declared_path_that_exists_as_a_directory(self):
+        (self.root / "src" / "greet.py").mkdir(parents=True)
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_declared_path_that_exists_as_a_fifo(self):
+        (self.root / "src").mkdir()
+        os.mkfifo(str(self.root / "src" / "greet.py"))
+        self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
+
+    def test_rejects_declared_path_whose_parent_is_a_file(self):
+        self.write_context(["seed.txt/inner.py"])
         self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
 
 
@@ -435,6 +506,14 @@ class ApplicationTests(DispatchFixture):
         self.assertIn("untracked.txt", digests)
         self.assertIn("seed.txt", digests)
 
+    def test_dirty_digests_consumes_a_worktree_side_rename_source(self):
+        """A rename reported in the worktree column (status[1]) also carries a
+        source path; missing it desynchronises the whole NUL walk."""
+        payload = b" R new.txt\x00old.txt\x00 M seed.txt\x00"
+        with patch.object(self.li, "git", lambda root, *args: payload):
+            digests = self.li.dirty_digests(self.root)
+        self.assertEqual(set(digests), {"new.txt", "seed.txt"})
+
 
 class DeclaredTestTests(DispatchFixture):
     def dispatch(self, **overrides):
@@ -550,6 +629,17 @@ class SelfRepairTests(DispatchFixture):
         self.assertEqual(used, 0)
         self.assertFalse((self.root / "src" / "greet.py").exists())
 
+    def test_a_blocked_repair_round_keeps_its_blocker(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "raise SystemExit(1)"))
+        bodies = [response_body(files=(("src/greet.py", "a\n"),)),
+                  response_body(status="BLOCKED", files=(),
+                                blocker="the brief omits the error type")]
+        with ollama_stub(self.li, responses=bodies):
+            proposal, _changed, run, used = self.li.implement(dispatch, self.artifacts())
+        self.assertEqual(used, 1)
+        self.assertEqual(run.result, "fail")
+        self.assertIn("the brief omits the error type", proposal.blocker)
+
 
 class ReportTests(DispatchFixture):
     def dispatch(self, **overrides):
@@ -572,6 +662,49 @@ class ReportTests(DispatchFixture):
         self.assertIn("pytest -q", text)
         self.assertIn("not executed", text)
         self.assertIn("naming", text)
+
+    def test_error_path_report_records_the_failed_first_round(self):
+        bodies = [response_body(files=(("src/greet.py", "ok\n"),)),
+                  response_body(files=(("src/undeclared.py", "x\n"),))]
+        with ollama_stub(self.li, responses=bodies):
+            result = self.li.run_skill([
+                "--brief", str(self.brief), "--report", str(self.report),
+                "--context", str(self.context), "--base", self.base,
+                "--workdir", str(self.root),
+                "--test-cmd", "python3", "-c", "raise SystemExit(1)"])
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["tests"]["result"], "fail")
+        self.assertTrue(result["tests"]["command"])
+        self.assertEqual(result["repair_rounds_used"], 1)
+        text = Path(result["report"]).read_text()
+        self.assertNotIn("No test command was supplied", text)
+        self.assertIn("Result: **fail**", text)
+        self.assertIn("Self-repair rounds used: 1", text)
+
+    def test_report_labels_model_authored_sections_as_quoted_output(self):
+        dispatch = self.dispatch()
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        body = response_body(files=(("src/greet.py", "ok\n"),), notes="added greet()",
+                             concerns=("naming",), suggested_tests=("pytest -q",))
+        with ollama_stub(self.li, responses=[body]):
+            proposal, changed, run, used = self.li.implement(dispatch, artifacts)
+        self.li.write_report(dispatch, proposal, changed, run, used, artifacts)
+        text = self.report.read_text()
+        self.assertIn("quoted model output", text)
+        self.assertNotIn("raw model output", text)
+
+    def test_report_names_the_test_log_when_no_run_survived(self):
+        dispatch = self.dispatch(test_cmd=("python3", "-c", "pass"))
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        proposal = self.li.Proposal("BLOCKED", (), "stopped", (), (), "boom")
+        self.li.write_report(dispatch, proposal, ("src/greet.py",), None, 0, artifacts)
+        text = self.report.read_text()
+        self.assertNotIn("No test command was supplied", text)
+        self.assertIn(str(artifacts.root), text)
 
 
 class StatusMappingTests(DispatchFixture):
@@ -733,34 +866,31 @@ class BudgetTests(DispatchFixture):
 
 
 class ErrorStatusTests(DispatchFixture):
+    def error_result(self, action):
+        """Fail loudly when the expected error is not raised at all."""
+        with self.assertRaises(self.li.LocalImplementError) as caught:
+            action()
+        return self.li._error_result(caught.exception)
+
     def test_illegal_path_reports_paths_allowed_false(self):
         self.write_context(["../outside.py"])
         with ollama_stub(self.li):
-            try:
-                self.li.load_dispatch(self.options())
-            except self.li.LocalImplementError as e:
-                result = self.li._error_result(e)
-                self.assertFalse(result["verified"]["paths_allowed"])
+            result = self.error_result(lambda: self.li.load_dispatch(self.options()))
+        self.assertFalse(result["verified"]["paths_allowed"])
 
     def test_illegal_path_is_needs_context(self):
         self.write_context(["../outside.py"])
         with ollama_stub(self.li):
-            try:
-                self.li.load_dispatch(self.options())
-            except self.li.LocalImplementError as e:
-                result = self.li._error_result(e)
-                self.assertEqual(result["status"], "NEEDS_CONTEXT")
+            result = self.error_result(lambda: self.li.load_dispatch(self.options()))
+        self.assertEqual(result["status"], "NEEDS_CONTEXT")
 
     def test_input_too_large_is_needs_context(self):
         target = self.root / "src" / "greet.py"
         target.parent.mkdir(parents=True)
         target.write_text("x" * (self.li.FILE_LIMIT + 1))
         with ollama_stub(self.li):
-            try:
-                self.li.load_dispatch(self.options())
-            except self.li.LocalImplementError as e:
-                result = self.li._error_result(e)
-                self.assertEqual(result["status"], "NEEDS_CONTEXT")
+            result = self.error_result(lambda: self.li.load_dispatch(self.options()))
+        self.assertEqual(result["status"], "NEEDS_CONTEXT")
 
 
 class ErrorDispatchPopulationTests(DispatchFixture):
@@ -871,6 +1001,72 @@ class ResultTests(DispatchFixture):
         self.addCleanup(lambda: subprocess.run(
             ["rm", "-rf", result["artifacts"]], check=False))
 
+    def test_unexpected_os_error_reports_applied_paths_and_writes_a_report(self):
+        self.write_context(["src/greet.py", "src/other.py"])
+        original = self.li.write_atomic
+        seen = []
+
+        def flaky(path, content):
+            seen.append(str(path))
+            if len(seen) == 2:
+                raise OSError(28, "No space left on device")
+            return original(path, content)
+
+        body = response_body(files=(("src/greet.py", "a\n"), ("src/other.py", "b\n")))
+        with patch.object(self.li, "write_atomic", flaky):
+            result = self.invoke(self.argv(), [body])
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+        self.assertEqual(result["code"], "IO_FAILED")
+        self.assertEqual(result["changed"], ["src/greet.py"])
+        self.assertTrue(result["verified"]["report_written"])
+        self.assertIn("src/greet.py", Path(result["report"]).read_text())
+        self.assertLessEqual(
+            len(json.dumps(result, ensure_ascii=False).encode("utf-8")),
+            self.li.RESULT_LIMIT)
+
+    def test_a_test_command_that_rewrites_a_dirty_path_fails_verification(self):
+        (self.root / "seed.txt").write_text("uncommitted edit\n")
+        script = self.root / "rewrite.py"
+        script.write_text("import pathlib\n"
+                          "pathlib.Path('seed.txt').write_text('clobbered\\n')\n")
+        self.git("add", "--", "rewrite.py")
+        self.git("commit", "-qm", "chore: add rewriter")
+        result = self.invoke(self.argv("--test-cmd", "python3", str(script)),
+                             [response_body(files=(("src/greet.py", "ok\n"),))])
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+        self.assertFalse(result["verified"]["untouched_dirty"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+
+    def test_error_path_also_reports_a_clobbered_dirty_path(self):
+        (self.root / "seed.txt").write_text("uncommitted edit\n")
+        script = self.root / "rewrite.py"
+        script.write_text("import pathlib, sys\n"
+                          "pathlib.Path('seed.txt').write_text('clobbered\\n')\n"
+                          "sys.exit(1)\n")
+        self.git("add", "--", "rewrite.py")
+        self.git("commit", "-qm", "chore: add rewriter")
+        bodies = [response_body(files=(("src/greet.py", "ok\n"),)),
+                  response_body(files=(("src/undeclared.py", "x\n"),))]
+        result = self.invoke(self.argv("--test-cmd", "python3", str(script)), bodies)
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+        self.assertEqual(result["code"], "UNDECLARED_PATH")
+        self.assertFalse(result["verified"]["untouched_dirty"])
+        self.assertEqual(result["status"], "VERIFY_FAILED")
+
+    def test_untouched_dirty_stays_true_when_dirty_paths_are_left_alone(self):
+        (self.root / "seed.txt").write_text("uncommitted edit\n")
+        result = self.invoke(self.argv("--test-cmd", "python3", "-c", "print('ok')"),
+                             [response_body(files=(("src/greet.py", "ok\n"),))])
+        self.addCleanup(lambda: subprocess.run(
+            ["rm", "-rf", result["artifacts"]], check=False))
+        self.assertTrue(result["verified"]["untouched_dirty"])
+        self.assertEqual(result["status"], "DONE")
+        self.assertEqual((self.root / "seed.txt").read_text(), "uncommitted edit\n")
+
     def test_main_exit_codes_follow_the_status(self):
         import io
         stdout_capture = io.StringIO()
@@ -892,6 +1088,27 @@ class ResultTests(DispatchFixture):
         artifacts_path2 = result.get("artifacts", "")
         self.addCleanup(lambda path=artifacts_path2: subprocess.run(
             ["rm", "-rf", path], check=False))
+
+
+class ArtifactPermissionTests(DispatchFixture):
+    def test_artifact_directory_and_files_are_owner_only(self):
+        artifacts = self.li.create_artifacts()
+        self.addCleanup(lambda: subprocess.run(["rm", "-rf", str(artifacts.root)], check=False))
+        self.assertEqual(artifacts.root.stat().st_mode & 0o777, 0o700)
+        for path in (artifacts.test_log, artifacts.rounds_path):
+            self.assertTrue(path.is_file(), f"{path.name} was not created")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600, path.name)
+
+
+class GitVerbGuardTests(DispatchFixture):
+    """Proves the suite-wide guard installed by DispatchFixture actually fires."""
+
+    def test_the_guard_rejects_a_mutating_subcommand(self):
+        with self.assertRaises(AssertionError):
+            self.li.git(self.root, "commit", "-m", "nope")
+
+    def test_the_guard_allows_the_read_only_subcommands(self):
+        self.assertIn(self.base.encode(), self.li.git(self.root, "rev-parse", "HEAD"))
 
 
 if __name__ == "__main__":

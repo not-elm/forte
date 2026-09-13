@@ -81,20 +81,30 @@ report file, and returns at most 2 KiB of JSON.
   --base $(git rev-parse HEAD) --test-cmd python3 -m unittest -q
 ```
 
-The context file's `## Files` section is the write allowlist: the runner refuses
-any other path, refuses a path that already had uncommitted changes, and never
-stages, commits, or changes Git state — the caller commits after verifying. Model
-suggested commands are recorded in the report and never executed. `--test-cmd` is
+The context file's `## Files` section is the write allowlist — one relative path
+per line, no prose. The runner refuses any other path, refuses a path that already
+had uncommitted changes, verifies that no already-dirty path changed during the
+run, and never stages, commits, or changes Git state; the caller commits after
+verifying. Model-suggested commands are recorded in the report and never executed.
+`--test-cmd` must be the last argument (everything after it is the command) and is
 optional: without it nothing is verified and the result reports `tests.result` as
-`not_run`. Each generation call has a 1,800-second deadline and the declared test
-command a separate fixed 900-second one, so a run with a repair round can take
-about 5,400 seconds. The prompt limit is 48 KiB, the per-file limit 16 KiB, and
-there is no retry or cloud fallback beyond the single self-repair round.
+`not_run`. When it is supplied it runs code the local model just wrote, unsandboxed
+with the inherited environment, so pass only the plan's verification command and
+only in a workspace you accept running untrusted code in. Each generation call has
+a 1,800-second deadline and the declared test command a separate fixed 900-second
+one, so a run with a repair round can take about 5,400 seconds. The prompt limit is
+48 KiB, the per-file limit 16 KiB, and there is no retry or cloud fallback beyond
+the single self-repair round.
+
+Because a run can outlast any foreground call, the skill launches the runner
+detached and waits on a sentinel file carrying its exit code.
 
 Requires Python 3.9+, Git, and a running Ollama service with `qwen3.8:27b-q8_0`.
 `FORTE_LOCAL_IMPL_MODEL` selects another installed model and
-`FORTE_LOCAL_IMPL_TIMEOUT` changes the per-generation deadline. The full test log and raw model
-output stay in the mode-0700 temporary directory named by the result.
+`FORTE_LOCAL_IMPL_TIMEOUT` changes the per-generation deadline. The full test log
+and a one-line-per-round proposal summary stay in owner-only files inside the
+mode-0700 temporary directory named by the result; the prompt and the model's file
+contents are not kept.
 
 `autopilot --local-impl` opts the pipeline into using this skill for Stage 5's
 initial implementation; review and fix rounds stay on Claude.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Implement one SDD task with a local model; this runner performs every side effect."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import http.client
 import json
@@ -69,11 +69,17 @@ class Dispatch:
     repair_rounds: int
 
 
+KNOWN_FLAGS = ("--brief", "--report", "--context", "--base", "--workdir",
+               "--repair-rounds", "--test-cmd")
+
+
 def _bad_arguments() -> LocalImplementError:
     return LocalImplementError(
         "BAD_ARGUMENTS",
         "usage: local_implement.py --brief P --report P --context P --base SHA "
-        "[--workdir DIR] [--repair-rounds 0|1] [--test-cmd ARGV...]")
+        "[--workdir DIR] [--repair-rounds 0|1] [--test-cmd ARGV...]\n"
+        "--test-cmd must be the final argument: every argument after it is part of "
+        "the command, so place every other flag before it.")
 
 
 def parse_argv(argv: Sequence[str]) -> dict:
@@ -89,6 +95,12 @@ def parse_argv(argv: Sequence[str]) -> dict:
             rest = tuple(items[index + 1:])
             if not rest:
                 raise _bad_arguments()
+            stray = next((item for item in rest if item in KNOWN_FLAGS), None)
+            if stray is not None:
+                raise LocalImplementError(
+                    "BAD_ARGUMENTS",
+                    f"--test-cmd must be the final argument, but {stray} follows it; "
+                    "everything after --test-cmd is taken as the command.")
             options["test_cmd"] = rest
             index = len(items)
             continue
@@ -142,8 +154,14 @@ def parse_files_section(text: str) -> Tuple[str, ...]:
         if not entry:
             continue
         entry = re.sub(r"^[-*]\s*", "", entry).strip().strip("`").strip()
-        if entry:
-            paths.append(entry)
+        if not entry:
+            continue
+        if re.search(r"\s", entry):
+            raise LocalImplementError(
+                "ILLEGAL_PATH",
+                "The '## Files' section takes one relative path per line, no prose: "
+                f"{entry}")
+        paths.append(entry)
     if not paths:
         raise LocalImplementError(
             "NO_FILES_SECTION",
@@ -158,7 +176,9 @@ def validate_declared_path(root: Path, raw: str) -> None:
     if not raw or raw.startswith(("/", "~")) or "\x00" in raw:
         raise illegal
     parts = Path(raw).parts
-    if not parts or ".." in parts or parts[0] == ".git":
+    # Case-insensitive and every component: this host's volume is case-insensitive,
+    # and a nested `sub/.git` is a real repository too.
+    if not parts or ".." in parts or any(part.lower() == ".git" for part in parts):
         raise illegal
     root_resolved = root.resolve()
     candidate = root_resolved / raw
@@ -265,6 +285,17 @@ def load_dispatch(options: dict) -> Dispatch:
     for raw in files:
         validate_declared_path(root, raw)
         target = root / raw
+        if os.path.lexists(target) and not target.is_file():
+            raise LocalImplementError(
+                "ILLEGAL_PATH",
+                f"Declared path exists but is not a regular file: {raw}")
+        parent = target.parent
+        while parent != root and not os.path.lexists(parent):
+            parent = parent.parent
+        if not parent.is_dir():
+            raise LocalImplementError(
+                "ILLEGAL_PATH",
+                f"A parent of the declared path is not a directory: {raw}")
         if target.is_file() and target.stat().st_size > FILE_LIMIT:
             raise LocalImplementError(
                 "INPUT_TOO_LARGE",
@@ -415,13 +446,17 @@ def generate(dispatch: Dispatch, failure: Optional[str] = None,
 class Artifacts:
     root: Path
     test_log: Path
-    raw_path: Path
+    rounds_path: Path
 
 
 def create_artifacts() -> Artifacts:
     root = Path(tempfile.mkdtemp(prefix="forte-local-implement-")).resolve()
     root.chmod(0o700)
-    return Artifacts(root=root, test_log=root / "tests.log", raw_path=root / "raw.json")
+    artifacts = Artifacts(root=root, test_log=root / "tests.log",
+                          rounds_path=root / "rounds.jsonl")
+    for path in (artifacts.test_log, artifacts.rounds_path):
+        os.close(os.open(str(path), os.O_CREAT | os.O_WRONLY, 0o600))
+    return artifacts
 
 
 def dirty_digests(root: Path) -> Dict[str, Optional[str]]:
@@ -436,7 +471,9 @@ def dirty_digests(root: Path) -> Dict[str, Optional[str]]:
             continue
         status = entry[:2].decode("utf-8", errors="replace")
         path = entry[3:].decode("utf-8", errors="replace")
-        if status[0] in ("R", "C") and index < len(entries):
+        # A rename/copy can be reported in the index column or the worktree one;
+        # either way the entry is followed by its source path.
+        if (status[0] in ("R", "C") or status[1] in ("R", "C")) and index < len(entries):
             index += 1  # consume the rename/copy source path
         target = root / path
         if target.is_file() and not target.is_symlink():
@@ -444,6 +481,23 @@ def dirty_digests(root: Path) -> Dict[str, Optional[str]]:
         else:
             digests[path] = None
     return digests
+
+
+def compare_dirty(root: Path, snapshot: Dict[str, Optional[str]]) -> bool:
+    """True when every already-dirty path still matches the snapshot byte for byte.
+
+    A snapshot path that has disappeared, or one that newly exists where the
+    snapshot recorded no regular file, counts as a mismatch.
+    """
+    for path, digest in snapshot.items():
+        target = root / path
+        if target.is_file() and not target.is_symlink():
+            current: Optional[str] = hashlib.sha256(target.read_bytes()).hexdigest()
+        else:
+            current = None
+        if current != digest:
+            return False
+    return True
 
 
 def write_atomic(path: Path, content: str) -> None:
@@ -465,7 +519,8 @@ def write_atomic(path: Path, content: str) -> None:
 
 
 def apply_proposal(dispatch: Dispatch, proposal: Proposal,
-                   dirty: Dict[str, Optional[str]]) -> Tuple[str, ...]:
+                   dirty: Dict[str, Optional[str]],
+                   record: Optional[list] = None) -> Tuple[str, ...]:
     for path, _content in proposal.files:
         if path not in dispatch.files:
             raise LocalImplementError(
@@ -477,6 +532,9 @@ def apply_proposal(dispatch: Dispatch, proposal: Proposal,
                 f"{path} already had uncommitted changes before the run; refusing to overwrite.")
     for path, content in proposal.files:
         write_atomic(dispatch.root / path, content)
+        # Recorded per write, so a failure partway through still names what landed.
+        if record is not None and path not in record:
+            record.append(path)
     return tuple(path for path, _content in proposal.files)
 
 
@@ -485,6 +543,16 @@ class TestRun:
     command: Tuple[str, ...]
     result: str
     output: str
+
+
+@dataclass
+class Progress:
+    """What a run has already done, readable even when it raises partway through."""
+    applied: list = field(default_factory=list)
+    run: Optional[TestRun] = None
+    used: int = 0
+    untouched_dirty: bool = True
+    dirty: Optional[Dict[str, Optional[str]]] = None
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -529,67 +597,87 @@ def _failure_excerpt(run: TestRun, budget: int = 8 * 1024) -> str:
     return "…(earlier output omitted)…\n" + encoded[-budget:].decode("utf-8", errors="replace")
 
 
-def implement(dispatch: Dispatch, artifacts: Artifacts, applied: Optional[list] = None):
+def implement(dispatch: Dispatch, artifacts: Artifacts,
+              progress: Optional[Progress] = None):
+    progress = Progress() if progress is None else progress
     dirty = dirty_digests(dispatch.root)
+    progress.dirty = dirty
     proposal = generate(dispatch)
-    _write_raw(artifacts, "initial", proposal)
+    _write_round(artifacts, "initial", proposal)
     if proposal.status == "BLOCKED":
+        progress.untouched_dirty = compare_dirty(dispatch.root, dirty)
         return proposal, (), None, 0
-    changed = apply_proposal(dispatch, proposal, dirty)
-    if applied is not None:
-        applied.extend(changed)
+    changed = apply_proposal(dispatch, proposal, dirty, record=progress.applied)
     run = run_declared_tests(dispatch, artifacts, "initial")
+    progress.run = run
     used = 0
     if (run is not None and run.result != "pass" and dispatch.repair_rounds > 0):
-        repaired = generate(dispatch, failure=_failure_excerpt(run), previous=proposal)
-        _write_raw(artifacts, "repair", repaired)
+        # The round is spent as soon as the call is made, even if it fails validation.
         used = 1
+        progress.used = used
+        repaired = generate(dispatch, failure=_failure_excerpt(run), previous=proposal)
+        _write_round(artifacts, "repair", repaired)
         if repaired.status != "BLOCKED" and repaired.files:
-            changed = tuple(dict.fromkeys(
-                changed + apply_proposal(dispatch, repaired, dirty)))
-            if applied is not None:
-                for path in changed:
-                    if path not in applied:
-                        applied.append(path)
+            changed = tuple(dict.fromkeys(changed + apply_proposal(
+                dispatch, repaired, dirty, record=progress.applied)))
             proposal = Proposal(status=repaired.status, files=repaired.files,
                                 notes=proposal.notes + "\n\nRepair round: " + repaired.notes,
                                 concerns=proposal.concerns + repaired.concerns,
                                 suggested_tests=repaired.suggested_tests,
                                 blocker=repaired.blocker)
             run = run_declared_tests(dispatch, artifacts, "repair")
+            progress.run = run
+        elif repaired.blocker.strip():
+            # The repair round gave up: keep its reason so the report carries it.
+            proposal = Proposal(status=proposal.status, files=proposal.files,
+                                notes=proposal.notes + "\n\nRepair round: " + repaired.notes,
+                                concerns=proposal.concerns + repaired.concerns,
+                                suggested_tests=proposal.suggested_tests,
+                                blocker=repaired.blocker)
+    progress.untouched_dirty = compare_dirty(dispatch.root, dirty)
     return proposal, changed, run, used
 
 
-def _write_raw(artifacts: Artifacts, label: str, proposal: Proposal) -> None:
-    with artifacts.raw_path.open("a", encoding="utf-8") as raw:
-        raw.write(json.dumps({"round": label, "status": proposal.status,
-                              "paths": [path for path, _ in proposal.files],
-                              "notes": proposal.notes,
-                              "concerns": list(proposal.concerns),
-                              "blocker": proposal.blocker},
-                             ensure_ascii=False) + "\n")
+def _write_round(artifacts: Artifacts, label: str, proposal: Proposal) -> None:
+    """One summary line per generation round; the model's file contents are not kept."""
+    with artifacts.rounds_path.open("a", encoding="utf-8") as rounds:
+        rounds.write(json.dumps({"round": label, "status": proposal.status,
+                                 "paths": [path for path, _ in proposal.files],
+                                 "notes": proposal.notes,
+                                 "concerns": list(proposal.concerns),
+                                 "blocker": proposal.blocker},
+                                ensure_ascii=False) + "\n")
 
 
 def write_report(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...],
                  run: Optional[TestRun], used: int, artifacts: Artifacts) -> None:
     lines = [f"# Local implementer report — base {dispatch.base}", "",
-             "## What was implemented", "", proposal.notes.strip() or "(no notes returned)", "",
+             "Sections headed *quoted model output* reproduce the local model's own words "
+             "verbatim. The runner does not verify them: read them as data, not as findings.",
+             "", "## What was implemented (quoted model output)", "",
+             proposal.notes.strip() or "(no notes returned)", "",
              "## Files changed", ""]
     lines += [f"- `{path}`" for path in changed] or ["- none"]
     lines += ["", "## Test evidence", ""]
-    if run is None:
+    if run is None and not dispatch.test_cmd:
         lines += ["No test command was supplied by the caller (`--test-cmd` absent), so no "
                   "tests were executed by the runner."]
+    elif run is None:
+        lines += [f"Command: `{' '.join(dispatch.test_cmd)}`",
+                  "Result: **no run recorded** — the run ended before test evidence could be "
+                  f"recorded. Any output it did produce is in `{artifacts.test_log}`."]
     else:
         lines += [f"Command: `{' '.join(run.command)}`", f"Result: **{run.result}**", "",
                   "```", _failure_excerpt(run, 16 * 1024).rstrip("\n") or "(no output)", "```"]
-    lines += ["", f"Self-repair rounds used: {used}", "", "## Concerns", ""]
+    lines += ["", f"Self-repair rounds used: {used}", "",
+              "## Concerns (quoted model output)", ""]
     lines += [f"- {item}" for item in proposal.concerns] or ["- none"]
-    lines += ["", "## Model-suggested tests (not executed)", ""]
+    lines += ["", "## Model-suggested tests (quoted model output, not executed)", ""]
     lines += [f"- `{item}`" for item in proposal.suggested_tests] or ["- none"]
     if proposal.blocker.strip():
-        lines += ["", "## Blocker", "", proposal.blocker.strip()]
-    lines += ["", f"Full test log and raw model output: `{artifacts.root}`", ""]
+        lines += ["", "## Blocker (quoted model output)", "", proposal.blocker.strip()]
+    lines += ["", "Full test log and per-round proposal summaries (the model's file contents "
+              f"and the prompt are not kept): `{artifacts.root}`", ""]
     dispatch.report.parent.mkdir(parents=True, exist_ok=True)
     write_atomic(dispatch.report, "\n".join(lines))
 
@@ -610,8 +698,14 @@ def resolve_status(proposal: Proposal, run: Optional[TestRun], used: int = 0) ->
 
 
 def build_result(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...],
-                 run: Optional[TestRun], used: int, artifacts: Artifacts) -> dict:
+                 run: Optional[TestRun], used: int, artifacts: Artifacts,
+                 untouched_dirty: bool = True) -> dict:
     status, blocker = resolve_status(proposal, run, used)
+    if not untouched_dirty:
+        status = "VERIFY_FAILED"
+        blocker = ("A path that already had uncommitted changes before the run no longer "
+                   "matches its pre-run snapshot; the working tree is not trustworthy. "
+                   + blocker).strip()
     return {
         "status": status,
         "changed": list(changed),
@@ -622,7 +716,7 @@ def build_result(dispatch: Dispatch, proposal: Proposal, changed: Tuple[str, ...
         "report": str(dispatch.report),
         "repair_rounds_used": used,
         "verified": {"base": dispatch.base, "paths_allowed": True,
-                     "untouched_dirty": True,
+                     "untouched_dirty": untouched_dirty,
                      "report_written": dispatch.report.is_file()
                      and dispatch.report.stat().st_size > 0},
         "artifacts": str(artifacts.root),
@@ -715,10 +809,12 @@ def emit_result(result: dict) -> None:
     sys.stdout.write(json.dumps(compact_result(result), ensure_ascii=False) + "\n")
 
 
-def _error_result(error: LocalImplementError, dispatch: Optional[Dispatch] = None) -> dict:
+def _error_result(error: LocalImplementError, dispatch: Optional[Dispatch] = None,
+                  run: Optional[TestRun] = None, used: int = 0) -> dict:
     needs_context = {"NO_FILES_SECTION", "MISSING_BRIEF", "EMPTY_BRIEF",
                      "MISSING_CONTEXT", "EMPTY_CONTEXT", "ILLEGAL_PATH", "INPUT_TOO_LARGE"}
-    verify_failed = {"INVALID_RESPONSE", "UNDECLARED_PATH", "DIRTY_PATH_CONFLICT"}
+    verify_failed = {"INVALID_RESPONSE", "UNDECLARED_PATH", "DIRTY_PATH_CONFLICT",
+                     "IO_FAILED"}
     if error.code in needs_context:
         status = "NEEDS_CONTEXT"
     elif error.code in verify_failed:
@@ -726,9 +822,12 @@ def _error_result(error: LocalImplementError, dispatch: Optional[Dispatch] = Non
     else:
         status = "BLOCKED"
     return {"status": status, "code": error.code, "message": error.message,
-            "changed": [], "tests": {"command": "", "result": "not_run"},
-            "concerns": [], "blocker": error.message, "report": str(dispatch.report) if dispatch else "",
-            "repair_rounds_used": 0,
+            "changed": [],
+            "tests": {"command": " ".join(run.command) if run else "",
+                      "result": run.result if run else "not_run"},
+            "concerns": [], "blocker": error.message,
+            "report": str(dispatch.report) if dispatch else "",
+            "repair_rounds_used": used,
             "verified": {"base": dispatch.base if dispatch else "",
                          "paths_allowed": error.code not in ("UNDECLARED_PATH", "ILLEGAL_PATH"),
                          "untouched_dirty": error.code != "DIRTY_PATH_CONFLICT",
@@ -736,29 +835,59 @@ def _error_result(error: LocalImplementError, dispatch: Optional[Dispatch] = Non
             "artifacts": ""}
 
 
+def _failure_result(error: LocalImplementError, dispatch: Optional[Dispatch],
+                    artifacts: Optional[Artifacts], progress: Progress) -> dict:
+    """Every failure path: report what landed, and leave a report behind."""
+    result = _error_result(error, dispatch, progress.run, progress.used)
+    if artifacts is not None:
+        result["artifacts"] = str(artifacts.root)
+    if dispatch is not None and progress.dirty is not None:
+        try:  # Before the report write, which may itself touch an already-dirty path.
+            intact = compare_dirty(dispatch.root, progress.dirty)
+        except OSError:
+            intact = False
+        if not intact:
+            result["verified"]["untouched_dirty"] = False
+            result["status"] = "VERIFY_FAILED"
+    if progress.applied:
+        result["changed"] = list(progress.applied)
+        if dispatch is not None and artifacts is not None:
+            error_proposal = Proposal(
+                status="BLOCKED", files=(),
+                notes="Run stopped partway through. See blocker message.",
+                concerns=(), suggested_tests=(), blocker=error.message)
+            try:
+                write_report(dispatch, error_proposal, tuple(progress.applied),
+                             progress.run, progress.used, artifacts)
+            except OSError:
+                pass  # The result line is the last thing left; never lose it too.
+            else:
+                result["report"] = str(dispatch.report)
+                result["verified"]["report_written"] = True
+    return compact_result(result)
+
+
 def run_skill(argv: Sequence[str]) -> dict:
     artifacts = None
     dispatch = None
-    applied: list = []
+    progress = Progress()
     try:
         dispatch = load_dispatch(parse_argv(argv))
         artifacts = create_artifacts()
-        proposal, changed, run, used = implement(dispatch, artifacts, applied=applied)
+        proposal, changed, run, used = implement(dispatch, artifacts, progress)
         write_report(dispatch, proposal, changed, run, used, artifacts)
-        return compact_result(build_result(dispatch, proposal, changed, run, used, artifacts))
+        return compact_result(build_result(dispatch, proposal, changed, run, used,
+                                           artifacts, progress.untouched_dirty))
     except LocalImplementError as error:
-        result = _error_result(error, dispatch)
-        if artifacts is not None:
-            result["artifacts"] = str(artifacts.root)
-        if applied:
-            result["changed"] = applied
-            if dispatch is not None:
-                error_proposal = Proposal(status="BLOCKED", files=(), notes="Run stopped partway through. See blocker message.",
-                                        concerns=(), suggested_tests=(), blocker=error.message)
-                write_report(dispatch, error_proposal, tuple(applied), None, 0, artifacts)
-                result["report"] = str(dispatch.report)
-                result["verified"]["report_written"] = True
-        return compact_result(result)
+        return _failure_result(error, dispatch, artifacts, progress)
+    except OSError as error:
+        # write_atomic, apply_proposal and the report write raise plain OSError on
+        # ordinary inputs; letting one escape would lose the result line entirely.
+        detail = error.strerror or str(error) or type(error).__name__
+        converted = LocalImplementError(
+            "IO_FAILED",
+            _truncate(f"A filesystem operation failed ({type(error).__name__}: {detail}).", 300))
+        return _failure_result(converted, dispatch, artifacts, progress)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

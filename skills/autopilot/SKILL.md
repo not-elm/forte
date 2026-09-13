@@ -140,11 +140,19 @@ Invoke `superpowers:subagent-driven-development` (SDD) via the Skill tool with t
     tool. Record BASE, run SDD's `scripts/task-brief`, then write a context file beside the
     brief (`task-<N>-context.md`) carrying the plan's Global Constraints verbatim, prior-task
     interfaces, your rulings on any ambiguity in the brief, pointers to parked findings in the
-    area, and a `## Files` section listing every path the task creates or modifies. Pass
-    `--brief`, `--report`, `--context`, `--base`, and `--test-cmd` (the plan's verification
-    command) — the `## Files` list is the runner's write allowlist. Omit `--test-cmd` only when
-    the task states no verification command; the result then reports `tests.result` as
-    `not_run`.
+    area, and a `## Files` section listing every path the task creates or modifies — one
+    relative path per line, no prose. Pass `--brief`, `--report`, `--context`, `--base`, and
+    `--test-cmd` (the plan's verification command) — the `## Files` list is the runner's write
+    allowlist. Omit `--test-cmd` only when the task states no verification command; the result
+    then reports `tests.result` as `not_run`.
+  - **Dispatch it detached and wait on its sentinel**, as the skill prescribes: launch the
+    runner with `nohup`, stdout redirected to a result file, and a sentinel file carrying the
+    exit code, then wait with a Monitor until-loop on that sentinel (ceiling 5400 seconds).
+    A foreground Bash call caps at 600 seconds, and killing it would strand a writing
+    subprocess in the repository beside the Claude fallback implementer.
+  - `--test-cmd` must be the **last** argument passed, and it executes code the local model
+    just wrote, unsandboxed with the full inherited environment — pass only the plan's
+    verification command, and only in a workspace you accept running untrusted code in.
   - A task whose files cannot be declared up front is not a fit: dispatch a Claude implementer
     for it and note why in the ledger.
   - **Batching is disabled under `--local-impl`** — one local run per task, even for small
@@ -274,3 +282,5 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 - **Resuming an implementer that does not exist** — after a local run, fix round R1 is a fresh
   Claude implementer, not a resume.
 - **Batching tasks under `--local-impl`** — one local run per task.
+- **Waiting on the local runner in the foreground** — it can run for 5400 seconds; launch it
+  detached and wait on its sentinel file, or a killed Bash call leaves it writing unattended.
