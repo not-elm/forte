@@ -7,8 +7,11 @@ description: Use when an authorized workflow needs one already-planned implement
 
 Requires Python 3.9+, Git, and Ollama with `qwen3.8:27b-q8_0`.
 `FORTE_LOCAL_IMPL_MODEL` overrides the model; `FORTE_LOCAL_IMPL_TIMEOUT` overrides
-the 1800-second deadline. The runner performs every side effect: the model only
-returns file contents as data.
+the 1800-second deadline on each generation call. The declared-test command has a
+separate fixed 900-second deadline, and a run may make two generation calls and two
+test runs, so allow about 5400 seconds worst case. The runner performs every side
+effect: the model returns file contents plus a short status report, and executes
+nothing.
 
 1. The caller records BASE, writes the task brief with SDD's `scripts/task-brief`,
    and writes a context file that MUST carry the plan's Global Constraints
@@ -26,10 +29,13 @@ returns file contents as data.
 
 3. `--test-cmd` is the plan's verification command and is the only command
    executed. Model-suggested commands are recorded in the report, never run.
-4. Read the one-line JSON result. `DONE` / `DONE_WITH_CONCERNS` mean the declared
-   tests passed; `BLOCKED`, `NEEDS_CONTEXT`, and `VERIFY_FAILED` mean the caller
-   takes the task over. Open the report file when reviewing; open the artifacts
-   directory only when the result is unclear.
+4. Read the one-line JSON result. `DONE` / `DONE_WITH_CONCERNS` mean the model
+   finished and every runner check passed — they mean the declared tests passed
+   only when a `--test-cmd` was supplied, so read `tests.result`, where
+   `not_run` means nothing was verified. `BLOCKED`, `NEEDS_CONTEXT`, and
+   `VERIFY_FAILED` mean the caller takes the task over. Open the report file
+   when `verified.report_written` is true; open the artifacts directory only
+   when the result is unclear.
 
 The caller stages and commits the changed paths afterwards — the runner never
 stages, commits, pushes, resets, checks out, or changes branches, and never
@@ -42,3 +48,5 @@ during normal use. Wait on that command session. A lost session means unknown.
 One task per invocation. No retry beyond the single self-repair round, no cloud
 fallback, no model pull, no batching, no caller substitute. Its run is terminal:
 do not invoke this skill around it. `/forte:local-implement` stays explicit.
+
+Preserve host permissions and higher-priority user instructions.
