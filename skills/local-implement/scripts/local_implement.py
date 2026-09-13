@@ -270,3 +270,138 @@ def load_dispatch(options: dict) -> Dispatch:
                     base=options["base"], files=files,
                     test_cmd=tuple(options["test_cmd"]),
                     repair_rounds=int(options["repair_rounds"]))
+
+
+RULES = """You implement exactly one task in a Git repository. Return only the JSON object
+described by the schema.
+
+Rules:
+- TASK BRIEF is your requirements. Use its exact values, names, and strings verbatim.
+- CONTEXT carries project-wide constraints and decisions from earlier tasks. Obey them.
+- You may change only the files listed under DECLARED FILES. Touch nothing else.
+- For every file you change, return its COMPLETE new content. Never return a diff, a patch,
+  a fragment, or a placeholder comment standing in for code you did not write.
+- Follow the style and patterns visible in the file contents you were given.
+- Write the tests the brief asks for. Do not invent requirements it does not state.
+- If the task cannot be implemented from what you were given, return status BLOCKED and put
+  the specifics in blocker. Never guess.
+- notes describes what you implemented; it becomes the report a reviewer reads.
+- suggested_tests is advisory only and will not be executed.
+"""
+
+RESPONSE_SCHEMA = {
+    "type": "object",
+    "required": ["status", "files", "notes", "concerns", "suggested_tests", "blocker"],
+    "additionalProperties": False,
+    "properties": {
+        "status": {"type": "string", "enum": ["DONE", "DONE_WITH_CONCERNS", "BLOCKED"]},
+        "files": {"type": "array", "items": {
+            "type": "object", "required": ["path", "content"], "additionalProperties": False,
+            "properties": {"path": {"type": "string"}, "content": {"type": "string"}}}},
+        "notes": {"type": "string"},
+        "concerns": {"type": "array", "items": {"type": "string"}},
+        "suggested_tests": {"type": "array", "items": {"type": "string"}},
+        "blocker": {"type": "string"},
+    },
+}
+
+
+@dataclass(frozen=True)
+class Proposal:
+    status: str
+    files: Tuple[Tuple[str, str], ...]
+    notes: str
+    concerns: Tuple[str, ...]
+    suggested_tests: Tuple[str, ...]
+    blocker: str
+
+
+def build_prompt(dispatch: Dispatch, failure: Optional[str] = None,
+                 previous: Optional[Proposal] = None) -> str:
+    sections = [RULES, "\n## TASK BRIEF\n", dispatch.brief.read_text(encoding="utf-8", errors="replace"),
+                "\n## CONTEXT\n", dispatch.context.read_text(encoding="utf-8", errors="replace"),
+                "\n## DECLARED FILES\n"]
+    for raw in dispatch.files:
+        target = dispatch.root / raw
+        sections.append(f"\n### {raw}\n")
+        if target.is_file():
+            sections.append(target.read_text(encoding="utf-8", errors="replace"))
+        else:
+            sections.append(NEW_FILE_MARKER + "\n")
+    if failure is not None:
+        previous_notes = previous.notes if previous else ""
+        sections.append(
+            "\n## PREVIOUS ATTEMPT FAILED ITS TESTS\n"
+            "Your previous attempt was applied and the declared test command failed. "
+            "Return the complete corrected content of every file that needs changing.\n"
+            f"\nYour previous notes:\n{previous_notes}\n"
+            f"\nTest output:\n{failure}\n")
+    prompt = "".join(sections)
+    if len(prompt.encode("utf-8")) > PROMPT_LIMIT:
+        raise LocalImplementError(
+            "INPUT_TOO_LARGE",
+            f"Prompt exceeds {PROMPT_LIMIT} bytes; split the task or shorten the context.")
+    return prompt
+
+
+def validate_proposal(response: object, dispatch: Dispatch) -> Proposal:
+    invalid = LocalImplementError("INVALID_RESPONSE",
+                                  "The local model did not return a valid proposal.")
+    if (not isinstance(response, dict) or response.get("done") is not True
+            or response.get("done_reason") != "stop"
+            or not isinstance(response.get("response"), str)):
+        raise invalid
+    try:
+        payload = json.loads(response["response"])
+    except ValueError:
+        raise invalid from None
+    if not isinstance(payload, dict) or set(payload) != set(RESPONSE_SCHEMA["required"]):
+        raise invalid
+    status = payload["status"]
+    if status not in ("DONE", "DONE_WITH_CONCERNS", "BLOCKED"):
+        raise invalid
+    for key in ("notes", "blocker"):
+        if not isinstance(payload[key], str):
+            raise invalid
+    for key in ("concerns", "suggested_tests"):
+        if not isinstance(payload[key], list) or any(
+                not isinstance(item, str) for item in payload[key]):
+            raise invalid
+    if not isinstance(payload["files"], list):
+        raise invalid
+    files = []
+    seen = set()
+    for entry in payload["files"]:
+        if (not isinstance(entry, dict) or set(entry) != {"path", "content"}
+                or not isinstance(entry["path"], str) or not isinstance(entry["content"], str)):
+            raise invalid
+        path = entry["path"]
+        if path not in dispatch.files:
+            raise LocalImplementError(
+                "UNDECLARED_PATH",
+                f"The model returned a path that was not declared: {path}")
+        if path in seen:
+            raise invalid
+        seen.add(path)
+        files.append((path, entry["content"]))
+    if status != "BLOCKED" and not files:
+        raise invalid
+    if status == "BLOCKED" and not payload["blocker"].strip():
+        raise invalid
+    return Proposal(status=status, files=tuple(files), notes=payload["notes"],
+                    concerns=tuple(payload["concerns"]),
+                    suggested_tests=tuple(payload["suggested_tests"]),
+                    blocker=payload["blocker"])
+
+
+def generate(dispatch: Dispatch, failure: Optional[str] = None,
+             previous: Optional[Proposal] = None) -> Proposal:
+    payload = {
+        "model": model_name(),
+        "prompt": build_prompt(dispatch, failure=failure, previous=previous),
+        "stream": False, "think": False,
+        "format": RESPONSE_SCHEMA,
+        "options": {"num_ctx": NUM_CTX, "num_predict": NUM_PREDICT},
+    }
+    return validate_proposal(ollama_request("/api/generate", payload, request_timeout()),
+                             dispatch)

@@ -254,5 +254,131 @@ class PreflightTests(DispatchFixture):
         self.assert_code("ILLEGAL_PATH", lambda: self.li.load_dispatch(self.options()))
 
 
+class PromptTests(DispatchFixture):
+    def test_prompt_contains_brief_context_and_new_file_marker(self):
+        with ollama_stub(self.li):
+            dispatch = self.li.load_dispatch(self.options())
+        prompt = self.li.build_prompt(dispatch)
+        self.assertIn("Create greet() returning HELLO.", prompt)
+        self.assertIn("stdlib only", prompt)
+        self.assertIn("src/greet.py", prompt)
+        self.assertIn(self.li.NEW_FILE_MARKER, prompt)
+
+    def test_prompt_contains_existing_file_content(self):
+        target = self.root / "src" / "greet.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("def greet():\n    return 'OLD'\n")
+        with ollama_stub(self.li):
+            dispatch = self.li.load_dispatch(self.options())
+        self.assertIn("return 'OLD'", self.li.build_prompt(dispatch))
+
+    def test_repair_prompt_carries_the_test_failure(self):
+        with ollama_stub(self.li):
+            dispatch = self.li.load_dispatch(self.options())
+        previous = self.li.Proposal("DONE", (("src/greet.py", "x"),), "n", (), (), "")
+        prompt = self.li.build_prompt(dispatch, failure="AssertionError: HELLO != HI",
+                                      previous=previous)
+        self.assertIn("AssertionError: HELLO != HI", prompt)
+
+    def test_oversized_prompt_is_rejected(self):
+        self.brief.write_text("z" * (self.li.PROMPT_LIMIT + 1))
+        with ollama_stub(self.li):
+            dispatch = self.li.load_dispatch(self.options())
+        self.assert_code("INPUT_TOO_LARGE", lambda: self.li.build_prompt(dispatch))
+
+
+class GenerationTests(DispatchFixture):
+    def dispatch(self):
+        with ollama_stub(self.li):
+            return self.li.load_dispatch(self.options())
+
+    def test_accepts_a_well_formed_proposal(self):
+        dispatch = self.dispatch()
+        body = response_body(files=(("src/greet.py", "def greet():\n    return 'HELLO'\n"),),
+                             concerns=("naming is provisional",))
+        with ollama_stub(self.li, responses=[body]) as requests:
+            proposal = self.li.generate(dispatch)
+        self.assertEqual(proposal.status, "DONE")
+        self.assertEqual(proposal.files[0][0], "src/greet.py")
+        self.assertEqual(proposal.concerns, ("naming is provisional",))
+        generate_calls = [r for r in requests if r[0] == "/api/generate"]
+        self.assertEqual(len(generate_calls), 1)
+        payload = generate_calls[0][1]
+        self.assertIs(payload["stream"], False)
+        self.assertIs(payload["think"], False)
+        self.assertEqual(payload["options"]["num_ctx"], self.li.NUM_CTX)
+        self.assertEqual(payload["options"]["num_predict"], self.li.NUM_PREDICT)
+        self.assertEqual(payload["format"], self.li.RESPONSE_SCHEMA)
+        self.assertEqual(payload["model"], self.li.DEFAULT_MODEL)
+
+    def test_model_override_is_honoured(self):
+        dispatch = self.dispatch()
+        with patch.dict(os.environ, {self.li.MODEL_ENV: "other-model"}):
+            with ollama_stub(self.li, responses=[response_body(
+                    files=(("src/greet.py", "x\n"),))]) as requests:
+                self.li.generate(dispatch)
+        payload = [r for r in requests if r[0] == "/api/generate"][0][1]
+        self.assertEqual(payload["model"], "other-model")
+
+    def test_rejects_unfinished_response(self):
+        dispatch = self.dispatch()
+        body = {"done": False, "done_reason": "length", "response": "{}"}
+        with ollama_stub(self.li, responses=[body]):
+            self.assert_code("INVALID_RESPONSE", lambda: self.li.generate(dispatch))
+
+    def test_rejects_non_json_inner_payload(self):
+        dispatch = self.dispatch()
+        body = {"done": True, "done_reason": "stop", "response": "not json"}
+        with ollama_stub(self.li, responses=[body]):
+            self.assert_code("INVALID_RESPONSE", lambda: self.li.generate(dispatch))
+
+    def test_rejects_missing_field(self):
+        dispatch = self.dispatch()
+        body = {"done": True, "done_reason": "stop",
+                "response": json.dumps({"status": "DONE", "files": []})}
+        with ollama_stub(self.li, responses=[body]):
+            self.assert_code("INVALID_RESPONSE", lambda: self.li.generate(dispatch))
+
+    def test_rejects_wrong_type(self):
+        dispatch = self.dispatch()
+        body = response_body(files=(("src/greet.py", "x"),))
+        inner = json.loads(body["response"])
+        inner["concerns"] = "not a list"
+        body["response"] = json.dumps(inner)
+        with ollama_stub(self.li, responses=[body]):
+            self.assert_code("INVALID_RESPONSE", lambda: self.li.generate(dispatch))
+
+    def test_rejects_unknown_status(self):
+        dispatch = self.dispatch()
+        with ollama_stub(self.li, responses=[response_body(status="VERIFY_FAILED")]):
+            self.assert_code("INVALID_RESPONSE", lambda: self.li.generate(dispatch))
+
+    def test_rejects_undeclared_path(self):
+        dispatch = self.dispatch()
+        with ollama_stub(self.li, responses=[response_body(
+                files=(("src/other.py", "x\n"),))]):
+            self.assert_code("UNDECLARED_PATH", lambda: self.li.generate(dispatch))
+
+    def test_rejects_done_without_files(self):
+        dispatch = self.dispatch()
+        with ollama_stub(self.li, responses=[response_body(files=())]):
+            self.assert_code("INVALID_RESPONSE", lambda: self.li.generate(dispatch))
+
+    def test_blocked_without_files_is_accepted(self):
+        dispatch = self.dispatch()
+        with ollama_stub(self.li, responses=[response_body(
+                status="BLOCKED", files=(), blocker="brief omits the return type")]):
+            proposal = self.li.generate(dispatch)
+        self.assertEqual(proposal.status, "BLOCKED")
+        self.assertEqual(proposal.blocker, "brief omits the return type")
+
+    def test_timeout_is_reported_without_retry(self):
+        dispatch = self.dispatch()
+        with patch.dict(os.environ, {self.li.TIMEOUT_ENV: "0.05"}):
+            with ollama_stub(self.li, delay=5) as requests:
+                self.assert_code("GENERATION_TIMEOUT", lambda: self.li.generate(dispatch))
+        self.assertEqual(len([r for r in requests if r[0] == "/api/generate"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
