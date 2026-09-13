@@ -142,25 +142,33 @@ Invoke `superpowers:subagent-driven-development` (SDD) via the Skill tool with t
     interfaces, your rulings on any ambiguity in the brief, pointers to parked findings in the
     area, and a `## Files` section listing every path the task creates or modifies. Pass
     `--brief`, `--report`, `--context`, `--base`, and `--test-cmd` (the plan's verification
-    command) — the `## Files` list is the runner's write allowlist.
+    command) — the `## Files` list is the runner's write allowlist. Omit `--test-cmd` only when
+    the task states no verification command; the result then reports `tests.result` as
+    `not_run`.
   - A task whose files cannot be declared up front is not a fit: dispatch a Claude implementer
     for it and note why in the ledger.
   - **Batching is disabled under `--local-impl`** — one local run per task, even for small
     same-shape tasks SDD would otherwise combine.
-  - On `DONE` / `DONE_WITH_CONCERNS`: verify the result yourself before reviewing — every
-    changed path was declared, no path that was already dirty changed, the report file is
-    non-empty, and the declared test command actually ran with its output in the report. Then
-    stage exactly the changed paths and commit via `forte:qwen-commit` — the runner never
-    commits. Only then generate the review package from the recorded BASE.
+  - On `DONE` / `DONE_WITH_CONCERNS`: check the result's own fields before reviewing —
+    `verified.paths_allowed` and `verified.untouched_dirty` are true (the runner refuses an
+    undeclared or already-dirty path before writing anything, so a false here means the result
+    is not usable), `verified.report_written` is true, and `tests.result` is `pass`. A
+    `tests.result` of `not_run` means nothing was verified: the task review is then the only
+    gate, so say so in the ledger. Then stage exactly the paths the result lists in `changed`
+    and commit via `forte:qwen-commit` — the runner never commits. Only then generate the
+    review package from the recorded BASE.
   - On `BLOCKED` / `NEEDS_CONTEXT` / `VERIFY_FAILED`, or any runner failure: fall back to a
-    Claude implementer for that task, carrying the brief path, the same report path, and the
-    working-tree state (`git status --porcelain`, `git diff --stat`). **Never** reset, check
+    Claude implementer for that task, carrying the brief path, the same report file path, and
+    the working-tree state (`git status --porcelain`, `git diff --stat`). **Never** reset, check
     out, stash, or otherwise discard the partial work — the Claude implementer decides whether
     to build on it.
-  - **Fix rounds always use a fresh Claude implementer.** SDD normally resumes the original
-    implementer for rounds 1–3; a local run leaves no resumable agent, so take SDD's documented
-    fallback for harnesses that cannot resume a live session: a fresh implementer with the
-    brief path, the same report file path, and the findings.
+  - **For a task whose initial implementation ran through `forte:local-implement`, fix rounds
+    always use a fresh Claude implementer.** SDD normally resumes the original implementer for
+    rounds 1-3; a local run leaves no resumable agent, so take SDD's documented fallback for
+    harnesses that cannot resume a live session: a fresh implementer with the brief path, the
+    same report file path, and the findings. A task that a Claude implementer started —
+    because its files could not be declared, or because the local run fell back — keeps SDD's
+    normal resume behaviour.
   - Append one ledger line per task: `LOCAL-IMPL: task <N> → <ok|fallback> (<reason>)`.
 - **Rust diagnostics:** when an implementation task needs `cargo check` or
   `cargo clippy`, invoke `forte:rust-diagnostics` with the task's exact
@@ -199,7 +207,7 @@ Present in the terminal (do NOT save the report to disk):
 | 3 Plan | {done} | {plan_path} |
 | 4 Plan review | {done — N edits applied} | {plan_path} |
 | 5 Implementation | {done — N tasks} | {start_sha}..{head_sha} |
-| 5a ローカル実装 | {N件成功 / M件フォールバック / 未使用} | {LOCAL-IMPL ledger lines} |
+| 5a Local implementation | {N ok / M fallback / not used} | {LOCAL-IMPL ledger lines} |
 | 6 Code review | {done — N findings fixed / skipped: reason} | {commit or "no changes"} |
 | 7 Simplify | {done / skipped: reason} | {commit or "no changes"} |
 
@@ -242,7 +250,7 @@ Explicitly NOT stop conditions: `codex` CLI unavailable (spec-review / plan-revi
 | Input | feature description and/or spec path (+ optional `--branch <name>`, `--local-impl`) |
 | Gate | Stage 1 spec approval ONLY; provided spec = pre-approved |
 | Ledger | `.superpowers/autopilot/pipeline.md`: header + start SHA, started/complete/DEFERRED/STOPPED/PIPELINE COMPLETE lines |
-| Stage args | spec-review `"<spec>"` · writing-plans (pre-answer Subagent-Driven) · plan-review `"<plan> <spec>"` (auto-apply is both reviews' default) · SDD (standing answers) · code-review `"max --fix"` · simplify |
+| Stage args | spec-review `"<spec>"` · writing-plans (pre-answer Subagent-Driven) · plan-review `"<plan> <spec>"` (auto-apply is both reviews' default) · SDD (standing answers) · local-implement `--brief/--report/--context/--base [--test-cmd]` (only with `--local-impl`) · code-review `"max --fix"` · simplify |
 | Deferred | plan-contradicting / scope-expanding / report-only findings → `DEFERRED:` lines → Stage 8 list |
 | Output | Stage 8 terminal report; no disk save, no push |
 
