@@ -130,15 +130,19 @@ Board skills define what happens before (setup, framing, evidence-gathering) and
   {hypotheses and critique claims from current round}
   ```
 
-- Execute the canonical invocation from codex-engine REFERENCE.md with `{PREFIX}` = `board-audit`.
-  Locate it with `Glob pattern="**/codex-engine/REFERENCE.md"` and read it first; if not found,
-  display `> Warning: codex-engine reference not found. Using inline rules only.`
+- Execute the canonical invocation from codex-engine REFERENCE.md with `{PREFIX}` = `board-audit`,
+  `{TIER}` = `light`, `{SCOPE}` = the file paths the audited claims cite (empty when they cite none).
+  Fact-checking claims the prompt already carries is the cheapest workload a board issues, and at
+  `light` Codex still reads any file the claims cite — it just does not go searching the repository.
+  Locate the reference with `Glob pattern="**/codex-engine/REFERENCE.md"` and read it first; if not
+  found, display `> Warning: codex-engine reference not found. Using inline rules only.`
 
 - Follow that reference's wait protocol (Monitor until-loop on `CODEX_DONE_MARKER`, 900s ceiling)
   and read-back protocol. Only after the complete final message has been read, write the results
   to WHITEBOARD-R{N}.md `## Audit`.
 
 - **Error handling:**
+  - **Codex usage limit** → the round is unaudited, not aborted. Leader writes `Audit: skipped (Codex usage limit{, retry after {time}})` into WHITEBOARD-R{N}.md `## Audit`, skips `revise`, proceeds to `synthesize` with the round's entries carrying reduced confidence in the Evidence Map, and applies -cx Withdrawal (below). Never retry the call.
   - Codex exits non-zero or times out → leader terminates the skill immediately with error: "Codex execution failed (exit code {N} / timeout). Skill aborted." Clean up working directory and temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
   - Codex returns partial/malformed output → leader writes available results, marks incomplete entries as ❓
 
@@ -389,7 +393,7 @@ Granularity: one row per hypothesis or critique entry (by entry ID), not per sen
 | 8 | `-cx` members follow identical write-zone rules as normal members (own `### {name}` subsection only) | Same isolation guarantees |
 | 9 | Base WHITEBOARD.md is read-only after its initial phases complete | Prevents retroactive modification; keeps base file small |
 | 10 | Older round files (WHITEBOARD-R{X}.md where X < current) are read-only; only current round file is writable | Prevents cross-round write conflicts; enforces incremental synthesis |
-| 11 | `-cx` members MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. They interact with these files exclusively through codex exec. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable or fails, -cx member reports failure to leader via SendMessage: "Codex failed at {phase}." Leader terminates the skill immediately. | Shifts token consumption from Claude to Codex (separate billing); fail-fast prevents context waste |
+| 11 | `-cx` members MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. They interact with these files exclusively through codex exec. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable or fails, -cx member reports failure to leader via SendMessage: "Codex failed at {phase}." Leader terminates the skill immediately — except on a Codex usage limit, which triggers -cx Withdrawal instead. | Shifts token consumption from Claude to Codex (separate billing); fail-fast prevents context waste, but an exhausted quota must not cost the user the discussion |
 
 Board skills may add additional rules (e.g., phase-specific read-only rules, escalation rules).
 
@@ -398,6 +402,7 @@ Board skills may add additional rules (e.g., phase-specific read-only rules, esc
 - **Voting members**: All members (normal + -cx). Count = role count × 2.
 - **Majority threshold**: ⌊N/2⌋ + 1 where N = total voting members.
 - **No advisory members**: All team members have voting rights.
+- **Withdrawn members leave the roster**: after -cx Withdrawal, N is the remaining member count and the threshold is recalculated from it.
 
 | Total Members | Majority Threshold |
 |---------------|-------------------|
@@ -411,6 +416,29 @@ Board skills may add additional rules (e.g., phase-specific read-only rules, esc
 - **Exhaustion**: If max rounds reached with no majority, leader writes "best available conclusion" with explicit uncertainty markers
 - **Abstention**: Not permitted. Every member must vote each round.
 - **Vote supersession**: A member's vote in round N supersedes prior rounds.
+
+### -cx Withdrawal (Codex usage limit)
+
+A plan's Codex capacity refills on a clock, so a usage limit mid-discussion is not something the
+board can retry its way out of — and it must not cost the user the discussion. When any `-cx`
+member reports `usage_limit` (codex-engine's Usage-Limit Degradation):
+
+1. **Every `-cx` member withdraws at once** — not only the one that hit the limit. The limit is
+   account-wide; letting the others discover it one phase at a time wastes a phase per member.
+2. **Leader announces it once** and records it in SYNTHESIS.md:
+   `Round {N}: -cx members withdrawn (Codex usage limit{, retry after {time}})`.
+3. **The voting roster shrinks to the remaining members.** Threshold becomes ⌊remaining/2⌋ + 1 for
+   this and every later round. Withdrawn members are off the roster — they are not "not submitted" votes.
+4. **Fewer than 2 members remain → terminate.** A debate needs at least two voices. The leader stops,
+   writes the best available conclusion with explicit uncertainty markers, and tells the user when
+   Codex capacity returns.
+5. **Entries already written stay.** Their IDs keep the `X` initial and remain valid Grep and
+   `refs=[...]` targets — the transcript stays readable.
+6. **Critique assignments are rebuilt** for the current round over the remaining members, preserving
+   full coverage (every hypothesis assigned to ≥1 member, no member assigned their own).
+7. **Audit degrades rather than blocks** — see the audit phase's error handling.
+8. **No re-spawn.** Withdrawn members do not rejoin later in the same discussion even if capacity
+   returns; a member re-entering with no memory of the rounds it missed is worse than a smaller team.
 
 ### Communication Rules
 
@@ -426,11 +454,12 @@ Board skills may add additional rules (e.g., phase-specific read-only rules, esc
 | Member has not reported completion | Leader sends one reminder via SendMessage |
 | After reminder, still no response | Leader proceeds with available results (partial round) |
 | Missing ratification vote | Recorded as "not submitted"; threshold recalculated as ⌊voting_count/2⌋ + 1 |
-| -cx member reports Codex failure | Leader terminates skill immediately (no fallback). Clean up working directory and temp files |
+| -cx member reports Codex failure (not installed, non-zero exit, timeout) | Leader terminates skill immediately (no fallback). Clean up working directory and temp files |
+| -cx member reports Codex **usage limit** | Leader applies -cx Withdrawal: all -cx members withdraw, roster and threshold recalculated, discussion continues. Terminate only if fewer than 2 members remain |
 
 ### Audit Notes
 
-- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, terminate skill immediately (same as audit phase prerequisite above).
+- **Prerequisite:** `codex` CLI must be installed (`npm i -g @openai/codex`). If unavailable, terminate skill immediately (same as audit phase prerequisite above). An exhausted usage limit is **not** this case — it leaves the round unaudited and the discussion running (see -cx Withdrawal).
 - **Do NOT audit opinions or forecasts** — only verifiable factual claims
 - **Audit is incremental** — each round audits only new entries, not the full history
 - **Revisions are append-only** — never edit the original hypothesis or critique text

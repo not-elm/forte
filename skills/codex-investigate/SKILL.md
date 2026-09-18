@@ -116,6 +116,8 @@ Run the canonical invocation from codex-engine REFERENCE.md with:
 | Value | |
 |-------|---|
 | `{PREFIX}` | `codex-investigate` |
+| `{TIER}` | `deep` — finding the cause *is* the work here |
+| `{SCOPE}` | Paths named in the symptom description, or empty. At `deep` these are starting points, never a restriction |
 | `{prompt}` | The prompt constructed in Phase 2 |
 
 Then follow the reference's wait protocol (Monitor until-loop on `CODEX_DONE_MARKER`, 900s
@@ -134,14 +136,23 @@ If the output does not follow the expected format, display Codex's raw final mes
 
 ## Error Handling
 
-- **`codex` not found**: Tell the user to install it with `npm i -g @openai/codex`
-- **Non-zero exit code**: Display the error message from Codex
-- **Empty output**: Suggest the symptom description may be too vague and ask for more detail
+Codex carries this skill, but its absence never cancels the investigation: fall back to
+investigating with Claude's own Read/Grep/Glob using the same Phase 2 prompt, and head the
+report with the reason Codex was not used.
+
+| Situation | Action |
+|---|---|
+| **`codex` not found** (exit 127) | Tell the user to install it with `npm i -g @openai/codex`, then investigate with Claude's own tools. Head the report `⚠ Codex未使用: 未インストール` |
+| **Usage limit reached** | Display codex-engine's one-line notice (with the retry time when the log carries one), then investigate with Claude's own tools. Head the report `⚠ Codex未使用: 利用上限（{retry time} 以降に再試行可）`. Never retry within this session |
+| **Non-zero exit (other)** | Display the error message from Codex, then fall back to Claude's own investigation with the same heading convention |
+| **Ceiling exceeded (900s)** | Kill `CODEX_PID`, then fall back to Claude's own investigation. Head the report `⚠ Codex未使用: タイムアウト` |
+| **Empty output** | Suggest the symptom description may be too vague and ask for more detail |
 
 ## Common Mistakes
 
 Invocation-level mistakes (wrong subcommand, CLI-argument prompts, truncated final message,
-model/effort flags) are covered in codex-engine REFERENCE.md. Skill-specific:
+model flags, raising effort, retrying a usage limit) are covered in codex-engine REFERENCE.md.
+Skill-specific:
 
 - **Symptom too vague**: Ensure the user provides enough detail for Codex to narrow down the search area
 - **Parsing a partial response**: If the four expected sections are missing, fall back to displaying the raw final message rather than inventing structure

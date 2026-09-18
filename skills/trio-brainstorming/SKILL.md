@@ -172,6 +172,8 @@ Then do Claude's own independent enumeration (see each checkpoint). Do not ask t
    | Value | |
    |-------|---|
    | `{PREFIX}` | `trio-cp1` |
+   | `{TIER}` | `standard` — the target is the State file the prompt already carries |
+   | `{SCOPE}` | Paths named in the User Brief or Evidence, or empty |
    | `{prompt}` | Full contents of STATE.md, followed by the CP1 request below |
 
 3. Display the waiting status line. Then, **before reading any Codex output**, write Claude's own question candidates into Question Ledger with `Origin: claude`, each with the Decision it affects. This ordering is mandatory: neither party's frame may contaminate the other's initial list.
@@ -222,6 +224,8 @@ Claude evaluates the trigger after every human answer. If it has not fired when 
    | Value | |
    |-------|---|
    | `{PREFIX}` | `trio-cp2` |
+   | `{TIER}` | `deep` — independent approach discovery needs unrestricted exploration |
+   | `{SCOPE}` | Paths named in the User Brief or Evidence, or empty. At `deep` these are starting points, never a restriction |
    | `{prompt}` | Full contents of STATE.md, followed by the CP2 request below |
 
 3. Display the waiting status line. Then, **before reading any Codex output**, write Claude's own 2–3 approaches (name, one-line summary, pros, cons, recommendation) into Positions & Dissent under `Claude:`.
@@ -280,6 +284,7 @@ At that point, the CP2 procedure may run again **only if** an answer received si
 | Situation | Action |
 |---|---|
 | `codex` not installed (the sentinel file contains `127`) | Show one line: `⚠ Codex 不在: 通常の brainstorming で続行`. Record `Codex (rev N): unavailable` in Positions & Dissent. Skip every remaining checkpoint. Keep the State file — the Ledger is still useful for Claude. |
+| Codex usage limit (see codex-engine's Usage-Limit Degradation) | Show one line: `⚠ Codex 利用上限（{retry time} 以降に再試行可）: 通常の brainstorming で続行`. Record `Codex (rev N): usage limit` in Positions & Dissent. Skip every remaining checkpoint — capacity returns on a clock, not on a retry. |
 | Codex non-zero exit (other) | Surface `CODEX_LOG` highlights, record `Codex (rev N): failed — {reason}` in Positions & Dissent, continue this checkpoint with Claude's list alone. Try Codex again at the next checkpoint. |
 | 900 s ceiling exceeded | `kill "$CODEX_PID"`, continue alone. Record `Codex (rev N): timeout` in Positions & Dissent so absence is not mistaken for agreement. |
 | Codex output malformed | Import what is readable; mark rows `Origin: codex (unstructured)`. |
@@ -290,7 +295,7 @@ Temp files are cleaned on every path per codex-engine.
 
 ## Common Mistakes
 
-Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation, model/effort flags, `run_in_background`) are covered in codex-engine REFERENCE.md. Skill-specific:
+Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation, model flags, raising effort, `run_in_background`, retrying a usage limit) are covered in codex-engine REFERENCE.md. Skill-specific:
 
 - **Reading Codex output before writing Claude's own list** — defeats independent discovery. Write first, read second, at both checkpoints.
 - **Calling Codex on every human answer** — the dialogue stalls for minutes per turn. Two checkpoints, plus named-decision rounds only.

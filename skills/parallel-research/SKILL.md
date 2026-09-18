@@ -195,6 +195,8 @@ Display a status message, then launch both investigations in a **single message*
 | Value | |
 |-------|---|
 | `{PREFIX}` | `parallel-research-codex` |
+| `{TIER}` | `deep` — exploring the codebase *is* the work here |
+| `{SCOPE}` | Paths surfaced by the Phase 2 cheap resolution pass, space-separated, or empty. At `deep` these are starting points, never a restriction |
 | `{prompt}` | `{codex_prompt}` built in Phase 4 |
 
 The call returns immediately — the detached run does not block the Agent call that follows it.
@@ -216,7 +218,7 @@ ceiling matters most here.
 Then wait per the reference's wait protocol: a Monitor until-loop on `CODEX_DONE_MARKER` with
 a 900s ceiling, and read `CODEX_FINAL_OUTPUT` from line 1 through EOF before synthesis.
 
-**Codex unavailable fallback:** If `CODEX_DONE_MARKER` reports exit code 127, proceed with Claude Code Agent results only. Note this in the report.
+**Codex unavailable fallback:** If `CODEX_DONE_MARKER` reports exit code 127, or the run ends in a usage limit (see codex-engine's Usage-Limit Degradation), proceed with Claude Code Agent results only. Note this in the report. A usage limit is never retried within the session.
 
 ### Phase 6: Synthesize Report
 
@@ -266,6 +268,7 @@ If an ambiguity was identified in Phase 2 but left unresolved (the user's answer
 | Situation | Action |
 |-----------|--------|
 | Codex CLI not installed (exit 127) or ceiling exceeded (900s) | Report with Claude Code Agent results only. Add note: "⚠ Codex未使用: {reason}" at report top |
+| Codex usage limit reached | Report with Claude Code Agent results only. Add note: "⚠ Codex未使用: 利用上限（{retry time} 以降に再試行可）" at report top. Never retry within this session |
 | Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent未使用: {reason}" at report top |
 | Both fail | Display error message and stop |
 | Partial/malformed output from either side | Best-effort integration, note which side was incomplete |
@@ -273,7 +276,8 @@ If an ambiguity was identified in Phase 2 but left unresolved (the user's answer
 ## Common Mistakes
 
 Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation,
-model/effort flags, `run_in_background`) are covered in codex-engine REFERENCE.md.
+model flags, raising effort, `run_in_background`, retrying a usage limit) are covered in
+codex-engine REFERENCE.md.
 Skill-specific:
 
 - **Not launching both tools in the same message**: Codex Bash call and Agent call MUST be in a single message for parallel execution. Sequential calls defeat the purpose of this skill.

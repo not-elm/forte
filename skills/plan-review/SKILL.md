@@ -244,6 +244,8 @@ Launch both tools in **a single message with two tool calls**. Sequential calls 
 | Value | |
 |-------|---|
 | `{PREFIX}` | `plan-review-codex` |
+| `{TIER}` | `standard` — the target is already identified by the plan |
+| `{SCOPE}` | The plan file path, plus any code paths the plan itself names |
 | `{prompt}` | `{codex_prompt}` built in Phase 3 |
 
 The call returns immediately, so it does not block the Agent call that follows it. After both
@@ -267,7 +269,7 @@ Plan reviews fan out wider than spec reviews — Axis 1 requires opening every f
 
 **Both tool calls MUST be in the same message.**
 
-**Codex unavailable fallback:** If `codex` returns exit 127, stderr contains "command not found", or the Bash call times out, proceed with Claude Code Agent results only. Note this at the top of the final report. (See Error Handling table for the full failure matrix.)
+**Codex unavailable fallback:** If `codex` returns exit 127, the run ends in a usage limit (see codex-engine's Usage-Limit Degradation), or the ceiling is exceeded, proceed with Claude Code Agent results only. Note this at the top of the final report. (See Error Handling table for the full failure matrix.)
 
 ### Phase 5: Synthesize Report
 
@@ -417,6 +419,7 @@ Suggest next action:
 | Situation | Action |
 |-----------|--------|
 | Codex CLI not installed (exit 127) or ceiling exceeded (900s) | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: {reason}" at report top. |
+| Codex usage limit reached | Report with Claude Code Agent results only. Add note: "⚠ Codex not used: usage limit (retry after {time})" at report top. Never retry within this session. |
 | Agent failure | Report with Codex results only. Add note: "⚠ Claude Code Agent not used: {reason}" at report top. |
 | Both fail | Display error message and stop. |
 | Partial / malformed output from either side | Best-effort integration; note which side was incomplete. |
@@ -431,7 +434,7 @@ Suggest next action:
 | Input | plan file path(s) (+ optional spec path) (+ optional free text) (+ optional `--review-only` flag) |
 | Pre-pass | grep plan for placeholder red flags + Interfaces lines → inject as verification candidates |
 | Prompts | 4 plan-edition axes, same output format for both, evidence-gathering differs |
-| Launch | 1 message, 2 tool calls (Bash: codex-engine canonical invocation, `{PREFIX}` = `plan-review-codex` + Agent), then the reference's wait protocol |
+| Launch | 1 message, 2 tool calls (Bash: codex-engine canonical invocation, `{PREFIX}` = `plan-review-codex`, `{TIER}` = `standard` + Agent), then the reference's wait protocol |
 | Output | Synthesized 4-axis report in terminal (no file save); editable vs report-only classification |
 | Update (Phase 7, default) | Filter editable findings → propose & display diff (Task N > Step M or section-heading anchors) → **auto-apply** (no approval gate) → `Edit` tool applies |
 | Update with `--review-only` | Filter editable findings → propose diff → user approves Apply/Skip → `Edit` tool applies |
@@ -439,7 +442,8 @@ Suggest next action:
 ## Common Mistakes
 
 Invocation-level mistakes (subcommand, approval policy, CLI-argument prompts, truncation,
-model/effort flags, timeouts) are covered in codex-engine REFERENCE.md. Skill-specific:
+model flags, raising effort, timeouts, retrying a usage limit) are covered in codex-engine
+REFERENCE.md. Skill-specific:
 
 - **Not launching both tools in the same message** — sequential calls defeat parallelism.
 - **Inlining full plan text into the prompt** — instead, list the file paths and let each tool `Read` the plan. Shorter prompts produce faster, more focused results.

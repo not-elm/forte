@@ -120,7 +120,19 @@ Do not include an "Audit" or "Auditor" role. Audit is handled by the board leade
 
 ## -cx Member: Codex-Mediated Protocol
 
--cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable or fails, report failure to leader via SendMessage. Leader terminates the skill immediately.
+-cx members interact with discussion files **exclusively through codex exec**. They MUST NOT directly Read or Grep any discussion files (base WHITEBOARD.md, WHITEBOARD-R{N}.md, SYNTHESIS.md) during any phase. Exception: hypothesize Round 1 (independent generation, no files to read). If codex CLI is unavailable or fails, report failure to leader via SendMessage; the leader terminates the skill immediately. A Codex **usage limit** is the one exception — it withdraws the -cx members instead of ending the discussion (see Codex Failure below).
+
+Every phase declares a workload tier, because a single board issues 20-30 Codex runs:
+
+| Phase | `{PREFIX}` | `{TIER}` | `{SCOPE}` |
+|-------|------------|----------|-----------|
+| Setup exploration | `cx-explore` | `deep` | Empty — the initial scan is exploration |
+| Framing | `cx-framing` | `light` | Base WHITEBOARD.md absolute path |
+| Hypothesize (Round 2+) | `cx-hypothesize` | `standard` | The phase's SYNTHESIS.md absolute path |
+| Critique | `cx-critique` | `light` | The round's WHITEBOARD-R{N}.md absolute path |
+
+At `light`, Codex still reads any file the scoped material explicitly cites, so a `file:line`
+claim remains verifiable — it just does not go searching the repository.
 
 ### Setup exploration (initial codebase scan)
 
@@ -134,7 +146,7 @@ Before participating in the discussion, run a Codex exploration:
    Identify key considerations, potential issues, and insights that a {role-name}
    would find relevant. Cite specific file paths and line numbers as evidence."
 
-2. Execute the canonical invocation from codex-engine REFERENCE.md with `{PREFIX}` = `cx-explore`.
+2. Execute the canonical invocation from codex-engine REFERENCE.md with `{PREFIX}` = `cx-explore`, `{TIER}` = `deep`.
 
 3. Follow the reference's wait protocol (Monitor until-loop on `CODEX_DONE_MARKER`, 900s ceiling) and read-back protocol.
 
@@ -143,11 +155,13 @@ Before participating in the discussion, run a Codex exploration:
 
 If codex CLI is not installed or fails, report failure to leader via SendMessage: "Codex CLI unavailable."
 Leader terminates the skill with error message to user.
+If the run ends in a Codex usage limit, report "Codex usage limit at setup{, retry after {time}}" instead —
+the leader withdraws the -cx members and continues with the remaining team.
 ````
 
 ### Framing
 
--cx members use codex exec to read base WHITEBOARD.md and generate framing entries. The framing prompt template is provided by the calling board skill, since framing fields vary by board and phase. Generic structure:
+-cx members use codex exec to read base WHITEBOARD.md and generate framing entries. Canonical invocation, `{PREFIX}` = `cx-framing`, `{TIER}` = `light`, `{SCOPE}` = the base WHITEBOARD.md absolute path. The framing prompt template is provided by the calling board skill, since framing fields vary by board and phase. Generic structure:
 
 1. Read base WHITEBOARD.md (topic, team composition, context)
 2. Analyze codebase from {role-description} perspective
@@ -159,7 +173,7 @@ Board skills provide the specific prompt with their framing field definitions (e
 
 ### Hypothesize (Round 2+)
 
-Canonical invocation from codex-engine REFERENCE.md, `{PREFIX}` = `cx-hypothesize`, with:
+Canonical invocation from codex-engine REFERENCE.md, `{PREFIX}` = `cx-hypothesize`, `{TIER}` = `standard`, `{SCOPE}` = the phase's SYNTHESIS.md absolute path, with:
 
 ```
 Read the following file and extract the Round Context Packet:
@@ -173,7 +187,7 @@ Output: hypothesis entries only, max 300 tokens.
 
 ### Critique
 
-Canonical invocation from codex-engine REFERENCE.md, `{PREFIX}` = `cx-critique`, with:
+Canonical invocation from codex-engine REFERENCE.md, `{PREFIX}` = `cx-critique`, `{TIER}` = `light`, `{SCOPE}` = the round's WHITEBOARD-R{round}.md absolute path, with:
 
 ```
 Read the following entries from {absolute-path}/phase-{N}/WHITEBOARD-R{round}.md:
@@ -191,8 +205,10 @@ Output: critique entries only, max 250 tokens.
 
 ### Codex Failure
 
-If codex CLI is not installed or fails at any phase, -cx member reports failure to leader via SendMessage: "Codex failed at {phase}. Skill must terminate."
-Leader terminates the skill immediately. Clean up: delete working directory if it exists, remove temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`).
+| Failure | Action |
+|---------|--------|
+| `codex` not installed, non-zero exit, or timeout at any phase | -cx member reports to leader via SendMessage: "Codex failed at {phase}. Skill must terminate." Leader terminates immediately. Clean up: delete working directory if it exists, remove temp files (`rm -f /tmp/cx-*.txt /tmp/codex-*.txt`) |
+| **Codex usage limit** (codex-engine's Usage-Limit Degradation) | -cx member reports to leader via SendMessage: "Codex usage limit at {phase}{, retry after {time}}." The leader does **not** terminate — it applies -cx Withdrawal (board-engine REFERENCE.md): every -cx member withdraws and the board continues with the remaining members. Never retry the call; capacity returns on a clock |
 
 ### Model recommendation
 
